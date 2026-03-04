@@ -26,7 +26,6 @@ on this stipulation... but it isn't entirely essential now.
   (p/let [room-info     (if (fn? (.-roomInfo room-interface)) (.roomInfo room-interface) nil)
           latest-event  (.latestEvent room-interface)
           room-id       (.-id room-info)
-          _ (log/debug latest-event)
            parents (if space-service
                     (.joinedParentsOfChild space-service room-id)
                     (p/resolved []))
