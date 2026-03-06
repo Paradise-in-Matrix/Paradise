@@ -6,21 +6,21 @@
         "url": "https://github.com/GigiaJ/Paradise"
     },
     "scripts": {
+        "notangle": "concurrently \"npx shadow-cljs watch app\" \"npx vite\"",
         "dev": "concurrently \"npx shadow-cljs watch app\" \"npx nbb src/utils/tangler.cljs\" \"npx vite\"",
+        "release": "npx shadow-cljs release app && npx vite build",
+        "serve": "npx serve -s dist -l 8002",
         "ubrn:web:build:release": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn build web --config ubrn.config.yaml --release",
         "ubrn:web:build": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn build web --config ubrn.config.yaml",
         "ubrn:checkout": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn checkout --config ubrn.config.yaml",
         "ubrn:clean": "rm -Rf cpp/ src/generated/ src/index.web.ts*"
     },
     "dependencies": {
-        "@element-hq/web-shared-components": "0.0.2",
         "@tiptap/core": "^3.20.0",
         "@tiptap/extension-mention": "^3.20.0",
         "@tiptap/extension-placeholder": "^3.20.0",
         "@tiptap/react": "^3.20.0",
         "@tiptap/starter-kit": "^3.20.0",
-        "@vector-im/compound-design-tokens": "^6.0.0",
-        "@vector-im/compound-web": "^8.3.6",
         "generated-compat": "file:./packages/generated-compat",
         "nbb": "^1.4.206",
         "react": "^19",
