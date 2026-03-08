@@ -17,7 +17,6 @@ to force it to use a home-server, but we should likely swap to retrieval
 from re-frame for the client to determine the home-server dynamically.
 This works for now though.
 
-* TODO Swap to using Reframe client for mxc homeserver determination
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
 (defn mxc->url
   "Converts an mxc:// URI to a full HTTP(S) URL.
@@ -27,10 +26,12 @@ This works for now though.
    - :height integer
    - :method 'crop' or 'scale'"
   ([mxc-url] (mxc->url mxc-url {}))
-  ([mxc-url {:keys [type width height method] :or {type :download}}]
+  ([mxc-url {:keys [homeserver type width height method] :or {type :download}}]
    (when (and mxc-url (str/starts-with? mxc-url "mxc://"))
-     (let [server-base (or js/process.env.MATRIX_HOMESERVER
-                           (or js/window.MATRIX_HOMESERVER "https://matrix.org"))
+     (let [db @re-frame.db/app-db
+           server-base (str/replace
+             (or (:homeserver-url db)
+                 (or js/window.MATRIX_HOMESERVER "https://matrix.org")) #"/+$" "")
            resource    (str/replace mxc-url #"^mxc://" "")
            base-path   (str "/_matrix/client/v1/media/" (name type) "/" resource)]
        (if (= type :thumbnail)
@@ -39,6 +40,16 @@ This works for now though.
               "&height=" (or height 48)
               "&method=" (or method "crop"))
          (str server-base base-path))))))
+
+(defn url->mxc [url]
+  (when (string? url)
+    (let [server-base (or js/process.env.MATRIX_HOMESERVER
+                          (or js/window.MATRIX_HOMESERVER "https://matrix.org"))
+          pattern (re-pattern (str "^" server-base "/_matrix/client/v1/media/(download|thumbnail)/"))]
+      (if (str/includes? url server-base)
+        (str "mxc://" (str/replace url pattern ""))
+        url))))
+
 #+end_src
 
 
@@ -46,7 +57,6 @@ This works for now though.
 So using Hickory we can actually just convert the HTML used in formatted messages into
 pure Clojure maps and navigate them natively with ease. Then when we want to display them...
 Just use Reagent.
-
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
 (def max-tag-nesting 100)
 
