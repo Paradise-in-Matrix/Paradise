@@ -23,7 +23,8 @@
          :esm-js-shim false
          :loader {".css" :css}}
         :compiler-options
-        {:optimizations :simple
+        {:optimizations
+         :simple
          :output-feature-set :es-next
          :warnings {:undeclared-ns false
                     :undeclared-var false
