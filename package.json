@@ -16,12 +16,14 @@
         "ubrn:clean": "rm -Rf cpp/ src/generated/ src/index.web.ts*"
     },
     "dependencies": {
+        "@element-hq/element-call-embedded": "^0.12.2",
         "@tiptap/core": "^3.20.0",
         "@tiptap/extension-mention": "^3.20.0",
         "@tiptap/extension-placeholder": "^3.20.0",
         "@tiptap/react": "^3.20.0",
         "@tiptap/starter-kit": "^3.20.0",
         "generated-compat": "file:./packages/generated-compat",
+        "matrix-widget-api": "^1.17.0",
         "nbb": "^1.4.206",
         "react": "^19",
         "react-dom": "^19",
