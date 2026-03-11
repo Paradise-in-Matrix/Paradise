@@ -4,7 +4,8 @@ just shortening or cleaning up usage to patching Vite and other incompatibilitie
 
 #+begin_src clojurescript :tangle ../../src/utils/macros.cljc
 (ns utils.macros
-  (:require [clojure.java.io :as io]))
+  (:require [clojure.java.io :as io]
+            [clojure.edn :as edn]))
 #+end_src
 
 These macros are effectively just wrappers that provide clean
@@ -41,3 +42,23 @@ to write a dynamic import of JSONs for ClojureScript.
     mapping))
 #+end_src
 
+
+Load our static macros and provide them globally
+#+begin_src clojurescript :tangle ../../src/utils/macros.cljs
+(ns utils.macros
+  (:require-macros [utils.macros :refer [load-static-config]]))
+
+(def config (load-static-config "config.edn"))
+#+end_src
+
+Loading non-secret variables at runtime is fairly straightforward.
+We can declare them as a EDN (extensible data notation) file and then
+write them as a Clojure map to easily consume at start.
+This way we don't have to convert or do anything odd to have consistently
+usable configs across the application.
+
+
+#+begin_src clojurescript :tangle ../../src/utils/macros.cljc
+(defmacro load-static-config [path]
+  (edn/read-string (slurp path)))
+#+end_src
