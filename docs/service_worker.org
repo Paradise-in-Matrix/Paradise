@@ -65,6 +65,41 @@ client loading too fast and trying to fetch.
                    (swap! session-resolvers conj resolve)))))
 #+end_src
 
+
+Now this is great if we want to do simple behavior, but the moment we expect
+long-living persistence we might wish to instead check against the IndexedDB
+for individual sessions for a user. This way we can actually support
+multiple accounts at once reliably for even our notification purposes.
+
+Now the immediate thought is that because the Rust SDK pickles our data at
+rest we'd need some way to actually unlock it. So the second part of this
+is to create a small entry in our IndexedDB in which we create entries
+with the access token. 
+
+#+begin_src clojurescript :tangle ../src/service_worker.cljs
+(defn- get-token-from-vault [user-id]
+  (p/create
+   (fn [resolve _]
+     (let [req (.open js/indexedDB "sw-vault" 1)]
+       (set! (.-onsuccess req)
+             (fn [e]
+                 (let [db (.. e -target -result)
+                       tx (try (.transaction db #js ["tokens"] "readonly") (catch :default _ nil))
+                       store (when tx (.objectStore tx "tokens"))
+                       get-req (if (and store user-id)
+                                 (.get store user-id)
+                                 (when store (.getAll store)))]
+                   (if-not get-req
+                     (resolve nil)
+                     (set! (.-onsuccess get-req)
+                           (fn [res]
+                             (let [result (.. res -target -result)]
+                               (if (array? result)
+                                 (resolve (some-> (first result) .-token))
+                                 (resolve (some-> result .-token))))))))))
+       (set! (.-onerror req) #(resolve nil))))))
+#+end_src
+
 If possible we want to manage the cache and we want to also make sure we don't
 cache items that are too old. By caching we provide a level of offline access.
 
