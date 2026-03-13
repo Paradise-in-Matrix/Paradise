@@ -453,18 +453,23 @@ then attaching an onUpdate to easily refresh those entries without much effort.
 We apply a filter to ensure we don't end up with any duplication on the resulting room list and
 apply it. Then we prompt the app to give us the first page for the controller.
 #+begin_src clojurescript :tangle ../../src/room/room_list.cljs
+
 (defn start-room-list-sync! [room-list]
-  (log/debug "Starting Room List Sync!")
-  (let [entries-result (.entriesWithDynamicAdapters room-list 200
-                         #js {:onUpdate #(re-frame/dispatch [:sdk/global-rooms-diff %])})]
-    (re-frame/dispatch [:sdk/save-room-list-handle entries-result])
-    (let [controller (.controller entries-result)
-          default-filter (get-rust-filter "people")]
-      (.setFilter controller default-filter)
-      (.addOnePage controller))
-    (let [loading-result (.loadingState room-list
-                           #js {:onUpdate #(re-frame/dispatch [:sdk/room-list-loading %])})]
-      (re-frame/dispatch [:sdk/room-list-loading (.-state loading-result)]))))
+  (log/debug "Starting Dual Room List Sync (UI + Background)")
+  (p/let [ui-result (.entriesWithDynamicAdapters room-list 200
+                                               #js {:onUpdate #(re-frame/dispatch [:room-list/home-rooms-diff %])})
+        ui-controller (.controller ui-result)
+        bg-result (.entriesWithDynamicAdapters room-list 200
+                                               #js {:onUpdate #(re-frame/dispatch [:room-list/bg-rooms-diff %])})
+        bg-controller (.controller bg-result)]
+
+    (re-frame/dispatch [:room-list/set-filter "people"])
+    (.setFilter ui-controller (get-rust-filter "people"))
+    (.addOnePage ui-controller)
+    (re-frame/dispatch [:room-list/save-home-list-handle ui-result])
+    (.setFilter bg-controller (get-rust-filter "all"))
+    (.addOnePage bg-controller)
+    (re-frame/dispatch [:room-list/save-bg-list-handle bg-result])))
 #+end_src
 
 This is just a simple filter method to deduplicate
