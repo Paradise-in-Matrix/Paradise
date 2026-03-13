@@ -575,59 +575,38 @@ the DMs list or All rooms list as these are best served fresh first.
 For the space rooms themselves we want to flatten as we have described
 above.
 #+begin_src clojurescript :tangle ../../src/room/room_list.cljs
-(re-frame/reg-sub
- :rooms/map
- :<- [:rooms/all]
- (fn [rooms-list _]
-   (into {}
-         (for [room rooms-list]
-           (let [r  (js->clj room :keywordize-keys true)
-                 id (or (:id r) (:roomId r))]
-             [id r])))))
 
 (re-frame/reg-sub
  :rooms/indexed-map
  :<- [:rooms/all]
  (fn [rooms-list _]
-   (into {}
-         (for [room rooms-list]
-           (let [r  (js->clj room :keywordize-keys true)
-                 id (or (:id r) (:roomId r))]
-             [id r])))))
+   (reduce (fn [acc room]
+             (let [id (or (aget room "id") (aget room "roomId"))]
+               (assoc acc id room)))
+           {}
+           rooms-list)))
+
 
 (re-frame/reg-sub
  :rooms/ordered-list
- :<- [:rooms/all]
- (fn [rooms-list _]
-   (mapv #(js->clj % :keywordize-keys true) rooms-list)))
-
+ (fn [db _]
+   (get db :rooms [])))
 
 (re-frame/reg-sub
  :rooms/current-view
  :<- [:spaces/active-id]
  :<- [:rooms/ordered-list]
- :<- [:rooms/indexed-map]
+ :<- [:rooms/unfiltered-indexed-map]
  :<- [:space-children/map]
+ :<- [:rooms/space-orders]
  :<- [:rooms/closed-drawers]
- (fn [[active-id ordered-list indexed-map children-map closed-drawers] _]
+ (fn [[active-id ordered-list indexed-map children-map space-orders closed-drawers] _]
    (if-not active-id
      ordered-list
-     (flatten-tree indexed-map children-map closed-drawers active-id 0))))
+     (flatten-tree indexed-map children-map space-orders closed-drawers active-id 0))))
 
-#_(re-frame/reg-sub
- :rooms/current-view
- :<- [:spaces/active-id]
- :<- [:rooms/ordered-list]
- :<- [:rooms/indexed-map]
- :<- [:room-list/active-filter]
- :<- [:space-children/map]
- :<- [:rooms/closed-drawers]
- (fn [[active-id ordered-list indexed-map active-filter children-map closed-drawers] _]
-   (cond
-     (= active-filter "people")
-     ordered-list
-     :else
-     (flatten-tree indexed-map children-map closed-drawers active-id 0))))
+
+
 
 (re-frame/reg-event-db
  :rooms/toggle-drawer
