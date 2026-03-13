@@ -208,6 +208,145 @@ to grow too large.
               (prune-cache! cache-name MAX_CACHE_ITEMS)]))))
 #+end_src
 
+
+
+
+
+**** Push Notifications
+So an important part to the service worker use is providing the web application
+a way to receive notifications from the background. The general standard implementation
+is WebPush denoted below:
+https://developer.mozilla.org/en-US/docs/Web/API/Push_API
+
+Now the implementation for these is relatively standardized (though for Clojurescript
+perhaps a bit less so).
+We want to simply add the push event listener and then parse the data out.
+We handle the requests in the form Sygnal delivers (though I'm unsure if
+the form is entirely ubiquitous across any push gateway implementation).
+For the sake of these docs currently, I'll be referring to them in the
+context of the Matrix solution Sygnal.
+https://github.com/element-hq/sygnal/blob/main/docs/applications.md#webpush
+
+We also go on to include a notification click in order to provide the future
+behavior on which clicking a notification brings that message into focus.
+Currently, however, it won't be functional as we have not implemented a go-to
+method for messages yet.
+
+It does seem unfortunately that we have no way to determine the recipient of a push...
+Perhaps I'll spend more time on the problem another time, but it is best we get
+this functional first.
+#+begin_src clojurescript :tangle ../src/service_worker.cljs
+(def default-icon "/public/res/apple/apple-touch-icon-180x180.png")
+(def default-badge "/public/res/apple/apple-touch-icon-72x72.png")
+
+(defn- get-session-from-vault [user-id]
+  (p/create
+   (fn [resolve reject]
+     (let [req (.open js/indexedDB "sw-vault" 1)]
+       (set! (.-onsuccess req)
+             (fn [e]
+               (let [db    (.. e -target -result)
+                     tx    (.transaction db #js ["tokens"] "readonly")
+                     store (.objectStore tx "tokens")]
+                 (if user-id
+                   (let [get-req (.get store user-id)]
+                     (set! (.-onsuccess get-req) #(resolve (.. % -target -result)))
+                     (set! (.-onerror get-req) #(resolve nil)))
+                   (let [all-req (.getAll store)]
+                     (set! (.-onsuccess all-req)
+                           (fn [ae]
+                             (let [results (vec (.. ae -target -result))]
+                               (if (empty? results)
+                                 (resolve nil)
+                                 (resolve (->> results
+                                               (sort-by #(.-updated_at %) >)
+                                               first)))))))))))))))
+
+
+
+(defn- fetch-avatar-url [hs-url token mxc-uri]
+  (if (and hs-url token mxc-uri)
+    (let [media-id (clojure.string/replace mxc-uri "mxc://" "")
+          thumb-url (str hs-url "/_matrix/media/v3/thumbnail/" media-id
+                         "?width=96&height=96&method=crop")]
+      (-> (js/fetch thumb-url #js {:headers #js {:Authorization (str "Bearer " token)}})
+          (p/then (fn [resp]
+                    (if (.-ok resp)
+                      (p/let [blob (.blob resp)]
+                        (js/URL.createObjectURL blob))
+                      nil)))
+          (p/catch (fn [_] nil))))
+    (p/resolved nil)))
+
+(defn- fetch-event-content [hs-url token room-id event-id]
+  (let [url (str hs-url "/_matrix/client/v3/rooms/" (js/encodeURIComponent room-id)
+                 "/context/" (js/encodeURIComponent event-id) "?limit=0")]
+    (-> (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})
+        (p/then (fn [resp]
+                  (if (.-ok resp)
+                    (.json resp)
+                    (throw (js/Error. "Failed to fetch event context")))))
+        (p/then (fn [json]
+                  (let [event (.-event json)]
+                    {:body (get-in (js->clj event) ["content" "body"])
+                     :sender (or (.-sender event) "Someone")
+                     }))))))
+
+(defn- show-smart-notification [push-data token hs-url]
+  (let [sender        (or (.-sender_display_name push-data) (.-sender push-data) "Someone")
+        room-name     (.-room_name push-data)
+        room-id       (.-room_id push-data)
+        unread-count  (.-unread push-data)
+        encrypted?    (= (.-type push-data) "m.room.encrypted")
+        avatar-mxc    (or (some-> push-data .-content .-avatar_url)
+                          (some-> push-data .-sender_avatar_url))
+        body          (if encrypted?
+                        "🔒 Encrypted Message"
+                        (or (some-> push-data .-content .-body) "New Message"))
+        title         (if room-name (str sender " in " room-name) sender)]
+
+    (when (exists? js/navigator.setAppBadge)
+      (if (and unread-count (pos? unread-count))
+        (.setAppBadge js/navigator unread-count)
+        (when (= unread-count 0)
+          (.clearAppBadge js/navigator))))
+
+    (p/let [icon-url (fetch-avatar-url hs-url token avatar-mxc)]
+      (.showNotification js/self.registration title
+        #js {:body   body
+             :icon   (or icon-url default-icon)
+             :badge  default-badge
+             :tag    (or room-id "matrix-chat")
+             :data   #js {:room_id room-id}}))))
+
+(js/self.addEventListener "push"
+  (fn [event]
+    (let [data (try (.. event -data json) (catch :default _ nil))]
+      (when data
+        (let [user-id (.-user_id data)]
+          (.waitUntil event
+            (p/let [session (get-session-from-vault user-id)
+                    token   (some-> session .-token)
+                    hs-url  (some-> session .-hs_url)]
+              (show-smart-notification data token hs-url))))))))
+
+
+(js/self.addEventListener "notificationclick"
+  (fn [event]
+    (let [notification (.-notification event)
+          room-id      (.. notification -data -room_id)]
+      (.close notification)
+
+      (.waitUntil event
+        (p/let [clients (.matchAll js/self.clients #js {:type "window" :includeUncontrolled true})
+                tab (first clients)]
+          (if tab
+            (do
+              (.focus tab)
+              (.postMessage tab #js {:type "NAVIGATE_TO_ROOM"
+                                     :room_id room-id}))
+            (.openWindow js/self.clients "/")))))))
+#+end_src
 Shadow-cljs seems to be a bit opinionated in how it generates the service worker file.
 That and the documentation for web-workers isn't amazingly clear, nonetheless it does
 provide enough info continue anyway.
