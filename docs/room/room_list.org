@@ -876,11 +876,31 @@ checking for the "kind" of room. For now though, this is plenty sufficient.
                      (long-press-props #(open-menu-fn nil %1 %2)))
               [:span.drawer-arrow "▼"]
               [:span.drawer-name (str/upper-case name)]]
-             [:div.room-item
-              {:style {:padding-left (str indent "px")}
-               :class (when (= id active-room) "active")
-               :on-click #(re-frame/dispatch [:rooms/select id])}
-              (if (= active-filter "people")
+             [:div.room-container
+              [:div.room-item
+               (merge {:style {:padding-left (str indent "px")}
+                       :class [(when (= id active-room) "active")
+                               (when unread? "has-unread")
+                               (when highlight? "has-highlight")]
+                       :on-click #(re-frame/dispatch [:rooms/select id])
+                       :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
+                      (long-press-props #(open-menu-fn nil %1 %2)))
+               (cond
+                 is-call?
+                 [:svg {:viewBox "0 0 24 24"
+                        :width "16px"
+                        :height "16px"
+                        :style {:margin-right "8px"
+                                :fill "none"
+                                :stroke "currentColor"
+                                :stroke-width "2.5"
+                                :stroke-linecap "round"
+                                :stroke-linejoin "round"}}
+                  [:path {:d "M11 5L6 9H2v6h4l5 4V5z"}]
+                  (when has-call?
+                    [:path {:d "M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"}])]
+                 (and (= active-filter "people") (not space-id))
+
                  [avatar {:id id :name name :url avatar-url :size 24 :status :online}]
                  [:span.room-hash "# "])
               [:span.room-name name]
