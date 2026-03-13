@@ -791,7 +791,7 @@ entire room list to reload. Hopefully not.
  :room-list/apply-filter
  (fn [{:keys [db]} [_ filter-id]]
    (let [current-filter (:active-filter-id db)
-         controller     (:room-list-controller db)]
+         controller     (:home-list-controller db)]
      (cond
        (= current-filter filter-id)
        (do (log/debug "Filter already set to:" filter-id)
