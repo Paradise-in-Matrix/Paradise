@@ -236,6 +236,67 @@ we rely on the list for our room list view behaviors (even if the space loads a
 
 
 
+Prior we had a very verbose and repeated diffs check, but
+as our timeline, spaces, and room list all share the same
+general patterns to handling diffs we can consolidate them and
+call them like so.
+So all we need to do is ask reframe for the current global rooms
+and call the diff check against those rooms and the updates
+to set the "new" global rooms. This will make our global list
+refresh automatically.
+Later we can apply filters on it to induce specific behavior
+like creating a DM grouping.
+
+To add onto this, but we use a mutex to ensure that the rust-sdk
+doesn't ever end up in a state where the diffs aren't readily
+available to refresh our window. We don't slow the rust-sdk down,
+but instead establish a queue for our code to process them
+and notify reframe properly.
+#+begin_src clojurescript :tangle ../../src/room/room_list.cljs
+(defonce !room-mutex (atom (p/resolved nil)))
+(defn apply-home-diffs-async! [updates]
+  (swap! !room-mutex
+         (fn [prev-promise]
+           (p/then prev-promise
+                   (fn []
+                     (let [db @re-frame.db/app-db
+                           current-rooms (get db :rooms [])
+                           space-service (:space-service db)
+                           client (:client db)]
+                       (-> (apply-matrix-diffs current-rooms updates #(parse-room client space-service %))
+                           (p/then (fn [next-rooms]
+                                     (re-frame/dispatch-sync [:room-list/set-home-rooms-sync next-rooms])
+                                     (re-frame/dispatch [:room-list/set-home-rooms next-rooms])))
+                           (p/catch (fn [err]
+                                      (log/error "Global Diff Panic:" err)
+                                      nil)))))))))
+
+
+(re-frame/reg-event-fx
+ :room-list/home-rooms-diff
+ (fn [_ [_ updates]]
+   (apply-home-diffs-async! updates)
+   {}))
+
+(re-frame/reg-event-db
+ :room-list/set-home-rooms-sync
+ (fn [db [_ rooms]]
+   (assoc db :rooms rooms)))
+
+(re-frame/reg-event-fx
+ :room-list/set-home-rooms
+ (fn [_ [_ rooms]]
+   (let [top-room-ids (take 5 (map #(.-id %) rooms))]
+     {:dispatch [:sdk/preload-timelines top-room-ids]})))
+
+(re-frame/reg-event-db
+ :room-list/save-home-list-handle
+ (fn [db [_ result]]
+   (assoc db
+          :home-list-result result
+          :home-list-controller (.controller result))))
+
+#+end_src
 We can simplify (and diverge) from Aurora's implementation as View models are very rigid
 and lock us into a certain pattern. Instead we'll just let reframe know the diff and let
 it handle re-rendering directly.
