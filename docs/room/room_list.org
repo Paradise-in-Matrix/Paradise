@@ -661,13 +661,62 @@ above.
 #+end_src
 
 
+So notification handling is actually a fairly annoying process if we want the
+smooth visual users expect. We need to bubble up the unread count for every
+room within a space. This meant we needed to have the parent-child relationships
+mapped out and then flatten them into a calculatable total.
+The parent-child mapping process is documented above, but amusingly is
+one of the more complex aspects of spaces and rooms.
 
+To a much easier degree, we need to also calculate the unread count for DMs.
+This is mostly useful for presenting that info on the space bar cleanly.
+Otherwise we would just re-use (and probably should see if we can)
+the method we have for all other rooms.
+#+begin_src clojurescript :tangle ../../src/room/room_list.cljs
+(re-frame/reg-sub
+ :space/unread-stats
+ :<- [:rooms/unfiltered-indexed-map]
+ :<- [:space-children/map]
+ :<- [:rooms/space-orders]
+ (fn [[rooms-map children-map space-orders] [_ space-id]]
+   (log/error space-id)
+   (let [rooms-in-space (flatten-tree rooms-map children-map space-orders #{} space-id 0)
+         _ (log/error rooms-in-space)
+         stats (reduce (fn [acc room]
+                         (let [notifs (get room :unreadNotificationsCount 0)
+                               mentions (get room :unreadMentionsCount 0)]
+                           (-> acc
+                               (update :notifs + notifs)
+                               (update :mentions + mentions))))
+                       {:notifs 0 :mentions 0}
+                       rooms-in-space)
+         _ (log/error stats)
+         ]
+     {:unread? (pos? (:notifs stats))
+      :notif-count (:notifs stats)
+      :mentions (:mentions stats)
+      :highlight? (pos? (:mentions stats))})))
 
-(re-frame/reg-event-fx
- :sdk/restore-global-list
- (fn [{:keys [db]} _]
-   (let [global-rooms (vals (:rooms db))]
-     {:db (assoc db :space-rooms (vec global-rooms))})))
+(re-frame/reg-sub
+ :rooms/active-dm-pops
+ :<- [:rooms/unfiltered-indexed-map]
+ (fn [rooms-map _]
+   (->> (vals rooms-map)
+        (filter #(aget % "isDirect"))
+        (filter #(pos? (or (aget % "unreadMessagesCount") 0)))
+        (sort-by #(or (aget % "last_message_ts") 0) >)
+        (map (fn [r]
+               (let [msg-count (or (aget r "unreadMessagesCount") 0)
+                     mentions  (or (aget r "unreadMentionsCount") 0)]
+                 {:id         (aget r "id")
+                  :name       (aget r "name")
+                  :avatar-url (aget r "avatar")
+                  :is-dm?     true
+                  :unread?    (pos? msg-count)
+                  :highlight? (pos? mentions)
+                  :mentions   msg-count}))))))
+
+#+end_src
 
 (re-frame/reg-event-db
  :sdk/save-room-list-handle
