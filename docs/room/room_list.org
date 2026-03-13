@@ -902,10 +902,59 @@ checking for the "kind" of room. For now though, this is plenty sufficient.
                  (and (= active-filter "people") (not space-id))
 
                  [avatar {:id id :name name :url avatar-url :size 24 :status :online}]
+
+                 :else
                  [:span.room-hash "# "])
-              [:span.room-name name]
-              (when (> (or notification-count 0) 0)
-                [:div.badge notification-count])]))))}]))
+               [:span.room-name name]
+               (when has-call?
+                 [:div.call-participants.hide-on-desktop
+                  {:style {:display "flex"
+                           :margin-left "auto"
+                           :margin-right "8px"}}
+                  (for [participant call-participants]
+                    ^{:key (str "mobile-call-" (or (:userId participant) participant))}
+                    [:div {:style {:margin-left "-8px"
+                                   :border "2px solid var(--bg-color)"
+                                   :border-radius "50%"}}
+                     [avatar {:id (or (:userId participant) participant)
+                              :url (or (:avatarUrl participant) nil)
+                              :size 20}]])])
+               (when unread?
+                 [:div.notification-badge
+                  {:class (when highlight? "highlight")}
+                  (if (> notif-count 99) "99+" notif-count)])]
+              (when has-call?
+                [:div.desktop-call-list.hide-on-mobile
+                 {:style {:display "flex"
+                          :flex-direction "column"
+                          :padding-left (str (+ indent 24) "px")}}
+                 (for [participant call-participants]
+                   (let [p-id   (or (:userId participant) participant)
+                         ;; Proper method seems to be
+                         ;; (.memberAvatarUrl (.getRoom client id) participant)
+                         ;; However, we need to build out the Member list for a
+                         ;; Room first. That way we can just reference
+                         ;; The generated list and not try
+                         ;; To resolve a promise here
+                         p-name (or (:displayName participant) p-id)
+                         p-url  (or (:avatarUrl participant) nil)]
+                     ^{:key (str "desktop-call-" p-id)}
+                     [:div.call-participant-item
+                      {:style {:display "flex"
+                               :align-items "center"
+                               :padding "4px 8px"
+                               :gap "8px"
+                               :cursor "pointer"}
+                       :on-click (fn [e]
+                                   (.stopPropagation e)
+                                   (re-frame/dispatch [:ui/open-user-profile p-id]))}
+                      [avatar {:id p-id :name p-name :url p-url :size 20}]
+                      [:span {:style {:font-size "0.85rem"
+                                      :color "var(--text-secondary)"
+                                      :overflow "hidden"
+                                      :text-overflow "ellipsis"
+                                      :white-space "nowrap"}}
+                       p-name]]))])]))))}]))
 #+end_src
 
 Now for our room list component itself, we have three subscriptions requested from reframe
@@ -913,12 +962,14 @@ We want to make sure the component updates if our rooms change, our active space
 or our active room changes. We then add some decorating Hiccup around it to round out the
 component.
 #+begin_src clojurescript :tangle ../../src/room/room_list.cljs
+
 (defn room-list []
   (let [rooms          @(re-frame/subscribe [:rooms/current-view])
         active-room    @(re-frame/subscribe [:rooms/active-id])
         active-space-id   @(re-frame/subscribe [:spaces/active-id])
         active-space    @(re-frame/subscribe [:spaces/active-metadata])
         closed-drawers @(re-frame/subscribe [:rooms/closed-drawers])
+        client          @(re-frame/subscribe [:sdk/client])
         room-array     (to-array rooms)]
 
     [:div.sidebar-rooms
@@ -931,7 +982,7 @@ component.
      (if (or (nil? room-array) (== (alength room-array) 0))
        [:div.empty-state "No rooms here..."]
        [:div.room-collection {:style {:flex 1 :min-height 0}}
-        [virtualized-room-list room-array active-space active-room closed-drawers]])]))
+        [virtualized-room-list client room-array active-space active-room closed-drawers]])]))
 #+end_src
 
 
