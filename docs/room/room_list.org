@@ -661,13 +661,6 @@ above.
 #+end_src
 
 
-(re-frame/reg-event-db
- :sdk/hydrate-rooms
- (fn [db [_ js-rooms]]
-   (let [rooms (js->clj js-rooms :keywordize-keys true)
-         rooms-map (into {} (for [r rooms]
-                              [(or (:id r) (:roomId r)) r]))]
-     (assoc db :rooms rooms-map))))
 
 
 (re-frame/reg-event-fx
