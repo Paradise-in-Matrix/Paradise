@@ -15,7 +15,8 @@ We do not want the user to download the WASM ever again unless we change it.
 (ns service-worker
   (:require [clojure.string :as str]
             [promesa.core :as p]
-            ["workbox-precaching" :refer [precacheAndRoute]]))
+            ["workbox-precaching" :refer [precacheAndRoute cleanupOutdatedCaches]]
+            ))
 #+end_src
 
 The message event is how the client communicates with the service worker.
