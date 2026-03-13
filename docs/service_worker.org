@@ -347,6 +347,11 @@ this functional first.
                                      :room_id room-id}))
             (.openWindow js/self.clients "/")))))))
 #+end_src
+
+
+
+
+
 Shadow-cljs seems to be a bit opinionated in how it generates the service worker file.
 That and the documentation for web-workers isn't amazingly clear, nonetheless it does
 provide enough info continue anyway.
