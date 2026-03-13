@@ -442,6 +442,8 @@ as well.
 
 
 #+end_src
+
+
 We can simplify (and diverge) from Aurora's implementation as View models are very rigid
 and lock us into a certain pattern. Instead we'll just let reframe know the diff and let
 it handle re-rendering directly.
