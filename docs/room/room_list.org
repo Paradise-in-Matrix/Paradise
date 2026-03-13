@@ -719,6 +719,28 @@ the method we have for all other rooms.
 #+end_src
 
 
+
+This is not an ideal implementation. If the room somehow changes type we will
+never know. It shouldn't happen often, but in the future we should have
+better access to the room type on the Room object itself.
+However, as we don't have access to that currently we instead must
+resolve the preview promise here and memoize it. That way we only
+ever do this once per room.
+#+begin_src clojurescript :tangle ../../src/room/room_list.cljs
+(defn room-type-call? [db room-id]
+  (let [summary (get-in db [:rooms-unfiltered-cache room-id])
+        preview (when summary (aget summary "room-preview"))
+        info    (when preview (.info @preview))
+        type    (when info (.-roomType info))
+        tag     (when type (.-tag type))]
+    (when tag (and (= "Custom" tag)
+                   (= "org.matrix.msc3417.call" (.-value (.-inner type)))))))
+
+(re-frame/reg-sub
+ :room/is-call?
+ (fn [db [_ room-id]]
+   (room-type-call? db room-id)))
+#+end_src
 Selection is likely the biggest component of rooms as far as users are concerned.
 This mechanism actually has to fulfill a few roles such as correctly entering
 the correct state for calling or opening the correct panels given the current
