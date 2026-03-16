@@ -1,5 +1,12 @@
+
+** Helper functions
+
+
+**** Preface
 So there a couple methods that don't mesh perfectly in any one location that for now we'll define here.
 
+
+**** Imports
 
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
 (ns utils.helpers
@@ -10,6 +17,10 @@ So there a couple methods that don't mesh perfectly in any one location that for
    [clojure.walk :as walk]
    [taoensso.timbre :as log]))
 #+end_src
+
+
+
+**** Mxc->Url/Url->Mxc
 
 This just provides a mechanism to convert mxc urls to usable urls
 according to the Matrix spec. Now it is convenient to be able
@@ -53,6 +64,7 @@ This works for now though.
 #+end_src
 
 
+**** Hickory HTML Parsing
 
 So using Hickory we can actually just convert the HTML used in formatted messages into
 pure Clojure maps and navigate them natively with ease. Then when we want to display them...
@@ -206,6 +218,7 @@ Just use Reagent.
    (into [:<>] children)])
 #+end_src
 
+**** Date formatting
 
 We need to be able to convert timestamps to date otherwise people might not be too fond of reading them. Haha.
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
