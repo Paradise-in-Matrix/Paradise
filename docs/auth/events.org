@@ -83,47 +83,282 @@ Probably needs a better name (and logical grouping)
 
 ***** Login Field
 
+#+begin_src clojurescript :tangle ../../src/auth/events.cljs
+(defn login-field [{:keys [id label type value on-change disabled]}]
+  [:div.field-group.mb-4
+   [:label.field-label {:for id} label]
+   [:input.field-input
+    {:id id
+     :type (or type "text")
+     :value value
+     :on-change on-change
+     :disabled disabled}]])
+
+#+end_src
 
 
 ***** Login Screen
 
+This needs to be broken up a good bit, but it'll suffice for now
+
 #+begin_src clojurescript :tangle ../../src/auth/events.cljs
 (defn login-screen []
-  (let [fields (r/atom {:hs (or js/process.env.MATRIX_HOMESERVER "")
+  (let [fields (r/atom {:hs (or js/process.env.MATRIX_HOMESERVER "https://matrix.org")
                         :user ""
                         :pass ""})]
     (fn []
-      (let [error @(re-frame/subscribe [:auth/error])
-            status @(re-frame/subscribe [:auth/status])]
-        [:div.login-container.flex.flex-col.items-center.justify-center.h-screen.bg-gray-900
-         [:h2.text-white.mb-4 "Paradise Login"]
+      (let [error    @(re-frame/subscribe [:auth/error])
+            status   @(re-frame/subscribe [:auth/status])
+            accounts @(re-frame/subscribe [:settings/available-accounts])
+            auth?    (= status :authenticating)]
+        [:div.auth-page-container
+         [:div.auth-card
+          [:div.auth-header
+           [:h2 "Welcome to Paradise."]
+           [:p "Make yourself comfy."]]
 
-         (when error
-           [:div.text-red-500.mb-4 error])
+          (when error
+            [:div.auth-error-message error])
 
-         [:input.mb-2.p-2.rounded.bg-gray-700.text-white
-          {:type "text" :placeholder "Homeserver" :value (:hs @fields)
-           :on-change #(swap! fields assoc :hs (.. % -target -value))
-           :disabled (= status :authenticating)}]
+          (when (seq accounts)
+            [:div.account-chooser.mb-6
+             [:h3.text-sm.font-bold.mb-2 "Continue as:"]
+             [:div.accounts-list
+              (for [acc accounts]
+                ^{:key (:userId acc)}
+                [:div.account-chooser-item
+                 {:style {:display "flex" :align-items "center" :padding "8px"
+                          :border "1px solid var(--border)" :border-radius "8px"
+                          :cursor "pointer" :margin-bottom "8px"}
+                  :on-click #(re-frame/dispatch [:auth/switch-account (:userId acc)])}
+                 ;; Should probably use the actual avatar later. This'll do for now
+                 [:div.avatar-placeholder {:style {:margin-right "12px"}} "👤"]
+                 [:div.account-details
+                  [:div.account-id {:style {:font-weight "bold"}} (:userId acc)]
+                  [:div.account-hs {:style {:font-size "0.8em" :color "gray"}} (:hs_url acc)]]])]
+             [:div.divider {:style {:text-align "center" :margin "16px 0" :color "gray"}} "— or log in to another —"]])
 
-         [:input.mb-2.p-2.rounded.bg-gray-700.text-white
-          {:type "text" :placeholder "Username"
-           :on-change #(swap! fields assoc :user (.. % -target -value))
-           :disabled (= status :authenticating)}]
+          [:form.auth-form
+           {:on-submit (fn [e]
+                         (.preventDefault e)
+                         (re-frame/dispatch [:auth/login (:hs @fields) (:user @fields) (:pass @fields)]))}
+           [login-field
+            {:id "hs" :label "Homeserver" :value (:hs @fields)
+             :disabled auth? :on-change #(swap! fields assoc :hs (.. % -target -value))}]
 
-         [:input.mb-2.p-2.rounded.bg-gray-700.text-white
-          {:type "password" :placeholder "Password"
-           :on-change #(swap! fields assoc :pass (.. % -target -value))
-           :disabled (= status :authenticating)}]
+           [login-field
+            {:id "user" :label "Username" :value (:user @fields)
+             :disabled auth? :on-change #(swap! fields assoc :user (.. % -target -value))}]
 
-         [:button.p-2.rounded.bg-blue-600.text-white.hover:bg-blue-500
-          {:disabled (= status :authenticating)
-           :on-click (fn [e]
-                       (.preventDefault e)
-                       (re-frame/dispatch [:auth/login (:hs @fields) (:user @fields) (:pass @fields)]))}
-          (if (= status :authenticating) "Logging in..." "Login")]]))))
+           [login-field
+            {:id "pass" :label "Password" :type "password" :value (:pass @fields)
+             :disabled auth? :on-change #(swap! fields assoc :pass (.. % -target -value))}]
+
+           [:button.btn-primary.w-full
+            {:type "submit" :disabled auth?}
+            (if auth? "Logging in..." "Login")]
+
+           [:div.auth-footer
+            "Need an account? " [:a.link {:href "#"} "Register"]]]]]))))
 #+end_src
 
 
 ***** CSS
+
+We likely need to redo the above component and make the naming scheme
+more meaningfully accurate.
+
+#+begin_src css :tangle ../../css/login.css
+.auth-page-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: var(--bg-tertiary);
+}
+
+
+.auth-card {
+  width: 100%;
+  max-width: 480px;
+  padding: 32px;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+.auth-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 8px;
+}
+
+.auth-header p {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--header-secondary);
+  margin-bottom: 8px;
+}
+
+.field-input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 3px;
+  background-color: var(--bg-input);
+  color: var(--text-normal);
+  border: none;
+}
+
+.field-input:focus {
+  outline: 2px solid var(--blurple);
+}
+
+.auth-error-message {
+  color: var(--text-danger);
+  font-size: 14px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+
+
+.field-input {
+    width: 100%;
+    padding: 10px 12px;
+    background-color: var(--bg-input);
+    color: #dbdee1;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    transition: border-color 0.2s ease;
+    outline: none;
+}
+
+:root {
+    --bg-secondary: #313338;
+    --bg-input: #1e1f22;
+    --bg-tertiary: #2b2d31;
+    --blurple: #5865f2;
+}
+
+.field-input:focus {
+    border-color: var(--blurple);
+    background-color: var(--bg-input-focus, var(--bg-input));
+}
+
+.btn-primary {
+    background-color: var(--blurple);
+    color: white;
+    padding: 12px;
+    font-weight: 500;
+    font-size: 16px;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--blurple-hover);
+}
+
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+
+.field-group {
+    margin-bottom: 20px;
+}
+
+.field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--header-secondary);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+}
+
+
+.boot-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary, #1e1f22);
+  z-index: 9999;
+}
+
+.boot-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.boot-logo-wrapper {
+  margin-bottom: 24px;
+}
+
+.paradise-logo {
+  width: 80px;
+  height: 80px;
+  background-color: var(--blurple, #5865f2);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: 800;
+  border-radius: 28%;
+  animation: logo-pulse 1.8s infinite ease-in-out;
+}
+
+.boot-loading-text {
+  color: var(--text-muted, #b5bac1);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+
+@keyframes logo-pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.boot-loading-text span[class^="dot-"] {
+  animation: dot-fade 1.4s infinite both;
+}
+
+.dot-two { animation-delay: 0.2s; }
+.dot-three { animation-delay: 0.4s; }
+
+@keyframes dot-fade {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+#+end_src
+
 
