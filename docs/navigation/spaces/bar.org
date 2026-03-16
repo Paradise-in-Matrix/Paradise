@@ -1,0 +1,631 @@
+
+** Spaces
+
+Spaces rendering. Now Aurora doesn't actually have a way to render spaces on the side bar currently, so we'll now be starting to cook up
+our own solutions for things.
+
+The logical starting point is ensuring that there isn't any internal structure for the Rust sdk that trivializes this further.
+I am aware, however, that as spaces are just rooms the room object contains a flag that outlines whether an item is a space or
+not (among many other indicators).
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(ns navigation.spaces.bar
+  (:require [promesa.core :as p]
+            [re-frame.core :as re-frame]
+            [re-frame.db :as db]
+            [reagent.core :as r]
+            ["react-virtuoso" :refer [Virtuoso]]
+            [client.state :as state :refer [sdk-world]]
+            [room.room-list :refer [process-parent-queue!]]
+            [client.diff-handler :refer [apply-matrix-diffs apply-generic-diffs!]]
+            [spaces.settings :refer [sidebar-profile-mini]]
+            [utils.helpers :refer [mxc->url]]
+            [utils.global-ui :refer [avatar]]
+            [taoensso.timbre :as log]))
+#+end_src
+
+
+**** Parsing Space Children
+
+Handle space children which are much simpler than just room summaries.
+It is interesting that they aren't just room objects, but they
+aren't particularly useful in the current sdk.
+
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(defn parse-space-child [obj]
+  (let [id   (or (.-roomId obj) (.-id obj))
+        name (or (.-displayName obj) (.-name obj) "Unknown")
+        type-tag (some-> obj .-roomType .-tag)
+        _ (log/warn name)
+        ]
+    (if-not id
+      nil
+      {:id        id
+       :name      name
+       :avatar-url (.-avatarUrl obj)
+       :is-space? (= type-tag "Space")
+       :raw-room  obj})))
+#+end_src
+
+
+**** Diff Handling
+
+We'll make this behavior global later. Room, timeline, and spaces can use it the same.
+We describe it in the method doc, but effectively it provides a buffer to the reframe
+without slowing don't the rust-sdk.
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+
+(defonce !global-space-mutex (atom (p/resolved nil)))
+
+(defn apply-global-spaces-diffs! [updates]
+  (apply-generic-diffs!
+   {:!mutex      !global-space-mutex
+    :db-path     [:spaces-list]
+    :parse-fn
+    #(parse-space-child %)
+    :sync-event  [:sdk/set-spaces-list-sync]
+    :async-event [:sdk/process-spaces]
+    :updates     updates}))
+
+(defonce !space-mutexes (atom {}))
+
+(defn apply-space-rooms-diffs! [space-id updates]
+  (swap! !space-mutexes update space-id #(or % (atom (p/resolved nil))))
+  (apply-generic-diffs!
+   {:!mutex      (get @!space-mutexes space-id)
+    :db-path     [:space-rooms space-id]
+    :parse-fn    #(parse-space-child %)
+    :sync-event  [:sdk/update-space-view space-id]
+    :async-event nil
+    :updates     updates}))
+
+#+end_src
+
+
+
+**** Initializing the Space Service
+
+This is just using the space-service to start subscribing to the
+top-level spaces for the user. We need these to start building
+out the parent-child relationships.
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(defn init-space-service! [client]
+  (p/let [space-service (.spaceService client)
+          _ (re-frame/dispatch [:sdk/set-space-service space-service])
+          listener #js {:onUpdate #(apply-global-spaces-diffs! %)}
+          sub (.subscribeToJoinedSpaces space-service listener)
+          initial-spaces (.joinedSpaces space-service)
+          _ (js/console.log initial-spaces)
+          _ (re-frame/dispatch [:sdk/set-global-space-sub sub])
+          initial-spaces (.joinedSpaces space-service)]
+    (process-parent-queue!)))
+
+(re-frame/reg-event-db
+ :sdk/save-space-sub
+ (fn [db [_ space-id space-list sub-handle]]
+   (assoc-in db [:space-subs space-id] {:list space-list :sub sub-handle})))
+
+
+(re-frame/reg-event-db
+ :sdk/set-global-space-sub
+ (fn [db [_ sub-handle]]
+   (assoc db :global-space-sub sub-handle)))
+
+(re-frame/reg-event-db
+ :sdk/set-spaces-list-sync
+ (fn [db [_ spaces-vec]]
+   (assoc db :spaces-list spaces-vec)))
+
+
+(re-frame/reg-event-fx
+ :sdk/process-spaces
+ (fn [{:keys [db]} [_ parsed-spaces-array]]
+   (let [new-spaces-map (into {} (for [s parsed-spaces-array
+                                       :when (:id s)]
+                                   [(:id s) s]))
+         existing-subs (or (:space-subs db) {})
+         space-service (:space-service db)
+         new-space-ids (remove #(contains? existing-subs %) (keys new-spaces-map))]
+     {:db (assoc db :spaces new-spaces-map)
+      :dispatch-n (for [id new-space-ids]
+                    [:sdk/boot-background-space-list space-service id])
+      })))
+#+end_src
+
+
+**** Booting the space lists
+
+So for the actual spaces themselves. We need to watch their rooms independently and paginate. Currently we'll keep it simple
+as pagination will just make it render more rooms. Not entirely necessary at the moment. The benefit of doing it like this
+is that we keep space loading at effectively O(1) since we're just asking the Rust SDK which already has built the dependency
+graph out for us what the Space contains.
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(re-frame/reg-event-fx
+ :sdk/boot-background-space-list
+ (fn [_ [_ service space-id]]
+   (-> (.spaceRoomList service space-id)
+       (.then (fn [space-list]
+                (let [listener #js {:onUpdate (fn [diffs] (apply-space-rooms-diffs! space-id diffs))}]
+                  (try
+                    (p/let [sub-handle (.subscribeToRoomUpdate space-list listener)
+                            _ (re-frame/dispatch [:sdk/save-space-sub space-list sub-handle])
+                            _ (.paginate space-list)
+
+                            ]
+                      ;;(apply-space-rooms-diffs! space-id #js {:tag "Reset" :inner initial-rooms})
+                      )
+                    (catch :default e
+                       (js/console.error "FFI Subscription Panic:" e))))))
+       (.catch (fn [err]
+                 (js/console.error "Failed to boot space list for" space-id ":" err))))
+   {}))
+#+end_src
+
+Now the UI component will need to know to load enough to fill its area, so there needs to be a method to actually
+paginate directly.
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(re-frame/reg-event-fx
+ :sdk/paginate-space
+ (fn [{:keys [db]} [_ space-id]]
+   (let [space-sub (get-in db [:space-subs space-id])
+         space-list (:list space-sub)]
+     (when space-list
+       (.paginate space-list))
+     {})))
+#+end_src
+
+
+Here are some implementations we were toying with to test
+if the SpaceRoomLists would be useful
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(re-frame/reg-event-fx
+ :room-list/paginate-global
+ (fn [{:keys [db]} _]
+   (when-let [controller (:room-list-controller db)]
+     (.addOnePage controller))
+   {}))
+
+(re-frame/reg-event-fx
+ :sdk/paginate-space-fully
+ (fn [{:keys [db]} [_ space-id]]
+   (let [space-sub  (get-in db [:space-subs space-id])
+         space-list (:list space-sub)]
+     (when space-list
+       (-> (.paginate space-list)
+           (.then (fn [has-more?]
+                    (log/debug "Pagination returned:" has-more?)
+                    (if has-more?
+                      (re-frame/dispatch [:sdk/paginate-space-fully space-id])
+                      (log/debug "Fully loaded all rooms for space:" space-id))))
+           (.catch (fn [err]
+                     (log/error "Pagination panic for space:" space-id err)))))
+     {})))
+#+end_src
+
+
+
+**** Fetching the Space Hierarchy
+
+Bit of an issue in the version of the sdk, but since we do need some state
+events (as the sdk lacks a coherent method) we must do some operations
+ourself. When we update I would imagine some of these will disappear.
+For now though, to determine the actual hierarchy we need the hierarchy
+end point itself which will easily allow us to sort Spaces.
+We do eventually need to clean up the filter as this will cause
+repeat fetches for the space rooms for now.
+
+We'll keep the re-frame portion here are well simply because I expect
+this to be removed later.
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(defn fetch-space-hierarchy [space-id]
+  (let [client @(re-frame/subscribe [:sdk/client])
+        base-url (.homeserver client)
+        token (.-accessToken (.session client))
+        url (str base-url "_matrix/client/v1/rooms/" space-id "/hierarchy")]
+    (-> (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})
+        (p/then #(.json %))
+        (p/then (fn [json]
+                  (let [resp (js->clj json :keywordize-keys true)]
+                    (re-frame/dispatch [:rooms/process-hierarchy space-id (:rooms resp)])))))))
+#+end_src
+
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(re-frame/reg-event-fx
+ :sdk/fetch-space-hierarchy
+ (fn [_ [_ space-id]]
+   (fetch-space-hierarchy space-id)
+   {}))
+#+end_src
+
+
+
+**** Reframe Components (Meta info)
+
+These are a stub until later.
+
+Mostly for providing meta info about the space lists or space
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(re-frame/reg-sub
+ :spaces/all
+ (fn [db _]
+   (get db :spaces-list [])))
+
+(re-frame/reg-sub
+ :spaces/active-id
+ (fn [db _]
+   (:active-space-id db)))
+
+(re-frame/reg-sub
+ :spaces/active-metadata
+ :<- [:spaces/active-id]
+ :<- [:spaces/all]
+ (fn [[active-id all-spaces] _]
+   (when active-id
+     (some #(when (= (:id %) active-id) %) all-spaces))))
+
+(re-frame/reg-sub
+ :space-children/map
+ (fn [db _]
+   (:space-children db)))
+
+
+(re-frame/reg-sub
+ :space-rooms-map
+ (fn [db _]
+   (or (:space-rooms db) {})))
+
+(re-frame/reg-sub
+ :sdk/space-service
+ (fn [db _]
+   (:space-service db)))
+
+(re-frame/reg-sub
+ :space/children
+ :<- [:space-children]
+ :<- [:rooms/all]
+ (fn [[rel-map all-rooms] [_ parent-id]]
+   (let [child-refs (get rel-map parent-id [])
+         _ (log/debug "Hit?")
+         _ (log/debug all-rooms)
+         rich-lookup (into {} (map (fn [r] [(or (:id r) (.-roomId r)) r]) all-rooms))
+         _ (log/debug rich-lookup)
+         ]
+     (mapv (fn [{:keys [id is-space?]}]
+             (let [rich-room (get rich-lookup id)]
+               (merge {:id id :is-space? is-space? :name "Loading..."}
+                      rich-room)))
+           child-refs))))
+
+(re-frame/reg-event-db
+ :sdk/update-space-view
+ (fn [db [_ space-id space-items]]
+   (let [children-refs (mapv (fn [item]
+                               {:id        (or (:id item) (.-roomId item) (.-id item))
+                                :is-space? (:is-space? item)})
+                             space-items)
+         _ (log/debug children-refs)
+         ]
+     (assoc-in db [:space-children space-id] children-refs))))
+
+(re-frame/reg-event-db
+ :sdk/set-space-service
+ (fn [db [_ service]]
+   (assoc db :space-service service)))
+#+end_src
+
+
+**** Selection
+
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(re-frame/reg-event-fx
+ :space/select
+ (fn [{:keys [db]} [_ space-id]]
+   (let [current-space (:active-space-id db)]
+     (if (= current-space space-id)
+       (do (process-parent-queue!)
+       {})
+       {:db (-> db
+                (assoc :active-space-id space-id)
+                (assoc :active-room-id nil))
+        :dispatch-n (if space-id
+                      [[:sdk/paginate-space space-id]
+;;                       [:room-list/apply-filter "all"]
+                       [:sdk/fetch-space-hierarchy space-id]]
+                      [[:room-list/apply-filter "people"]])}))))
+#+end_src
+
+
+**** Space Icon Item
+
+***** Icon
+
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(defn space-icon-item [item active-id]
+  (let [{:keys [id name avatar-url is-dm?]} item
+        stats (if is-dm?
+                item
+                @(re-frame/subscribe [:space/unread-stats id]))
+
+        {:keys [unread? highlight? mentions]} stats]
+
+    [:div.space-icon-wrapper
+     {:class [(when (= id active-id) "active")
+              (when unread? "has-unread")
+              (when highlight? "has-highlight")
+              (when is-dm? "is-dm-entry")]
+      :on-click #(if is-dm?
+                   (do
+                     (re-frame/dispatch [:space/select nil])
+                     (re-frame/dispatch [:rooms/select id]))
+                   (re-frame/dispatch [:space/select id]))
+      :title name}
+
+     (when unread?
+       [:div.space-notification-pill])
+
+     [avatar {:id id :name name :url (mxc->url avatar-url) :size 48 :shape :circle}]
+
+     (when (and mentions (pos? mentions))
+       [:div.space-mention-badge mentions])]))
+#+end_src
+
+***** CSS
+
+Now for the CSS for the space icons
+#+begin_src css :tangle ../../../css/space-icons.css
+.space-icon-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 4px 0;
+    cursor: pointer;
+    position: relative;
+}
+
+.space-icon-wrapper .avatar-container.space {
+    transition: border-radius 0.2s ease, background-color 0.2s ease;
+}
+
+.space-icon-wrapper:hover .avatar-container.space,
+.space-icon-wrapper.active .avatar-container.space {
+    border-radius: 16px;
+}
+
+.space-icon-wrapper:hover .avatar-placeholder-layer,
+.space-icon-wrapper.active .avatar-placeholder-layer {
+    background-color: #5865f2 !important;
+}
+
+.space-icon-wrapper::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 4px;
+    height: 8px;
+    background-color: white;
+    border-radius: 0 4px 4px 0;
+    transition: height 0.2s ease;
+    opacity: 0;
+}
+
+.space-icon-wrapper:hover::before {
+    opacity: 1;
+    height: 20px;
+}
+
+.space-icon-wrapper.active::before {
+    opacity: 1;
+    height: 40px;
+}
+
+
+.home-icon-container {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    background-color: #313338;
+    border-radius: 50%;
+    transition: border-radius 0.2s ease, background-color 0.2s ease;
+}
+
+.space-icon-wrapper:hover .home-icon-container,
+.space-icon-wrapper.active .home-icon-container {
+    border-radius: 16px;
+    background-color: #5865f2;
+}
+
+
+.space-icon-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.space-notification-pill {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    transition: all 0.2s ease;
+}
+
+.space-mention-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: #ff4b4b;
+    color: white;
+    border-radius: 10px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: bold;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #18191c;
+    z-index: 10;
+    pointer-events: none;
+    animation: badge-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badge-pop {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+
+
+.space-icon-wrapper:hover .space-notification-pill {
+    height: 20px;
+    border-radius: 4px;
+}
+
+
+.is-dm-entry {
+    margin-bottom: 4px;
+}
+
+.is-dm-entry img {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+#+end_src
+
+
+
+**** Virtuoso Spaces
+
+
+***** Virtuoso
+
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+(defn virtualized-space-bar [spaces active-space-id]
+  (let [space-array (to-array spaces)]
+    [:> Virtuoso
+     {:style {:height "100%" :width "100%"}
+      :data space-array
+      :itemContent
+      (fn [index space-map]
+        (r/as-element
+         ^{:key (:id space-map)}
+         [space-icon-item space-map active-space-id]))}]))
+#+end_src
+
+***** CSS
+
+#+begin_src css :tangle ../../../css/navigaion.css
+.sidebar-spaces {
+    width: 72px;
+    flex-shrink: 0;
+    background-color: #1e1f22;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 12px;
+    gap: 8px;
+}
+
+.sidebar-divider {
+    width: 32px;
+    height: 2px;
+    background-color: #3f4147;
+    border-radius: 1px;
+    margin: 4px 0;
+}
+
+/* This one may be old... */
+.sidebar-rooms {
+    width: 240px;
+    flex-shrink: 0;
+    background-color: #2b2d31;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+}
+
+
+.virtuoso-grid-item {
+    overflow: visible !important;
+}
+
+#+end_src
+
+Now for the actual spacebar we want a Virtuso. It makes the rendering of a
+list based object effectively trivial. We'll be using them around quite frequently.
+
+Now we inform Virtuso what to list to display (and we need it to be a vector/js array)
+and then we inform it *how* to display each component.
+In this case we just grab all of the stored spaces and the currently active one
+supply them as a React component by surrounding the Hiccup with (r/as-element).
+Inside we just set the click event to inform re-frame that we want this
+dispatch event. No extra imports. Just use what you need. Reframe is delightful
+at abstracting the excessive state management of React.
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+
+#_(defn virtualized-space-bar [spaces active-space-id]
+  (let [space-array (to-array spaces)]
+    [:> Virtuoso
+     {:style {:height "100%" :width "100%"}
+      :data space-array
+      :itemContent
+      (fn [index space-map]
+        (r/as-element
+         ^{:key (:id space-map)}
+         [space-icon-item space-map active-space-id]))}]))
+
+
+#+end_src
+
+
+
+**** Spaces (side)bar
+
+Actually using the virtualized space bar is easy. We just need
+a default "home" button which is actually just de-selecting a space
+This causes the diffs to show every room for now (until we set a
+nice filter for this)
+Adding features would a "home" button could be expanded to have "no-filter"
+or "non-space" (both of those filters exist). Then you could easily add a
+button in Hiccup here for a DMs button.
+Keeping with our goal of easily mutated to look how you want!
+
+****** TODO Swap home icon out with SVG
+#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
+
+(defn spaces-sidebar []
+  (let [spaces        @(re-frame/subscribe [:spaces/all])
+        active-id     @(re-frame/subscribe [:spaces/active-id])
+        active-dms    @(re-frame/subscribe [:rooms/active-dm-pops])]
+    [:div.sidebar-spaces
+     [:div.home-group
+      [:div.space-icon-wrapper
+       {:class (when (nil? active-id) "active")
+        :on-click #(re-frame/dispatch [:space/select nil])
+        :title "Home"}
+       [:div.home-icon-container "🏠"]]
+
+      (for [dm active-dms]
+        ^{:key (:id dm)}
+        [space-icon-item dm active-id])]
+     [:div.sidebar-divider]
+     [:div.spaces-list-container
+      [virtualized-space-bar spaces active-id]]
+     [sidebar-profile-mini]]))
+
+#+end_src
+
+

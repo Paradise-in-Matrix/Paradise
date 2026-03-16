@@ -1,0 +1,547 @@
+** Room List Entries
+
+***** Preface
+
+So each entry in the room list should likely be handled with some more care than
+just planting all the logic for it into one file.
+So this is where we'll start allowing that logic to live.
+
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+(ns room.entry
+  (:require
+   [clojure.string :as str]
+   [promesa.core :as p]
+   [re-frame.core :as re-frame]
+   [taoensso.timbre :as log]
+   [re-frame.db :as db]
+   ["react-virtuoso" :refer [Virtuoso]]
+   [promesa.core :as p]
+   [reagent.core :as r]
+   [utils.svg :as icons]
+   [reagent.dom.client :as rdom]
+   [room.room-summary :refer [build-room-summary]]
+   [client.diff-handler :refer [apply-matrix-diffs]]
+   [utils.global-ui :refer [avatar long-press-props]]
+   ["generated-compat" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory RoomListLoadingState]])
+  (:require-macros [utils.macros :refer [ocall oget]]))
+#+end_src
+
+**** Room Actions
+
+Eventually I'd like to swap these out with SVGs too, but for now they can stay.
+#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+(defn build-room-actions [room-id room-name is-space?]
+  [{:id "mark-read"
+    :label "Mark as Read"
+    :icon "✓"
+    :action #(re-frame/dispatch [:rooms/mark-read room-id])}
+   {:id "copy-link"
+    :label "Copy Link"
+    :icon "🔗"
+    :action #(js/console.log "Copy permalink for" room-id)}
+   {:id "leave"
+    :label (if is-space? "Leave Space" "Leave Room")
+    :icon "🚪"
+    :class-name "danger"
+    :action #(re-frame/dispatch [:rooms/leave room-id])}])
+#+end_src
+
+
+
+**** Room Entry CSS
+
+***** Top Level CSS
+
+Moving on to construction of the actual room list entries themselves though.
+
+We'll start with the CSS components that compose the element's themselves.
+
+Now we need a container to 'hold' the room entry items as well as some nice
+behaviors on hover. Should also style the name to prevent any weird UI
+side-effects like too long of a name squishing the SVG (icon).
+
+#+begin_src css :tangle ../../../css/room-list-entry.css
+.room-item {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  min-height: 32px;
+  transition: background 0.1s ease;
+}
+
+.room-item:hover { background: var(--bg-hover); }
+.room-item.active { background: var(--bg-selected); }
+
+.room-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--text-normal);
+}
+
+#+end_src
+
+
+***** Mobile and Desktop Hiding!
+
+#+begin_src css :tangle ../../../css/room-list-entry.css
+@media (min-width: 768px) { .hide-on-desktop { display: none !important; } }
+@media (max-width: 767px) { .hide-on-mobile { display: none !important; } }
+#+end_src
+
+
+***** Right Side Item CSS
+
+So we want to ensure that we have a grouping to the right for notifs, room
+actions, and such. Generally they'll only be visible when hovered.
+#+begin_src css :tangle ../../../css/room-list-entry.css
+.room-item-right {
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+      gap: 8px;
+}
+
+.room-hover-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+}
+
+.room-item:hover .room-hover-actions {
+      opacity: 1;
+}
+#+end_src
+
+
+***** Participant's CSS
+
+Now we need to also provide styling for the calling participants
+and ensure they are different across desktop and mobile.
+On desktop we have much more liberty with vertical space, but
+on mobile we should ensure we're compressing the participants into
+a nice little 'indicator' of sorts.
+#+begin_src css :tangle ../../../css/room-list-entry.css
+
+  .call-participants {
+    display: flex;
+}
+
+.participant-avatar-ring {
+    margin-left: -8px;
+    border: 2px solid var(--bg-color);
+    border-radius: 50%;
+}
+
+.desktop-call-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.call-participant-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    gap: 8px;
+    cursor: pointer;
+}
+#+end_src
+
+
+***** Notification CSS
+
+
+Now we want a smooth notification appearance
+Mentions should probably be a strong red,
+but regular counts should be much softer.
+#+begin_src css :tangle ../../../css/room-list-entry.css
+.room-item.has-unread .room-name {
+      font-weight: 600;
+      color: #ffffff;
+}
+
+.notification-badge {
+      background-color: #4a4d53;
+      color: white;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 12px;
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 16px;
+}
+
+.notification-badge.highlight {
+    background-color: #f23f43;
+}
+
+#+end_src
+
+
+
+
+**** Active Call Panel
+
+***** Panel CSS
+So ideally we want to provide the user with a graphical indicator that they are
+in a call. We want this to be persistent regardless of whether they navigate
+away as well.
+
+A certain familiar chat application used to keep this indicator locked at the bottom
+of the room list navigation. For now, that is where we will also plant it.
+
+So let's start by providing the CSS for that.
+
+
+
+We mostly just need to enforce the behavior on the name
+(don't want names to appear too long) the grid for the
+call controls and some color styling.
+
+#+begin_src css :tangle ../../../css/room-list-entry.css
+.active-call-panel {
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border-top: 2px solid rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.call-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.call-status-container {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.call-status-label {
+  color: #43b581;
+  font-weight: bold;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.call-room-name {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.hangup-icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #f04747;
+  padding: 4px;
+  margin-right: 10px;
+  transition: transform 0.1s ease;
+}
+
+.hangup-icon-btn:hover {
+  transform: scale(1.1);
+}
+
+.call-controls-grid {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: var(--surface-1);
+  border-radius: 4px;
+  padding: 4px 0;
+}
+#+end_src
+
+
+***** Media Button
+
+Now before we define the panel we may want to define media buttons...
+
+#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+(defn media-button [active? icon-on icon-off title on-click color-active color-inactive]
+  [:button.media-btn
+   {:style {:background "transparent"
+            :border "none"
+            :padding "6px"
+            :cursor "pointer"
+            :border-radius "4px"
+            :color (if active? color-active color-inactive)
+            :transition "background-color 0.2s ease"}
+    :title title
+    :on-click on-click}
+   (if active? icon-on icon-off)])
+#+end_src
+
+
+***** Active Panel Code
+
+
+#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+(defn active-call-panel []
+  (let [active-call-id  @(re-frame/subscribe [:call/active-room])
+        audio-on?       @(re-frame/subscribe [:call/audio-enabled?])
+        video-on?       @(re-frame/subscribe [:call/video-enabled?])
+        deafened?       @(re-frame/subscribe [:call/deafened?])
+        screen-sharing? @(re-frame/subscribe [:call/screen-sharing?])
+        rooms-map       @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
+        room-obj        (when active-call-id (get rooms-map active-call-id))
+        room-name       (or (when room-obj (aget room-obj "name")) "Active Call")]
+
+    (when active-call-id
+      [:div.active-call-panel
+       [:div.call-info-row
+        [:div.call-status-container
+         {:on-click #(re-frame/dispatch [:rooms/select active-call-id])}
+         [:span.call-status-label "VOICE CONNECTED"]
+         [:span.call-room-name (str "/ " room-name)]]
+
+        [:button.hangup-icon-btn
+         {:title "Disconnect"
+          :on-click #(re-frame/dispatch [:call/hangup])}
+         [icons/phone-hangup]]]
+
+       [:div.call-controls-grid
+        [media-button audio-on?
+         [icons/mic] [icons/mic-off]
+         (if audio-on? "Mute" "Unmute")
+         #(re-frame/dispatch [:call/toggle-audio])
+         "var(--text-normal)" "#f04747"]
+
+        [media-button (not deafened?)
+         [icons/headphones] [icons/headphones-off]
+         (if deafened? "Undeafen" "Deafen")
+         #(re-frame/dispatch [:call/toggle-deafen])
+         "var(--text-normal)" "#f04747"]
+
+        [media-button video-on?
+         [icons/video] [icons/video-off]
+         (if video-on? "Stop Video" "Start Video")
+         #(re-frame/dispatch [:call/toggle-video])
+         "var(--text-normal)" "#f04747"]
+
+        [media-button screen-sharing?
+         [icons/screen-share] [icons/screen-share-off]
+         (if screen-sharing? "Stop Sharing" "Share Screen")
+         #(re-frame/dispatch [:call/toggle-screen-share])
+         "var(--accent-color)" "var(--text-normal)"]]])))
+#+end_src
+
+
+
+
+**** Room Type Checking?
+
+Now we need to provide utilize our room preview to actually
+determine whether the room is a call room or not.
+Ideally in later versions this won't really be needed as
+a separate method, but for now we need to safely
+check the structure of the object before extraction.
+The rationale for this is that some object don't have
+these inside, so a nice 'some->' guard prevents us
+from crashing the rust-sdk.
+
+This is not an ideal implementation. If the room somehow changes type we will
+never know. It shouldn't happen often, but in the future we should have
+better access to the room type on the Room object itself.
+However, as we don't have access to that currently we instead must
+resolve the preview promise here and memoize it. That way we only
+ever do this once per room.
+#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+(defn room-type-call? [db room-id]
+  (let [summary (get-in db [:rooms-unfiltered-cache room-id])
+        preview (when summary (aget summary "room-preview"))
+        info    (some-> preview deref .info)
+        type    (some-> info .-roomType)]
+    (and (= "Custom" (some-> type .-tag))
+         (= "org.matrix.msc3417.call" (some-> type .-inner .-value)))))
+
+(re-frame/reg-sub
+ :room/is-call?
+ (fn [db [_ room-id]]
+   (room-type-call? db room-id)))
+#+end_src
+
+
+
+**** Room List Entries!
+
+Now we can outline the room list entry nicely.
+We want spaces to act as simple categories. So we'll give them a nice
+collapsable behavior.
+The room rows themselves determines whether it should show a speaker for calls,
+the avatar for DMs (with the people filter on the UI list) or a simple
+hash.
+
+
+The right side we want to allocate to hover effects and badges. These are important
+visual indicators to the user, so it is important they feel *fluid* but not too
+cluttered.
+However, on mobile we also push the active call avatars into this spot. It may not
+be particularly well-tested for those instances yet. We'll see as we flesh more
+out.
+On desktop we also provide the ability for the users within the call to appear
+below the room name itself. The neat part is we actually support this for
+any room (though perhaps we should restrict for just call rooms?)
+The idea is that any room can have a call and a visual indicator for that is
+important.
+
+#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+(defn room-item [{:keys [id name indent is-space? is-closed? is-call? has-call?
+                        active-room unread? highlight? notif-count
+                        call-participants avatar-url space-id active-filter open-menu-fn]}]
+  (let [active? (= id active-room)]
+    [:div.room-container
+     (if is-space?
+       [:div.room-drawer-header
+        (merge {:style {:padding-left (str indent "px")}
+                :class (when is-closed? "collapsed")
+                :on-click #(re-frame/dispatch [:rooms/toggle-drawer id])
+                :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
+               (long-press-props #(open-menu-fn nil %1 %2)))
+        [:span.drawer-arrow (if is-closed? "▶" "▼")]
+        [:span.drawer-name (str/upper-case name)]]
+
+       [:div.room-item
+        (merge {:style {:padding-left (str indent "px")}
+                :class [(when active? "active")
+                        (when unread? "has-unread")
+                        (when highlight? "has-highlight")]
+                :on-click #(re-frame/dispatch [:rooms/select id])
+                :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
+               (long-press-props #(open-menu-fn nil %1 %2)))
+
+        (cond
+          is-call?
+          [icons/speaker {:has-call? has-call? :style {:margin-right "8px"}}]
+          (and (= active-filter "people")
+               (not space-id)
+;;               avatar-url
+               )
+          [avatar {:id id :name name :url avatar-url :size 24 :status :online}]
+          :else
+          [icons/hash])
+        [:span.room-name name]
+        [:div.room-item-right
+         [:div.room-hover-actions
+          (when is-call?
+            [:div.action-icon.chat-action
+             {:title "View Chat & Lobby"
+              :on-click (fn [e]
+                          (.stopPropagation e)
+                          (re-frame/dispatch [:rooms/select id {:force-lobby? true :focus-override :timeline}]))}
+             [icons/chat-bubble]])
+          [:div.action-icon.settings-action
+           {:title "Room Settings"
+            :on-click (fn [e]
+                        (.stopPropagation e)
+                        (re-frame/dispatch [:rooms/open-settings id]))}
+           [icons/settings {:animate :spin}]]]
+         (when has-call?
+           [:div.call-participants.hide-on-desktop
+            (for [participant call-participants]
+              (let [p-id (or (:userId participant) participant)]
+                ^{:key (str "mobile-call-" p-id)}
+                [:div.participant-avatar-ring
+                 [avatar {:id p-id :url (:avatarUrl participant) :size 20}]]))])
+
+         (when unread?
+           [:div.notification-badge
+            {:class (when highlight? "highlight")}
+            (if (> notif-count 99) "99+" notif-count)])]])
+     (when (and has-call? (not is-closed?))
+       [:div.desktop-call-list.hide-on-mobile
+        {:style {:padding-left (str (+ indent 24) "px")}}
+        (for [participant call-participants]
+          (let [p-id   (or (:userId participant) participant)
+                p-name (or (:displayName participant) p-id)]
+            ^{:key (str "desktop-call-" p-id)}
+            [:div.call-participant-item
+             {:on-click (fn [e]
+                          (.stopPropagation e)
+                          (re-frame/dispatch [:ui/open-user-profile p-id]))}
+             [avatar {:id p-id :name p-name :url (:avatarUrl participant) :size 20}]
+             [:span.participant-name p-name]]))])]))
+
+#+end_src
+
+
+
+**** Building the Room List Entry
+
+
+
+Now this is actually what we provide to the Virtuoso list for rendering the
+individual elements. Effectively just a fancy destructure to grab the values we
+need out.
+#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+(defn render-room-item [client rooms active-space active-room closed-drawers active-filter]
+  (fn [_ raw-room]
+    (let [{:keys [id roomId name is-space? isSpace depth
+                  notification-count unreadNotificationsCount
+                  highlight-count unreadMentionsCount
+                  avatar avatarUrl activeRoomCallParticipants]
+           :or {activeRoomCallParticipants []}
+           :as room} (if (map? raw-room) raw-room (js->clj raw-room :keywordize-keys true))
+          id          (or id roomId)
+          room-name   (or name "Loading...")
+          space?      (or is-space? isSpace)
+          notif-count (or notification-count unreadNotificationsCount 0)
+          high-count  (or highlight-count unreadMentionsCount 0)
+          url         (or avatar avatarUrl)
+          depth       (or depth 0)
+          is-call?    (room-type-call? @re-frame.db/app-db id)
+          open-menu   (fn [e mx my]
+                        (when e (.preventDefault e) (.stopPropagation e))
+                        (re-frame/dispatch
+                         [:context-menu/open
+                          {:x mx :y my
+                           :items (build-room-actions id room-name space? #_is-call?)}]))]
+      (log/error active-space)
+      (r/as-element
+       [room-item {:id id
+                   :name room-name
+                   :indent (* depth 12)
+                   :is-space? space?
+                   :is-closed? (contains? closed-drawers id)
+                   :is-call? is-call?
+                   :has-call? (seq activeRoomCallParticipants)
+                   :active-room active-room
+                   :space-id (:id active-space)
+                   :active-filter active-filter
+                   :unread? (pos? notif-count)
+                   :highlight? (pos? high-count)
+                   :notif-count notif-count
+                   :call-participants activeRoomCallParticipants
+                   :avatar-url url
+                   :open-menu-fn open-menu}]))))
+
+#+end_src
+
+
+
+
+
+

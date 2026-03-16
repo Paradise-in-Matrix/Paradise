@@ -1,6 +1,13 @@
+
+* App
+
+
 After having explored setting up and interfacing with the Rust sdk I believe we're in a good state to actually
 start building out the *actual* UI.
 Now re-frame more or less trivializes this and enables us to write a UI and then wire it up later.
+
+
+**** Preface
 
 For base functionality I would define the minimum usable product as:
 - Spaces navigation (and DMs)
@@ -12,6 +19,9 @@ For base functionality I would define the minimum usable product as:
 So these would be the first things to build on.
 We'll continue to keep our minimalist login page, but we'll start trying to do a bit more polish on the
 actual UI components themselves.
+
+
+**** Imports
 
 #+begin_src clojurescript :tangle ../src/app.cljs
 (ns app
