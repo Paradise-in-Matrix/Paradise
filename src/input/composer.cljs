@@ -4,13 +4,79 @@
             [taoensso.timbre :as log]
             [clojure.string :as str]
             [reagent.core :as r]
+            [utils.helpers :refer [mxc->url url->mxc]]
+            [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
             ["react" :as react]
             ["@tiptap/react" :refer [useEditor EditorContent]]
             ["@tiptap/starter-kit" :default StarterKit]
             ["@tiptap/extension-placeholder" :default Placeholder]
-            ["@tiptap/core" :refer [Extension]]
+            ["@tiptap/extension-mention" :default Mention]
+            ["@tiptap/core" :refer [Extension Node mergeAttributes]]
             ["prosemirror-state" :refer [Plugin PluginKey]]
             ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
+
+(defn renderHtml [^js props]
+                      #js ["img" (mergeAttributes
+                                  (.-HTMLAttributes props)
+                                  #js {"data-emote" true
+                                       "class" "chat-input-emote"
+                                       "style" "height: 1.5em; width: auto; vertical-align: middle; display: inline-block;"})])
+
+(defn prepare-html-for-editor [raw-html]
+  (if (string? raw-html)
+    (str/replace raw-html
+                 #"mxc://[^\"\'\s>]+"
+                 #(mxc->url %))
+    ""))
+
+(defn- get-matrix-formatted-body [editor]
+  (let [json (.. editor getJSON -content)
+        node->html (fn node->html [node]
+                     (let [type (.-type node)
+                           attrs (.-attrs node)]
+                       (cond
+                         (= type "customEmote")
+                         (let [
+                               render-vec (renderHtml #js {:HTMLAttributes attrs})
+                               tag-name   (first render-vec)
+                               html-attrs (second render-vec)
+                               shortcode  (aget attrs "shortcode")
+                               mxc-uri    (url->mxc (aget attrs "src"))]
+                           (str "<" tag-name
+                                " data-mx-emoticon"
+                                " src=\"" mxc-uri "\""
+                                " alt=\":" shortcode ":\""
+                                " title=\":" shortcode ":\""
+                                " style=\"" (aget html-attrs "style") "\">")
+                           )
+                         (= type "text") (.-text node)
+                         :else "")))]
+    (str/join ""
+      (map (fn [p]
+             (str "<p>"
+                  (str/join "" (map node->html (js/Array.from (or (.-content p) #js []))))
+                  "</p>"))
+           (js/Array.from json)))))
+
+
+(def custom-emote
+  (.create Node
+   #js {:name "customEmote"
+        :inline true
+        :group "inline"
+        :selectable true
+        :atom true
+        :addAttributes (fn [] #js {:src #js {:default nil}
+                                   :shortcode #js {:default nil}})
+        :parseHTML (fn []
+                     #js [#js {:tag "img[data-emote]"}
+                          #js {:tag "img[data-mx-emoticon]"}
+                          #js {:tag "img"
+                               :getAttrs (fn [^js node]
+                                           #js {:src (.getAttribute node "src")
+                                                :shortcode (or (.getAttribute node "alt")
+                                                               (.getAttribute node "title"))})}])
+        :renderHTML renderHtml}))
 
 (def file-drop-extension
   (.create Extension
@@ -67,17 +133,27 @@
         on-files     (.. props -children -onFiles)
         on-change    (.. props -children -onChange)
         loaded-text  (.. props -children -loadedText)
+        on-ready     (.. props -children -onEditorReady)
         editor (useEditor
                 #js {:extensions #js [(.configure StarterKit #js {})
                                       (.configure Placeholder #js {:placeholder "Type a message..."})
                                       (.configure submit-extension #js {:onSend on-send})
-                                      (.configure file-drop-extension #js {:onFiles on-files})]
+                                      (.configure file-drop-extension #js {:onFiles on-files})
+                                      (.configure custom-emote #js {})
+                                      (.configure Mention #js {:name "emojiSuggestion"
+                                                               :suggestion (emoji-suggestion-options)})
+                                      (.configure Mention #js {:name "userMention"
+                                                               :suggestion (user-mention-options)})
+                                      ]
                      :content (or loaded-text "")
                      :editable (boolean active-id)
                      :onUpdate (fn [ctx]
                                  (when on-change
                                    (on-change (.getText (.-editor ctx))
                                               (.getHTML (.-editor ctx)))))
+                     :onCreate (fn [ctx]
+                                 (when on-ready
+                                   (on-ready (.-editor ctx))))
                      :editorProps #js {:attributes #js {:class "tiptap-editor-surface"}}}
                 #js [active-id (boolean loaded-text)])]
     (if-not editor
