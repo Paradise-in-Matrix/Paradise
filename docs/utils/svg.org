@@ -1,0 +1,290 @@
+
+** SVG
+
+
+**** Preface
+Scalable Vector Graphics solve an issue of having perfectly scaling 'icons' for example using vector math
+to determine how it should look at different sizes.
+
+Now rather than do them all by hand... We'll give a go at using a conventional library
+as a reference.
+Now at some point we may wish to fully import a library, but for now I think we
+should just take the vector graphic itself and plant it here for reuse.
+To add to that, the library icons could also be modified without too much effort
+using Inkscape.
+
+If we decide to change and use a dependency then they can just be shifted here.
+We might also like to start actually compartmentalizing the CSS to be kept together with the
+org file using it. The scope creep has really started to set in there.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(ns utils.svg
+  (:require)
+  )
+#+end_src
+
+
+**** Icon Base
+
+So we should establish a nice icon base that we intend to use throughout.
+Since we have intent to provide animated SVGs for our icons... we'll
+go ahead and plan for that by providing a class we can hook to for
+the CSS.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn- icon-base [{:keys [animate] :as props} & children]
+  (into
+   [:svg (merge {:viewBox "0 0 24 24"
+                 :width "16px"
+                 :height "16px"
+                 :fill "none"
+                 :stroke "currentColor"
+                 :stroke-width "2"
+                 :stroke-linecap "round"
+                 :stroke-linejoin "round"
+                 :class (when animate (str "animate-" (name animate)))}
+                (dissoc props :animate))]
+   children))
+#+end_src
+
+
+And then some basic 'animations' defined in CSS
+#+begin_src css :tangle ../../css/icons.css
+@keyframes wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(10deg); }
+      75% { transform: rotate(-10deg); }
+  }
+
+.animate-wiggle:hover {
+      animation: wiggle 0.3s ease-in-out;
+      transform-origin: center;
+}
+
+#+end_src
+
+Now the first thing I'd like to animate is the Mic icon. In a certain chat
+application I noticed the Microphone wiggles when you hover over it.
+So let us start there.
+
+I think a simple bounce can just be done in CSS, so we'll write that out using keyframe transforms
+#+begin_src css :tangle ../../css/icons.css
+@keyframes mic-talk {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+}
+
+@keyframes hangup-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-2px); }
+      75% { transform: translateX(2px); }
+}
+
+.animate-talk {
+      animation: mic-talk 0.4s ease-in-out infinite;
+      transform-origin: center;
+}
+
+.animate-hangup:hover {
+      animation: hangup-shake 0.2s ease-in-out infinite;
+      transform-origin: center;
+}
+#+end_src
+A nice ease out on them doesn't hurt either.
+
+
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+
+
+#+end_src
+
+
+**** Calling Icons
+
+Now calling has a set of icons easily attributable to it, so
+we'll try to keep those all nicely grouped here
+
+For hanging up we just want to use the CSS we wrote for simplicity.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn phone-hangup [props]
+  [icon-base (merge {:fill "currentColor" :stroke "none" :animate :hangup} props)
+   [:path {:d "M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.58.9-.98.45-1.89.86-2.73 1.34-.14.07-.31.11-.49.11-.28 0-.53-.11-.7-.3l-2.6-2.6c-.18-.17-.3-.43-.3-.71 0-.28.11-.53.3-.7C3.12 7.32 7.32 4 12 4s8.88 3.32 11.7 6.96c.19.17.3.43.3.71 0 .28-.11.53-.3.71l-2.6 2.6c-.17.19-.42.3-.7.3-.18 0-.35-.04-.49-.11-.84-.48-1.75-.89-2.73-1.34-.35-.16-.58-.51-.58-.9v-3.1C15.15 9.25 13.6 9 12 9z"}]])
+#+end_src
+
+For the mic, we once against just use our CSS animation written above.
+Now we want to future plan for this one, so perhaps we enable merging
+a passed prop in so that it can also glow when we speak.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn mic [props]
+  [icon-base (merge {:animate :wiggle} props)
+   [:path {:d "M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"}]])
+#+end_src
+
+Now this will be our first truly animated SVG...
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn screen-share [props]
+  [icon-base props
+   [:rect {:x "2" :y "3" :width "20" :height "14" :rx "2" :ry "2"}]
+   [:path {:d "M8 21h8M12 17v4"}]
+   [:path {:d "M17 8l-5-5-5 5M12 3v9" :stroke "var(--accent-color)"}
+    [:animate {:attributeName "stroke-opacity"
+               :values "1;0.3;1"
+               :dur "2s"
+               :repeatCount "indefinite"}]]])
+#+end_src
+
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn video [props]
+  [icon-base props
+   [:path {:d "M23 7l-7 5 7 5V7zM1 5h15v14H1z"}]])
+#+end_src
+
+Now for muting we just want the strike to animate its way in. Nothing too fancy.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn mic-off [props]
+  [icon-base props
+   [:g
+    [:path {:d "M9 9a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"}]
+    [:path {:d "M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23M12 19v4M8 23h8"}]
+    [:line {:x1 "1" :y1 "1" :x2 "23" :y2 "23"
+            :stroke-dasharray "32"
+            :stroke-dashoffset "32"}
+     [:animate {:attributeName "stroke-dashoffset"
+                :from "32" :to "0"
+                :dur "0.2s"
+                :fill "freeze"}]]]])
+#+end_src
+
+Now for the headphones icon... we want to give some sort of visual effect on hover...
+So a nice little bit of CSS animating each ear should do fine.
+#+begin_src css :tangle ../../css/icons.css
+@keyframes ear-wiggle {
+      0%, 100% { transform: scaleX(1); }
+      50% { transform: scaleX(1.1); }
+}
+
+.animate-ears:hover {
+      animation: ear-wiggle 0.3s ease-in-out infinite;
+      transform-origin: center;
+}
+
+#+end_src
+
+Now using that CSS is easy!
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn headphones [props]
+  [icon-base (merge {:animate :ears} props)
+   [:path {:d "M3 18v-6a9 9 0 0 1 18 0v6M4 15h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2zM18 15h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z"}]])
+#+end_src
+
+Using the same technique from mic-off we can easily drive a stroke across the headphones icon too.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn headphones-off [props]
+  [icon-base props
+   [:g [:path {:d "M3 11a9 9 0 0 1 13.52-7.78M20.42 15h.58a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 .58-1.42M2 17v3a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"}]
+       [:line {:x1 "1" :y1 "1" :x2 "23" :y2 "23"
+               :stroke-dasharray "32" :stroke-dashoffset "32"}
+        [:animate {:attributeName "stroke-dashoffset" :from "32" :to "0" :dur "0.2s" :fill "freeze"}]]]])
+#+end_src
+
+Same for video off as well.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn video-off [props]
+  [icon-base props
+   [:g [:path {:d "M16 16v3H1V5h2m4 0h9v9l7 5V7l-7 5V7.94"}]
+       [:line {:x1 "1" :y1 "1" :x2 "23" :y2 "23"
+               :stroke-dasharray "32" :stroke-dashoffset "32"}
+        [:animate {:attributeName "stroke-dashoffset" :from "32" :to "0" :dur "0.2s" :fill "freeze"}]]]])
+#+end_src
+
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn screen-share-off [props]
+  [icon-base props
+   [:rect {:x "2" :y "3" :width "20" :height "14" :rx "2" :ry "2"}
+    [:animate {:attributeName "opacity" :from "1" :to "0.3" :dur "0.4s" :fill "freeze"}]]
+   [:path {:d "M8 21h8M12 17v4"}]])
+#+end_src
+
+
+Now what about something with some external logic? Still extremely straight-forward.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn speaker [{:keys [has-call?] :as props}]
+  [icon-base (merge {:stroke-width "2.5"
+                     :animate (when has-call? :waves)}
+                    (dissoc props :has-call?))
+   [:path {:d "M11 5L6 9H2v6h4l5 4V5z"}]
+   (when has-call?
+     [:path {:d "M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"}])])
+#+end_src
+
+
+**** General icons
+
+Not super sure how I want to do the sections here, but this will group up ones that may appear in multiple spots
+
+So let us start with the classic settings gear.
+Since it is a gear, let's write some CSS to facilitate spinning the icon.
+
+#+begin_src css :tangle ../../css/icons.css
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.animate-spin:hover {
+    animation: spin 2s linear infinite;
+    transform-origin: center;
+}
+#+end_src
+
+Now... the gear is a very complex geometric shape, so it has one of the more amusing SVG data values.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn settings [props]
+  [icon-base props
+   [:circle {:cx "12" :cy "12" :r "3"}]
+   [:path {:d "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"}]])
+#+end_src
+
+
+Where as chat bubble? Simple.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn chat-bubble [props]
+  [icon-base props
+   [:path {:d "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"}]])
+#+end_src
+
+Now a little bit of a pan motion for the icon to give it a nice little feel.
+#+begin_src css :tangle ../../css/icons.css
+@keyframes search-scan {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-1.5px, -1.5px); }
+      75% { transform: translate(1px, 1px); }
+}
+
+.animate-scan:hover {
+      animation: search-scan 0.6s ease-in-out infinite;
+}
+#+end_src
+
+
+We'll need a nice search icon, so let's plant that here too.
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn search [props]
+  [icon-base (merge {:animate :scan} props)
+   [:circle {:cx "11" :cy "11" :r "8"}]
+   [:line {:x1 "21" :y1 "21" :x2 "16.65" :y2 "16.65"}]])
+#+end_src
+
+Now for a simple hash icon
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn hash [props]
+  [icon-base props
+   [:line {:x1 "4" :y1 "9" :x2 "20" :y2 "9"}]
+   [:line {:x1 "4" :y1 "15" :x2 "20" :y2 "15"}]
+   [:line {:x1 "10" :y1 "3" :x2 "8" :y2 "21"}]
+   [:line {:x1 "16" :y1 "3" :x2 "14" :y2 "21"}]])
+#+end_src
+
+
