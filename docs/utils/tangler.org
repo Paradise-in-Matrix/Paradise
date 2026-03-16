@@ -1,3 +1,10 @@
+
+** Tangling
+
+
+
+**** Preface
+
 A thought here, as these can execute before runtime is to make the tangler
 macro-like then. If we actually make a build hook with the lifecycle target
 :compile-prepare we can tangle .org files into their CLJS locations quite
@@ -13,6 +20,9 @@ and ask your questions. It's a refreshingly different experience.
 
 Nonetheless, we aim to allow developers to use whatever platform they choose
 as long as it can handle org-mode blocks.
+
+
+**** VS Code Extension
 
 It is realistically only reasonable to support the most popular editor on the planet
 VS Code. An extension may wish to register .org files via a new extension:
@@ -68,7 +78,8 @@ burden on the end user even more.
 The idea is to introduce them to org files and literate programming while
 making sure we're showing that it is immensely unintruisive.
 
-** Built-in Org Tangler
+
+**** Built-in Org Tangler
 
 These build hooks provide the ability for CLJS to auto-tangle org files for you.
 Now while Emacs has this functionality baked in... This does not help those
@@ -80,7 +91,7 @@ This one evaluates the src blocks inside the org file and then pumps out all of 
 tangled blocks out.
 
 
-
+***** Imports
 
 #+begin_src clojurescript :tangle ../../src/utils/tangler.cljs
 (ns utils.tangler
@@ -88,6 +99,9 @@ tangled blocks out.
             ["path" :as path]
             [clojure.string :as str]))
 #+end_src
+
+
+***** Tangling
 
 This iterates over the org mode files in the path supplied.
 It looks at the src block for the designation "clojurescript" and if it has "tangle"
@@ -114,6 +128,9 @@ could easily be extended later to support more.
             (println "  > Tangled (Updated):" full-path)))))))
 #+end_src
 
+
+***** Tangler Directories
+
 This just supplies the directory that should be scanned for org files.
 It then calls the tangle-file method on matching files within there.
 It avoids picking up Emacs lock files, so there shouldn't be any worry
@@ -135,6 +152,8 @@ tangler function.
 #+end_src
 
 
+***** BB Watch Function to Tangle
+
 This sets the tangler to be watched and long lived. It also sets
 the interval to scan the file system for changes. That way it can
 neatly fit in the ClojureScript web development process.
@@ -148,6 +167,7 @@ neatly fit in the ClojureScript web development process.
 #+end_src
 
 
+**** Later
 
 Then, of course, we have plans to write a quick VS Code extension to open
 up development options to a much larger audience.
