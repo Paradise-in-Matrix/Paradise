@@ -1,12 +1,23 @@
+
+** Macros
+
+
+**** Preface
+
 So we need some helper macros to cover a number of circumstances whether that be
 just shortening or cleaning up usage to patching Vite and other incompatibilities.
 
+
+**** Imports
 
 #+begin_src clojurescript :tangle ../../src/utils/macros.cljc
 (ns utils.macros
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]))
 #+end_src
+
+
+**** Safe Rust Object Prototype Calling
 
 These macros are effectively just wrappers that provide clean
 interop with the underlying Rust objects as the Rust objects
@@ -28,6 +39,10 @@ outputs them.
   [obj prop]
   `(js/goog.object.get ~obj ~(name prop)))
 #+end_src
+
+
+
+**** Generating Translation map (Depreciated)
 
 This allows us to aggregate the language JSONs from the node_modules
 in order to serve them properly to users. It's just a fancy way
@@ -57,6 +72,8 @@ write them as a Clojure map to easily consume at start.
 This way we don't have to convert or do anything odd to have consistently
 usable configs across the application.
 
+
+**** Config EDN Loading
 
 #+begin_src clojurescript :tangle ../../src/utils/macros.cljc
 (defmacro load-static-config [path]
