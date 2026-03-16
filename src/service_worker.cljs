@@ -11,7 +11,6 @@
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
   (precacheAndRoute manifest))
 
-
 (.addEventListener js/self "message"
   (fn [event]
     (let [data (.-data event)
@@ -195,6 +194,7 @@
              :tag    (or room-id "matrix-chat")
              :data   #js {:room_id room-id}}))))
 
+
 (js/self.addEventListener "push"
   (fn [event]
     (let [data (try (.. event -data json) (catch :default _ nil))]
@@ -205,7 +205,6 @@
                     token   (some-> session .-token)
                     hs-url  (some-> session .-hs_url)]
               (show-smart-notification data token hs-url))))))))
-
 
 (js/self.addEventListener "notificationclick"
   (fn [event]
