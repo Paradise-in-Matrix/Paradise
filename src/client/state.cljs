@@ -3,7 +3,8 @@
               [clojure.string :as str]
               [cljs.spec.alpha :as s]
               [taoensso.timbre :as log]
-              ["@element-hq/web-shared-components" :as element-ui])
+
+              )
     (:require-macros [utils.macros :refer [ocall oget]]))
 
 (defprotocol IMatrixClient
