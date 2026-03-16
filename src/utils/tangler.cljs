@@ -5,8 +5,8 @@
 
 (defn tangle-file [f-path]
   (let [content (fs/readFileSync f-path "utf8")
-        blocks (re-seq #"(?is)#\+begin_src\s+clojurescript\s+:tangle\s+([^\s\n]+).*?\n(.*?)\n#\+end_src" content)
-        tangled-map (reduce (fn [acc [_ rel-path code]]
+        blocks (re-seq #"(?is)#\+begin_src\s+(?:clojurescript|css)\s+:tangle\s+([^\s\n]+).*?\n(.*?)\n#\+end_src" content)
+        tangled-map (reduce (fn [acc [ _ rel-path code]]
                               (update acc rel-path (fnil conj []) code))
                             {}
                             blocks)]
