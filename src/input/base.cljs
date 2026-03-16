@@ -3,11 +3,15 @@
             [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [input.drafts :refer [attachment-preview reify-attachment]]
-            [input.composer :refer [tiptap-component]]
+            [input.drafts :refer [attachment-preview reify-attachment prepare-attachment]]
+            [input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
             [input.emotes :refer [emoji-sticker-board]]
+            [input.autocomplete :refer [suggestion-menu]]
             [reagent.core :as r]
-            ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
+            [utils.helpers :refer [mxc->url]]
+            ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
+            
+            ))
 
 (re-frame/reg-event-fx
  :sdk/upload-media
@@ -53,36 +57,51 @@
            (re-frame/dispatch [:sdk/upload-complete]))))
      {})))
 
-
 (re-frame/reg-event-fx
  :sdk/handle-file-drop
  (fn [{:keys [db]} [_ room-id files]]
-   (let [raw-file (first files)]
-     (if raw-file
-       (let [reader (js/FileReader.)
-             preview-url (js/URL.createObjectURL raw-file)
-             mime (.-type raw-file)
-             filename (.-name raw-file)]
-         (set! (.-onload reader)
-               (fn [e]
-                 (let [buffer (.. e -target -result)
-                       attachment {:buffer buffer
-                                   :mime mime
-                                   :filename filename
-                                   :preview-url preview-url}]
-                   (re-frame/dispatch [:composer/add-attachment room-id attachment]))))
-         (.readAsArrayBuffer reader raw-file)
-         {:db db})
-       (do (log/warn "Missing file for drop") {})))))
+   (doseq [raw-file files]
+     (let [reader      (js/FileReader.)
+           preview-url (js/URL.createObjectURL raw-file)
+           mime        (.-type raw-file)
+           filename    (.-name raw-file)]
+       (set! (.-onload reader)
+             (fn [e]
+               (let [buffer (.. e -target -result)
+                     attachment {:buffer      buffer
+                                 :mime        mime
+                                 :filename    filename
+                                 :preview-url preview-url}]
+                 (re-frame/dispatch [:composer/add-attachment room-id attachment]))))
+       (.readAsArrayBuffer reader raw-file)))
+   {}))
 
-(defn build-mentions [user-ids push-room?]
-  (if (and (empty? user-ids) (not push-room?))
-    js/undefined
-    (.. (.-Mentions sdk)
-        (create #js {:userIds (clj->js user-ids)
-                     :room (boolean push-room?)}))))
+(defn send-attachments! [sdk timeline room attachments text html]
+  (let [total (count attachments)]
+    (p/let [_ (p/loop [idx 0]
+                (when (< idx total)
+                  (let [att       (nth attachments idx)
+                        is-last?  (= idx (dec total))
+                        {:keys [source info type]} (prepare-attachment sdk att)
+                        caption   (if is-last? (or text js/undefined) (:filename att))
+                        formatted (if (and is-last? (not (str/blank? html)))
+                                    #js {:format (.new (.-Html (.-MessageFormat sdk)))
+                                         :body html}
+                                    js/undefined)
+                        params    (.. sdk -UploadParameters
+                                      (create #js {:source source
+                                                   :caption (or caption js/undefined)
+                                                   :formattedCaption (or formatted js/undefined)}))]
+                    (log/info "Sending attachment" (inc idx) "of" total "as" type)
+                    (.sendFile timeline params info)
+                    (p/do! (p/delay 100)
+                           (p/recur (inc idx))))))]
+      (.clearComposerDraft room js/undefined)
+      (doseq [att attachments]
+        (js/URL.revokeObjectURL (:preview-url att)))
+      true)))
 
-(defn send-all! [timeline attachments text html]
+  (defn send-all! [timeline attachments text html]
   (let [total (count attachments)
         send-one (fn send-one [remaining-atts idx]
                    (if (empty? remaining-atts)
@@ -112,71 +131,85 @@
 
 (re-frame/reg-event-fx
  :composer/submit
- (fn [{:keys [db]} [_ room-id text html _]]
-   (let [client   (:client db)
-         timeline (get-in db [:timeline-subs room-id :timeline])
-         room     (when client (.getRoom client room-id))
-         attachments (get-in db [:drafts room-id :attachments])]
+ (fn [{:keys [db]} [_ room-id text html]]
+   (let [client      (:client db)
+         timeline    (get-in db [:timeline-subs room-id :timeline])
+         room        (when client (.getRoom client room-id))
+         attachments (get-in db [:drafts room-id :attachments])
+         context     (get-in db [:input-context room-id])]
      (cond
        (or (not timeline) (not room))
        (do (log/error "Room or Timeline missing for" room-id) {})
        (seq attachments)
-       (let [total (count attachments)]
-         (p/let [_ (p/loop [idx 0]
-                     (when (< idx total)
-                       (let [att       (nth attachments idx)
-                             is-last?  (= idx (dec total))
-                             ffi-att   (reify-attachment att)
-                             inner     (.-inner ffi-att)
-                             tag       (.-tag ffi-att)
-                             caption   (if is-last? (or text js/undefined) (:filename att))
-                             formatted (if (and is-last? (not (str/blank? html)))
-                                         #js {:format (.new (.-Html (.-MessageFormat sdk)))
-                                              :body html}
-                                         js/undefined)
-                             params (.. (.-UploadParameters sdk)
-                                        (create #js {:source (.-source inner)
-                                                     :caption (or caption js/undefined)
-                                                     :formattedCaption (or formatted js/undefined)}))
-                             info   (condp = tag
-                                      "Image" (.-imageInfo inner)
-                                      "Video" (.-videoInfo inner)
-                                      (.-fileInfo inner))]
-                         (log/info "Sending" tag (inc idx) "of" total)
-                         (.sendFile timeline params info)
-                         (p/do! (p/delay 100)
-                                (p/recur (inc idx))))))]
-           (.clearComposerDraft room js/undefined)
-           (doseq [att attachments] (js/URL.revokeObjectURL (:preview-url att)))
-           (re-frame/dispatch [:composer/clear-after-submit room-id]))
+       (do
+         (-> (send-attachments! sdk timeline room attachments text html)
+             (.then #(re-frame/dispatch [:composer/clear-after-submit room-id]))
+             (.catch #(log/error "Failed to send attachments:" %)))
          {})
-       :else
+:else
        (try
-         (let [msg-type (.new (.-Text MessageType) #js {:content #js {:body text :formatted js/undefined}})
-               event    (.createMessageContent timeline msg-type)]
-           (.send timeline event)
+         (let [_       (log/debug "LIVE CONTEXT FROM DB:" context)
+               payload (.messageEventContentFromHtml sdk text (or html text))]
+           (if context
+             (let [action     (:mode context)
+                   raw-id-obj (-> context :target :event-or-transaction-id)
+                   target-id  (if (= (.-tag raw-id-obj) "EventId")
+                                (.. raw-id-obj -inner -eventId)
+                                (.. raw-id-obj -inner -transactionId))
+                   id-enum    (if (str/starts-with? target-id "$")
+                                #js {:tag "EventId" :inner #js {:eventId target-id}}
+                                #js {:tag "TransactionId" :inner #js {:transactionId target-id}})]
+               (log/debug "Executing:" action "on" target-id)
+               (cond
+                 (= action :reply)
+                 (.sendReply timeline payload target-id js/undefined)
+                 (= action :edit)
+                 (.edit timeline id-enum payload js/undefined)))
+             (.send timeline payload js/undefined))
            (.clearComposerDraft room js/undefined)
-           {:db (assoc-in db [:composer room-id] {:text "" :html "" :loaded-text ""})})
-         (catch :default e (log/error "Send Text Panic:" e) {}))))))
-
+           {:db (-> db
+                    (assoc-in [:composer room-id] {:text "" :html "" :loaded-text ""})
+                    (update :input-context dissoc room-id))})
+         (catch :default e (log/error "Send error:" e) {}))))))
 
 (re-frame/reg-event-fx
- :sdk/send-message
- (fn [{:keys [db]} [_ room-id text html]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (if-not timeline
-       (js/console.error "Cannot send: Timeline not booted for" room-id)
-       (try
-         (let [text-payload #js {:content #js {:body text
-                                               :formatted js/undefined}}
-               msg-type     (.new (.-Text MessageType) text-payload)
-               event        (.createMessageContent timeline msg-type)]
-           (-> (.send timeline event)
-               (.then #(js/console.log "Message sent!"))
-               (.catch #(js/console.error "Failed to send message:" %))))
-         (catch :default e
-           (js/console.error "FFI Constructor panic:" e)))))
-   {}))
+ :sdk/send-sticker
+ (fn [{:keys [db]} [_ room-id mxc alt-text info]]
+   (let [client  (:client db)
+         session (when client (.session client))]
+     (if-not (and client session)
+       (log/error "Cannot send raw sticker: No active session")
+       (let [token   (.-accessToken session)
+             hs      (str/replace (.-homeserverUrl session) #"/+$" "")
+             txn-id  (str "stk-" (.getTime (js/Date.)) "-" (rand-int 10000))
+             url     (str hs "/_matrix/client/v3/rooms/"
+                          (js/encodeURIComponent room-id)
+                          "/send/m.sticker/" txn-id)
+             clean-body (cond
+                          (keyword? alt-text) (name alt-text)
+                          (string? alt-text) alt-text
+                          :else "Sticker")
+
+             ;; 2. Clean JS Object with no nulls
+             info-obj (js-obj "mimetype" (or (:mimetype info) "image/png"))
+             _        (when (:w info) (aset info-obj "w" (js/Number (:w info))))
+             _        (when (:h info) (aset info-obj "h" (js/Number (:h info))))
+
+             payload  #js {:body clean-body
+                           :url  mxc
+                           :info info-obj}]
+
+         (log/info "Sending RAW m.sticker event to:" url)
+         (-> (js/fetch url #js {:method  "PUT"
+                                :headers #js {:Authorization (str "Bearer " token)
+                                              :Content-Type  "application/json"}
+                                :body    (js/JSON.stringify payload)})
+             (.then (fn [resp]
+                      (if (.-ok resp)
+                        (log/info "Raw Sticker sent successfully!")
+                        (log/error "Server rejected raw sticker:" (.-status resp)))))
+             (.catch #(log/error "Sticker network error:" %)))))
+     {})))
 
 (re-frame/reg-event-db
  :sdk/upload-complete
@@ -188,58 +221,138 @@
  (fn [db _]
    (:uploading-files? db false)))
 
+(re-frame/reg-event-db
+ :input/set-context
+ (fn [db [_ room-id mode target-item]]
+   (assoc-in db [:input-context room-id]
+             {:mode mode
+              :target target-item})))
+
+(re-frame/reg-event-db
+ :input/clear-context
+ (fn [db [_ room-id]]
+   (update db :input-context dissoc room-id)))
+
+(re-frame/reg-sub
+ :input/context
+ (fn [db [_ room-id]]
+   (get-in db [:input-context room-id])))
+
+(defn inline-editor [item active-id]
+  (r/with-let [!editor (r/atom nil)]
+    (fn [item active-id]
+      (let [m-content    (get-in item [:content :inner :content])
+            raw-html     (:html m-content)
+            initial-text (if (seq raw-html)
+                           (prepare-html-for-editor raw-html)
+                           (or (:body m-content) ""))
+            _ (log/debug initial-text)
+            _ (log/debug raw-html)
+            ]
+        [:div.inline-editor-wrapper
+         [:div.inline-editor-box
+          [:> tiptap-component
+           #js {:activeId active-id
+                :loadedText initial-text
+                :onEditorReady #(reset! !editor %)
+                :onSend (fn [text html]
+                          (let [matrix-html (get-matrix-formatted-body @!editor)]
+                            (re-frame/dispatch [:msg/edit active-id item text matrix-html])
+                            (re-frame/dispatch [:input/clear-context active-id])))}]]
+         [:div.inline-editor-hint
+          "escape to "
+          [:span.link-btn {:on-click #(re-frame/dispatch [:input/clear-context active-id])} "cancel"]
+          " • enter to "
+          [:span.link-btn {:on-click (fn []
+                                       (when-let [ed @!editor]
+                                         (let [text (.getText ed)
+                                               matrix-html (get-matrix-formatted-body ed)]
+                                           (re-frame/dispatch [:msg/edit active-id item text matrix-html])
+                                           (re-frame/dispatch [:input/clear-context active-id]))))} "save"]]]))))
+
 (defn message-input []
-  (r/with-let [!picker-open? (r/atom false)]
+  (r/with-let [!picker-open? (r/atom false)
+               !editor       (r/atom nil)
+               !sug-command  (r/atom nil)]
     (fn []
       (let [active-id   @(re-frame/subscribe [:rooms/active-id])
             uploading?  @(re-frame/subscribe [:input/uploading?])
             attachments @(re-frame/subscribe [:composer/attachments active-id])
-            loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])]
-        [:div.timeline-input-outer {:style {:position "relative"}}
+            loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])
+            context     @(re-frame/subscribe [:input/context active-id])
+            _ (log/debug context)]
+        [:div.timeline-input-outer
+         [suggestion-menu
+          (fn [item]
+            (when-let [cmd @!sug-command]
+              (cmd #js {:props item})))]
          (when @!picker-open?
            [emoji-sticker-board
-            {:on-send-sticker
+            {:on-close #(reset! !picker-open? false)
+             :on-send-sticker
              (fn [mxc alt-text info]
                (re-frame/dispatch [:sdk/send-sticker active-id mxc alt-text info])
                (reset! !picker-open? false))
              :on-insert-emoji
-             (fn [shortcode]
-               ;; TODO: We need to tell Tiptap to insert this
-               (js/console.log "Need to insert into Tiptap:" shortcode)
+             (fn [shortcode url]
+               (when-let [ed @!editor]
+                 (-> ed .chain .focus
+                     (.insertContent #js {:type "customEmote"
+                                          :attrs #js {:shortcode shortcode
+                                                      :src (mxc->url url)}})
+                     .run))
                (reset! !picker-open? false))}])
-         [:div.timeline-input-wrapper {:style {:display "flex" :flex-direction "column"}}
+         (when (and context (= (:mode context) :reply))
+           [:div.input-context-banner
+            [:div.context-info
+             [:span (str "Replying to " (-> context :target :sender-name))]]
+            [:button.context-cancel-btn
+             {:on-click #(re-frame/dispatch [:input/clear-context active-id])} "✖"]])
+
+         [:div.timeline-input-wrapper
           (when (seq attachments)
-            [:div.composer-attachments {:style {:display "flex" :flex-direction "row" :overflow-x "auto"
-                                                :gap "10px" :padding "10px" :background "rgba(0,0,0,0.2)"}}
+            [:div.composer-attachments
              (doall
               (map-indexed (fn [idx att]
                              ^{:key (str "att-" idx)}
                              [attachment-preview active-id att idx])
                            attachments))])
+
           (when uploading?
             [:div.upload-indicator
              [:span.upload-text "Uploading file..."]
              [:div.upload-progress-bar [:div.upload-progress-fill]]])
-          [:div.input-row {:style {:display "flex" :flex-direction "row" :align-items "center" :width "100%"}}
-           [:div.editor-container {:style {:flex-grow 1 :min-width 0 :padding "8px 12px"}}
+
+          [:div.timeline-input-row
+           [:label.timeline-upload-btn
+            {:title "Upload a file"}
+            [:input {:type "file"
+                     :multiple true
+                     :style {:display "none"}
+                     :on-change (fn [e]
+                                  (let [files      (.. e -target -files)
+                                        file-array (js/Array.from files)]
+                                    (when (seq file-array)
+                                      (re-frame/dispatch [:sdk/handle-file-drop active-id file-array]))
+                                    (set! (.-value (.-target e)) "")))}]
+            "➕"]
+           [:div.timeline-editor-container
             [:> tiptap-component
              #js {:activeId active-id
                   :loadedText loaded-text
                   :onChange (fn [text html]
                               (re-frame/dispatch [:composer/on-change active-id text html]))
                   :onSend (fn [text html]
-                            (re-frame/dispatch [:composer/submit active-id text html attachments]))
+                            (let [matrix-html (get-matrix-formatted-body @!editor)]
+                              (re-frame/dispatch [:composer/submit active-id text matrix-html])))
                   :onFiles (fn [files]
                              (let [file-array (js/Array.from files)]
-                               (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))}]]
-           [:button.emoji-toggle-btn
+                               (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))
+                  :onEditorReady #(reset! !editor %)
+                  :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
+                  :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
+           [:button.timeline-emoji-btn
             {:on-click (fn [e]
                          (.stopPropagation e)
-                         (swap! !picker-open? not))
-             :style {:padding "10px 16px"
-                     :background "transparent"
-                     :border "none"
-                     :cursor "pointer"
-                     :font-size "1.4rem"
-                     :flex-shrink 0}}
+                         (swap! !picker-open? not))}
             "😀"]]]]))))
