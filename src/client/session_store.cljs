@@ -6,7 +6,6 @@
 (def ^:private storage-key "mx_session_v3")
 
 (defn- get-session-class []
-  ;; Use the exact same root-finding logic that worked in login.cljs!
   (let [sdk-root (if (.-Session sdk) sdk (.-default sdk))]
     (if sdk-root
       (.-Session sdk-root)
@@ -45,6 +44,35 @@
 (set! (.-onerror request) #(resolve))
 (set! (.-onblocked request) #(resolve)))))))
 
+(defn- sync-to-sw-vault! [sessions-obj]
+  (let [user-keys (js/Object.keys sessions-obj)]
+    (when (pos? (.-length user-keys))
+      (let [request (.open js/indexedDB "sw-vault" 1)]
+        (set! (.-onupgradeneeded request)
+              (fn [e]
+                (let [db (.. e -target -result)]
+                  (.createObjectStore db "tokens" #js {:keyPath "userId"}))))
+        (set! (.-onsuccess request)
+              (fn [e]
+                (let [db (.. e -target -result)
+                      tx (.transaction db #js ["tokens"] "readwrite")
+                      store (.objectStore tx "tokens")]
+                  (.clear store)
+                  (doseq [user-id user-keys]
+                    (let [data (aget sessions-obj user-id)
+                          session (aget data "session")
+                          token (aget session "accessToken")
+                          device-id (aget session "deviceId")
+                          hs-url (aget session "homeserverUrl")]
+                      (.put store #js {:userId    user-id
+                                       :token      token
+                                       :deviceId  device-id
+                                       :hsUrl     hs-url
+                                       :updatedAt (js/Date.now)}))))))))))
+
+
+
+
 (defn- load-sessions-sync-impl []
 (let [sessions (load-raw-sessions-js)
       Session (get-session-class)]
@@ -68,14 +96,27 @@ final-id   (or store-id   (when existing (aget existing "storeId")))]
   (aset sessions user-id #js {:session session
                               :passphrase final-pass
                               :storeId final-id})
-  (save-raw-sessions-js! sessions))))
+  (save-raw-sessions-js! sessions)
+  (sync-to-sw-vault! sessions)
+  )))
+
+(defn- clear-sw-vault-user! [user-id]
+  (let [request (.open js/indexedDB "sw-vault" 1)]
+    (set! (.-onsuccess request)
+          (fn [e]
+            (let [db (.. e -target -result)
+                  tx (.transaction db #js ["tokens"] "readwrite")
+                  store (.objectStore tx "tokens")]
+              (.delete store user-id))))))
 
 (defn- clear-session-impl! [user-id]
 (let [sessions (load-raw-sessions-js)
 data (aget sessions user-id)]
 (p/do
 (when-let [sid (and data (aget data "storeId"))]
-(delete-store-impl! sid))
+(delete-store-impl! sid)
+(clear-sw-vault-user! user-id)
+)
   (js-delete sessions user-id)
   (save-raw-sessions-js! sessions))))
 
@@ -94,8 +135,8 @@ Object
     (generate-uuid))
 
 (getStoreName [this store-id]
-(str "closura-store-" store-id))
+(str "paradise-store-" store-id))
 
 (clear [this user-id]
-;; Return a promise to the caller so they can await the cleanup
+
 (clear-session-impl! user-id)))
