@@ -31,11 +31,19 @@ actual UI components themselves.
    [promesa.core :as p]
    [reagent.core :as r]
    [reagent.dom.client :as rdom]
-   [spaces.bar :refer [spaces-sidebar]]
-   [timeline.base :refer [timeline]]
+   [navigation.spaces.bar :refer [spaces-sidebar]]
+   [overlays.settings :refer [settings-modal]]
+   [container.timeline.base :refer [timeline]]
+   [overlays.lightbox :refer [image-lightbox]]
+   [container.call.call-container :refer [persistent-call-container]]
+   [container.call.call-view :refer [call-view]]
    [auth.events :refer [login-screen]]
+   [input.emotes :refer [emoji-sticker-board]]
+   [utils.global-ui :refer [global-reaction-picker global-context-menu satellite-overlay]]
    [client.login :refer [bootstrap!]]
-   [room.room-list :refer [room-list]]
+   [navigation.rooms.room-list :refer [room-list]]
+   [container.call.events]
+   [container.call.core]
    ))
 #+end_src
 
