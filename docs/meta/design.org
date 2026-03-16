@@ -1,0 +1,91 @@
+
+** Design Documents
+
+I feel it is appropriate at some level to outline the architectural
+design choices for structuring the project.
+
+
+***** Container
+
+The container directory will contain the items that are often the center piece of a
+viewing experience. It simplifies the layout of the architecture to reduce
+the items within the UI into commonality.
+
+As such we can identify that the container would host functionality such as
+the Timeline, Composer, Call interface, and Threads.
+Effectively, if it is a panel that is to be rendered as a base component
+that is not the navigation then it is classified as living here.
+
+
+
+***** Overlays
+
+That said, organization of said features becomes inaccurate when broken
+into these components to some extent. The emoji board exists inside the composer
+however we utilize it across the application.
+Components that behave in this manner can be labeled as popout both for how
+they are expected to behave but also in the fact that they tend to pop out
+of the rigid organizational structure they might be placed in.
+Some are modals, but some are much less... scope changing (auto-complete pop-outs).
+So overlay feels like an appropriate term to capture both.
+
+***** Navigation
+
+To wrap the simple organizational structure we identify that often the
+navigation components often exist in a sidebar. Regardless of where or
+how they exist though they serve the user in maneuvering around the application
+interface. Whether this is through literal CLI keyboard navigation or from
+a GUI sidebar it is all the same. So it makes sense to place them in a
+logical group called 'navigation'.
+
+
+***** Globals
+
+Of course there are miscellaneous portions of an application that don't fit
+neatly into any sort of easy system. Examples such as 'global' macro
+declarations or helper functions. For the most part these are sensible to
+position inside of a utils directory.
+
+
+
+***** Reusable
+
+Beyond those reusable global functions there is another group
+of items that aren't quite as global, but might see some level of replication.
+In the goal of utilizing the concept abstraction these might be functions
+that are utilized by higher level functions to perform some sort of base
+behavior. A good example in this project is the use of the diff handling.
+Much of the rust-sdk uses diffs to enable updating object states through
+subscription listeners. For the sake of simplicity, these also might be
+practical to simply keep in the utils directory.
+
+
+***** Root Level
+
+Outside these you might have entry points to the application, build hooks, or
+even service workers. These are best left in the root.
+
+
+***** Summarized
+
+None of these particularly rely on whatever decisions we make as far as
+graphic library used or not used. Of course, like anything these are
+all quite reduction-ist, opinionated thoughts on UI from an individual
+who  fails to meet any sort of criteria of being an 'expert' on the
+matter.
+
+Still, for the sake of the project it is important to define and elaborate
+on the design choices within. That way the shortcomings and failure in
+consideration can be easily gleaned by a later viewer. Perhaps then, that
+individual might do a better job at improving upon the goal and ideas
+captured by this project.
+
+
+
+
+***** Mermaid Chart
+
+#+begin_src mermaid :file architecture.png
+#+end_src
+
+
