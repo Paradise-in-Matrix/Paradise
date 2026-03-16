@@ -81,46 +81,66 @@ https://matrix-org.github.io/matrix-rust-sdk/
            (js/console.error "FFI Sync Call Panic:" e)
            (re-frame/dispatch [:sdk/upload-complete]))))
      {})))
-
 #+end_src
+
+
+
 
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
 (re-frame/reg-event-fx
  :sdk/handle-file-drop
  (fn [{:keys [db]} [_ room-id files]]
-   (let [raw-file (first files)]
-     (if raw-file
-       (let [reader (js/FileReader.)
-             preview-url (js/URL.createObjectURL raw-file)
-             mime (.-type raw-file)
-             filename (.-name raw-file)]
-         (set! (.-onload reader)
-               (fn [e]
-                 (let [buffer (.. e -target -result)
-                       attachment {:buffer buffer
-                                   :mime mime
-                                   :filename filename
-                                   :preview-url preview-url}]
-                   (re-frame/dispatch [:composer/add-attachment room-id attachment]))))
-         (.readAsArrayBuffer reader raw-file)
-         {:db db})
-       (do (log/warn "Missing file for drop") {})))))
-#+end_src
-
-
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
-(defn build-mentions [user-ids push-room?]
-  (if (and (empty? user-ids) (not push-room?))
-    js/undefined
-    (.. (.-Mentions sdk)
-        (create #js {:userIds (clj->js user-ids)
-                     :room (boolean push-room?)}))))
+   (doseq [raw-file files]
+     (let [reader      (js/FileReader.)
+           preview-url (js/URL.createObjectURL raw-file)
+           mime        (.-type raw-file)
+           filename    (.-name raw-file)]
+       (set! (.-onload reader)
+             (fn [e]
+               (let [buffer (.. e -target -result)
+                     attachment {:buffer      buffer
+                                 :mime        mime
+                                 :filename    filename
+                                 :preview-url preview-url}]
+                 (re-frame/dispatch [:composer/add-attachment room-id attachment]))))
+       (.readAsArrayBuffer reader raw-file)))
+   {}))
 #+end_src
 
 
 
+**** Sending Messages
+
+
+***** Sending Attachments
+
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
-(defn send-all! [timeline attachments text html]
+(defn send-attachments! [sdk timeline room attachments text html]
+  (let [total (count attachments)]
+    (p/let [_ (p/loop [idx 0]
+                (when (< idx total)
+                  (let [att       (nth attachments idx)
+                        is-last?  (= idx (dec total))
+                        {:keys [source info type]} (prepare-attachment sdk att)
+                        caption   (if is-last? (or text js/undefined) (:filename att))
+                        formatted (if (and is-last? (not (str/blank? html)))
+                                    #js {:format (.new (.-Html (.-MessageFormat sdk)))
+                                         :body html}
+                                    js/undefined)
+                        params    (.. sdk -UploadParameters
+                                      (create #js {:source source
+                                                   :caption (or caption js/undefined)
+                                                   :formattedCaption (or formatted js/undefined)}))]
+                    (log/info "Sending attachment" (inc idx) "of" total "as" type)
+                    (.sendFile timeline params info)
+                    (p/do! (p/delay 100)
+                           (p/recur (inc idx))))))]
+      (.clearComposerDraft room js/undefined)
+      (doseq [att attachments]
+        (js/URL.revokeObjectURL (:preview-url att)))
+      true)))
+
+  (defn send-all! [timeline attachments text html]
   (let [total (count attachments)
         send-one (fn send-one [remaining-atts idx]
                    (if (empty? remaining-atts)
@@ -147,75 +167,138 @@ https://matrix-org.github.io/matrix-rust-sdk/
                        (-> (.sendFile timeline params info)
                            (.then (fn [] (send-one (rest remaining-atts) (inc idx))))))))]
     (send-one (vec attachments) 0)))
+#+end_src
 
+
+
+**** Message Submit
+
+
+#+begin_src clojurescript :tangle ../../src/input/base.cljs
 (re-frame/reg-event-fx
  :composer/submit
- (fn [{:keys [db]} [_ room-id text html _]]
-   (let [client   (:client db)
-         timeline (get-in db [:timeline-subs room-id :timeline])
-         room     (when client (.getRoom client room-id))
-         attachments (get-in db [:drafts room-id :attachments])]
+ (fn [{:keys [db]} [_ room-id text html]]
+   (let [client      (:client db)
+         timeline    (get-in db [:timeline-subs room-id :timeline])
+         room        (when client (.getRoom client room-id))
+         attachments (get-in db [:drafts room-id :attachments])
+         context     (get-in db [:input-context room-id])]
      (cond
        (or (not timeline) (not room))
        (do (log/error "Room or Timeline missing for" room-id) {})
        (seq attachments)
-       (let [total (count attachments)]
-         (p/let [_ (p/loop [idx 0]
-                     (when (< idx total)
-                       (let [att       (nth attachments idx)
-                             is-last?  (= idx (dec total))
-                             ffi-att   (reify-attachment att)
-                             inner     (.-inner ffi-att)
-                             tag       (.-tag ffi-att)
-                             caption   (if is-last? (or text js/undefined) (:filename att))
-                             formatted (if (and is-last? (not (str/blank? html)))
-                                         #js {:format (.new (.-Html (.-MessageFormat sdk)))
-                                              :body html}
-                                         js/undefined)
-                             params (.. (.-UploadParameters sdk)
-                                        (create #js {:source (.-source inner)
-                                                     :caption (or caption js/undefined)
-                                                     :formattedCaption (or formatted js/undefined)}))
-                             info   (condp = tag
-                                      "Image" (.-imageInfo inner)
-                                      "Video" (.-videoInfo inner)
-                                      (.-fileInfo inner))]
-                         (log/info "Sending" tag (inc idx) "of" total)
-                         (.sendFile timeline params info)
-                         (p/do! (p/delay 100)
-                                (p/recur (inc idx))))))]
-           (.clearComposerDraft room js/undefined)
-           (doseq [att attachments] (js/URL.revokeObjectURL (:preview-url att)))
-           (re-frame/dispatch [:composer/clear-after-submit room-id]))
+       (do
+         (-> (send-attachments! sdk timeline room attachments text html)
+             (.then #(re-frame/dispatch [:composer/clear-after-submit room-id]))
+             (.catch #(log/error "Failed to send attachments:" %)))
          {})
-       :else
+:else
        (try
-         (let [msg-type (.new (.-Text MessageType) #js {:content #js {:body text :formatted js/undefined}})
-               event    (.createMessageContent timeline msg-type)]
-           (.send timeline event)
+         (let [_       (log/debug "LIVE CONTEXT FROM DB:" context)
+               payload (.messageEventContentFromHtml sdk text (or html text))]
+           (if context
+             (let [action     (:mode context)
+                   raw-id-obj (-> context :target :event-or-transaction-id)
+                   target-id  (if (= (.-tag raw-id-obj) "EventId")
+                                (.. raw-id-obj -inner -eventId)
+                                (.. raw-id-obj -inner -transactionId))
+                   id-enum    (if (str/starts-with? target-id "$")
+                                #js {:tag "EventId" :inner #js {:eventId target-id}}
+                                #js {:tag "TransactionId" :inner #js {:transactionId target-id}})]
+               (log/debug "Executing:" action "on" target-id)
+               (cond
+                 (= action :reply)
+                 (.sendReply timeline payload target-id js/undefined)
+                 (= action :edit)
+                 (.edit timeline id-enum payload js/undefined)))
+             (.send timeline payload js/undefined))
            (.clearComposerDraft room js/undefined)
-           {:db (assoc-in db [:composer room-id] {:text "" :html "" :loaded-text ""})})
-         (catch :default e (log/error "Send Text Panic:" e) {}))))))
+           {:db (-> db
+                    (assoc-in [:composer room-id] {:text "" :html "" :loaded-text ""})
+                    (update :input-context dissoc room-id))})
+         (catch :default e (log/error "Send error:" e) {}))))))
+#+end_src
 
 
+**** Sending Stickers
+
+
+Stickers are actually an annoying special case. Inside the Rust-sdk
+as of this version they are actually a stubbed method.
+
+#+begin_src Typescript
+    class Sticker_ extends UniffiEnum implements Sticker__interface {
+        /**
+         * @private
+         * This field is private and should not be used, use `tag` instead.
+         */
+        readonly [uniffiTypeNameSymbol] = "MessageLikeEventContent";
+        readonly tag = MessageLikeEventContent_Tags.Sticker;
+        constructor() {
+            super("MessageLikeEventContent", "Sticker")
+        }
+
+        static new(): Sticker_ {
+            return new Sticker_()
+        }
+
+        static instanceOf(obj: any): obj is Sticker_ {
+            return obj.tag === MessageLikeEventContent_Tags.Sticker
+        }
+    }
+#+end_src
+
+As you can note... the constructor has no parameters among other issues.
+So instead, we must inform the server that we are sending a Sticker directly.
+Later on this ideally will be changed, but for now this is the only path
+forward.
+
+#+begin_src clojurescript :tangle ../../src/input/base.cljs
 (re-frame/reg-event-fx
- :sdk/send-message
- (fn [{:keys [db]} [_ room-id text html]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (if-not timeline
-       (js/console.error "Cannot send: Timeline not booted for" room-id)
-       (try
-         (let [text-payload #js {:content #js {:body text
-                                               :formatted js/undefined}}
-               msg-type     (.new (.-Text MessageType) text-payload)
-               event        (.createMessageContent timeline msg-type)]
-           (-> (.send timeline event)
-               (.then #(js/console.log "Message sent!"))
-               (.catch #(js/console.error "Failed to send message:" %))))
-         (catch :default e
-           (js/console.error "FFI Constructor panic:" e)))))
-   {}))
+ :sdk/send-sticker
+ (fn [{:keys [db]} [_ room-id mxc alt-text info]]
+   (let [client  (:client db)
+         session (when client (.session client))]
+     (if-not (and client session)
+       (log/error "Cannot send raw sticker: No active session")
+       (let [token   (.-accessToken session)
+             hs      (str/replace (.-homeserverUrl session) #"/+$" "")
+             txn-id  (str "stk-" (.getTime (js/Date.)) "-" (rand-int 10000))
+             url     (str hs "/_matrix/client/v3/rooms/"
+                          (js/encodeURIComponent room-id)
+                          "/send/m.sticker/" txn-id)
+             clean-body (cond
+                          (keyword? alt-text) (name alt-text)
+                          (string? alt-text) alt-text
+                          :else "Sticker")
 
+             ;; 2. Clean JS Object with no nulls
+             info-obj (js-obj "mimetype" (or (:mimetype info) "image/png"))
+             _        (when (:w info) (aset info-obj "w" (js/Number (:w info))))
+             _        (when (:h info) (aset info-obj "h" (js/Number (:h info))))
+
+             payload  #js {:body clean-body
+                           :url  mxc
+                           :info info-obj}]
+
+         (log/info "Sending RAW m.sticker event to:" url)
+         (-> (js/fetch url #js {:method  "PUT"
+                                :headers #js {:Authorization (str "Bearer " token)
+                                              :Content-Type  "application/json"}
+                                :body    (js/JSON.stringify payload)})
+             (.then (fn [resp]
+                      (if (.-ok resp)
+                        (log/info "Raw Sticker sent successfully!")
+                        (log/error "Server rejected raw sticker:" (.-status resp)))))
+             (.catch #(log/error "Sticker network error:" %)))))
+     {})))
+#+end_src
+
+
+**** Reframe events and subscriptions
+
+
+#+begin_src clojurescript :tangle ../../src/input/base.cljs
 (re-frame/reg-event-db
  :sdk/upload-complete
  (fn [db _]
