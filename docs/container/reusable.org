@@ -1,0 +1,256 @@
+
+** Reusable Container Elements
+
+**** Preface
+
+There are some reusable components between the items in the container,
+so we'll keep them nicely collected here.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
+(ns container.reusable
+            (:require [re-frame.core :as re-frame]
+            [taoensso.timbre :as log]
+            [re-frame.db :as db]
+            ["react-virtuoso" :refer [Virtuoso]]
+            [promesa.core :as p]
+            [reagent.core :as r]
+            [reagent.dom.client :as rdom])
+  )
+#+end_src
+
+
+
+**** Reframe Events and Subscriptions
+
+#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
+(re-frame/reg-event-db
+ :container/set-main-focus
+ (fn [db [_ focus]]
+   (assoc db :main-focus focus)))
+
+(re-frame/reg-event-db
+ :container/set-side-panel
+ (fn [db [_ panel]]
+   (assoc db :side-panel panel)))
+
+(re-frame/reg-sub
+ :container/main-focus
+ (fn [db _]
+   (:main-focus db :timeline)))
+
+(re-frame/reg-sub
+ :container/side-panel
+ (fn [db _]
+   (:side-panel db nil)))
+#+end_src
+
+
+**** Room Header
+
+
+***** Room Header Component
+
+******* TODO Swap icons for SVGs
+
+#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
+(defn room-header [{:keys [display-name compact? active-id]}]
+  (let [main-focus    @(re-frame/subscribe [:container/main-focus])
+        side-panel    @(re-frame/subscribe [:container/side-panel])
+        call-active?  @(re-frame/subscribe [:call/is-active?])
+        in-lobby?     (and (= main-focus :timeline) call-active?)
+        show-actions? (or (not compact?) (= main-focus :call))]
+    [:div.timeline-header
+     [:div.header-left
+      [:button.mobile-menu-btn {:on-click #(re-frame/dispatch [:container/toggle-sidebar])} "☰"]
+      (when display-name
+        [:h2.timeline-header-title display-name])]
+     (when (and show-actions? active-id)
+       [:div.header-actions
+        [:button.header-icon-btn
+         {:title (if in-lobby? "Join Call" "Start Call")
+          :class (when (or (= main-focus :call) call-active?) "active-green")
+          :on-click (fn [_]
+                      (re-frame/dispatch [:call/init-widget active-id])
+                      (re-frame/dispatch [:container/set-main-focus :call]))}
+         [:svg {:viewBox "0 0 24 24" :width "20" :height "20" :fill "none" :stroke "currentColor" :stroke-width "2"}
+          [:path {:d "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"}]]]
+
+       (when (= main-focus :call)
+          [:button.header-icon-btn
+           {:title "Room Chat"
+            :class (when (= side-panel :timeline) "active")
+            :on-click #(re-frame/dispatch [:container/set-side-panel (if (= side-panel :timeline) nil :timeline)])}
+           [:svg {:viewBox "0 0 24 24" :width "20" :height "20" :fill "none" :stroke "currentColor" :stroke-width "2"}
+            [:path {:d "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"}]]])
+
+        [:button.header-icon-btn
+         {:title "Search"
+          :class (when (= side-panel :search) "active")
+          :on-click #(re-frame/dispatch [:container/set-side-panel :search])}
+         [:svg {:viewBox "0 0 24 24" :width "20" :height "20" :fill "none" :stroke "currentColor" :stroke-width "2"}
+          [:circle {:cx "11" :cy "11" :r "8"}]
+          [:line {:x1 "21" :y1 "21" :x2 "16.65" :y2 "16.65"}]]]
+
+        [:button.header-icon-btn
+         {:title "Pinned Messages"
+          :class (when (= side-panel :pins) "active")
+          :on-click #(re-frame/dispatch [:container/set-side-panel :pins])}
+         [:svg {:viewBox "0 0 24 24" :width "20" :height "20" :fill "none" :stroke "currentColor" :stroke-width "2"}
+          [:path {:d "M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v2a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 10z"}]
+          [:path {:d "M12 22v-6"}]
+          [:path {:d "m12 16 7-4"}]
+          [:path {:d "M12 16 5 12"}]]]
+
+        [:button.header-icon-btn
+         {:title "Member List"
+          :class (when (= side-panel :members) "active")
+          :on-click #(re-frame/dispatch [:container/set-side-panel :members])}
+         [:svg {:viewBox "0 0 24 24" :width "20" :height "20" :fill "none" :stroke "currentColor" :stroke-width "2"}
+          [:path {:d "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"}]
+          [:circle {:cx "9" :cy "7" :r "4"}]
+          [:path {:d "M23 21v-2a4 4 0 0 0-3-3.87"}]
+          [:path {:d "M16 3.13a4 4 0 0 1 0 7.75"}]]]
+
+        [:button.header-icon-btn
+         {:title "More Options"
+          :on-click (fn [e]
+                      (let [mx (.-clientX e)
+                            my (.-clientY e)]
+                        (re-frame/dispatch [:context-menu/open {:x mx :y my :items (build-room-actions active-id display-name)}])))}
+         [:svg {:viewBox "0 0 24 24" :width "20" :height "20" :fill "none" :stroke "currentColor" :stroke-width "2"}
+          [:circle {:cx "12" :cy "12" :r "1"}]
+          [:circle {:cx "12" :cy "5" :r "1"}]
+          [:circle {:cx "12" :cy "19" :r "1"}]]]])]))
+#+end_src
+
+
+***** Room Header CSS
+
+#+begin_src css :tangle ../../css/room-header.css
+.room-layout {
+    flex: 1;
+    height: 100vh;
+    display: grid;
+    overflow: hidden;
+}
+
+.room-header {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 48px;
+    border-bottom: 1px solid #1e1f22;
+    background: #313338;
+    min-width: 0;
+}
+
+.room-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
+}
+
+.main-content, .sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.header-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a0a0a0;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease-in-out;
+  outline: none;
+}
+
+.header-btn .icon {
+  font-size: 1rem;
+  filter: grayscale(100%);
+  opacity: 0.7;
+}
+
+.header-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.header-btn:hover .icon {
+  filter: none;
+  opacity: 1;
+}
+
+.header-btn.active {
+  background: rgba(88, 101, 242, 0.2);
+  border-color: #5865f2;
+  color: #fff;
+}
+
+.header-btn.active .icon {
+  filter: none;
+  opacity: 1;
+}
+
+.header-btn.pulse-green {
+  border-color: #23a559;
+  color: #23a559;
+  animation: header-pulse 2s infinite;
+}
+
+@keyframes header-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); }
+}
+
+.header-icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.header-icon-btn:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
+}
+
+.header-icon-btn.active {
+    background: var(--surface-3);
+    color: var(--primary-accent);
+}
+
+.header-icon-btn.active-green {
+    color: #43b581;
+}
+
+#+end_src

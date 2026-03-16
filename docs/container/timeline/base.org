@@ -1,0 +1,916 @@
+
+** Timeline
+
+
+**** Preface
+
+Obviously a Matrix client needs a timeline. For now we'll scaffold out a design similar to the other components
+we've made interop with the WASM bindings.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(ns container.timeline.base
+  (:require [promesa.core :as p]
+            [re-frame.core :as re-frame]
+            [taoensso.timbre :as log]
+            [clojure.string :as str]
+            [re-frame.db :as db]
+            ["react-virtuoso" :refer [Virtuoso]]
+            [reagent.core :as r]
+            [reagent.dom.client :as rdom]
+            [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date]]
+            [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
+            [container.timeline.item :refer [event-tile reify-item]]
+            [container.reusable :refer [room-header]]
+            [input.base :refer [message-input inline-editor]]
+            [navigation.rooms.room-summary :refer [build-room-summary]]
+            [client.diff-handler :refer [apply-matrix-diffs]]
+            ["generated-compat" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent]]
+            ))
+#+end_src
+
+
+**** Timeline Queue
+
+This is our diff trigger method. On a diff returned from the Rust SDK
+It then takes the diff and tells reframe what to update the timeline
+to now display. This could be just *adding* a single message or swapping
+rooms.
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(defonce !timeline-queues (atom {}))
+
+(defn apply-timeline-diffs! [room-id updates]
+  (swap! !timeline-queues update room-id #(or % (p/resolved [])))
+  (swap! !timeline-queues
+         (fn [queues]
+           (update queues room-id
+                   (fn [prev-promise]
+                     (-> prev-promise
+                         (p/then (fn [current-events]
+                                   (apply-matrix-diffs current-events updates reify-item)))
+                         (p/then (fn [next-events]
+                                   (log/debug "Timeline diffs finished")
+                                   (re-frame/dispatch [:sdk/update-timeline room-id next-events])
+                                   next-events))
+                         (p/catch (fn [err]
+                                    (js/console.error "Timeline Diff Panic for room" room-id ":" err)
+                                    (get-in @re-frame.db/app-db [:timeline room-id] []))))))))
+  nil)
+#+end_src
+
+
+**** Reframe event and subscriptions
+
+This is a functional stub for now. I'll go back and split and describe
+each of these later.
+****** TODO Describe these
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(re-frame/reg-sub
+ :timeline/event-by-id
+ (fn [[_ room-id _]]
+   (re-frame/subscribe [:timeline/current-events room-id]))
+ (fn [events [_ _ target-id]]
+   (first (filter #(= (:id %) target-id) events))))
+
+(re-frame/reg-event-db
+ :sdk/update-timeline
+ (fn [db [_ room-id events]]
+   (assoc-in db [:timeline room-id] events)))
+
+(re-frame/reg-event-fx
+ :sdk/cleanup-timeline
+ (fn [{:keys [db]} [_ room-id]]
+   (when-let [subs (get-in db [:timeline-subs room-id])]
+     (when-let [tl-handle (:tl-handle subs)]
+       (.cancel tl-handle))
+     (when-let [pag-handle (:pag-handle subs)]
+       (.cancel pag-handle)))
+   {:db (update db :timeline-subs dissoc room-id)}))
+
+(re-frame/reg-event-db
+ :sdk/update-pagination-status
+ (fn [db [_ room-id status]]
+   (assoc-in db [:timeline-pagination room-id] status)))
+
+
+(re-frame/reg-event-fx
+ :sdk/boot-timeline
+ (fn [{:keys [db]} [_ room-id]]
+   (if (get-in db [:timeline-subs room-id])
+     (do (log/warn "Prevented duplicate timeline boot for:" room-id) {})
+     (let [client (:client db)]
+       (when-let [room (.getRoom client room-id)]
+         (-> (p/let [timeline        (.timeline room)
+                     listener        #js {:onUpdate (fn [diffs] (apply-timeline-diffs! room-id diffs))}
+
+                     timeline-handle (.addListener timeline listener)
+                     pag-listener    #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])}
+                     pag-handle      (.subscribeToBackPaginationStatus timeline pag-listener)
+                     ]
+               (.paginateBackwards timeline 5)
+             (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline timeline-handle pag-handle]))
+             (.catch #(js/console.error "Boot failed:" %))))
+       {}))))
+
+(re-frame/reg-event-fx
+ :sdk/preload-timelines
+ (fn [{:keys [db]} [_ room-ids]]
+   (let [active-subs (get db :timeline-subs {})
+         rooms-to-boot (remove #(contains? active-subs %) (take 3 room-ids))]
+     (if (seq rooms-to-boot)
+       {:dispatch-n (map (fn [rid] [:sdk/boot-timeline rid]) rooms-to-boot)}
+       {}))))
+
+(re-frame/reg-event-fx
+ :sdk/preload-timeline-safe
+ (fn [{:keys [db]} [_ room-id]]
+   (let [already-booted? (contains? (:timeline-subs db) room-id)]
+     (if already-booted?
+       {}
+       {:dispatch [:sdk/boot-timeline room-id]}))))
+
+(re-frame/reg-event-db
+ :sdk/save-timeline-sub
+ (fn [db [_ room-id timeline tl-handle pag-handle]]
+   (assoc-in db [:timeline-subs room-id]
+             {:timeline timeline
+              :tl-handle tl-handle
+              :pag-handle pag-handle})))
+
+(re-frame/reg-event-fx
+ :sdk/back-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading? (get-in db [:timeline/loading-more? room-id])
+         status   (get-in db [:timeline-pagination room-id])]
+     (if (and room-id
+              (not loading?)
+              (not= status "Paginating")
+              (not= status "TimelineStartReached"))
+       (when-let [timeline (get-in db [:timeline-subs room-id :timeline])]
+         (-> (.paginateBackwards timeline 50)
+             (.then #(re-frame/dispatch [:sdk/pagination-complete room-id])))
+         {:db (assoc-in db [:timeline/loading-more? room-id] true)})
+       {}))))
+
+(re-frame/reg-event-db
+ :sdk/pagination-complete
+ (fn [db [_ room-id]]
+   (let [timeline-path [:timeline-pagination room-id]
+         ]
+     (-> db
+         (assoc-in [:timeline/loading-more? room-id] false)
+         ))))
+#+end_src
+
+
+This is important to do as we must normalize the list coming from the
+Rust SDK. Otherwise sliding sync will provide us duplicate unique
+IDs and cause the Timeline rendering to freak out.
+In addition to normalizing on the id, we need to ensure we
+only render the LATEST version of an id (yes the timeline will
+have two objects with the same unique ID if for example there
+is an edit)
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(re-frame/reg-sub
+ :timeline/current-events
+ (fn [db _]
+   (let [active-room (:active-room-id db)
+         raw-events  (get-in db [:timeline active-room] [])]
+     (->> raw-events
+          (reduce (fn [acc e]
+                    (let [id-key   (or (:internal-id e) (:id e))
+                          existing (get acc id-key)]
+                      (if (and existing
+                               (not (:is-edited? e))
+                               (<= (:ts e) (:ts existing)))
+                        acc
+                        (assoc acc id-key e))))
+                  {})
+          (vals)
+          (sort-by :ts)
+          (vec)))))
+#+end_src
+
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(re-frame/reg-sub
+ :timeline/loading-more?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/loading-more? room-id] false)))
+#+end_src
+
+
+**** Virtuoso Timeline Component
+
+Similar to Spaces and RoomLists we do a Virtuoso component here.
+We ensure the array that will compose its table of individual elements
+is a JS array and then we move on with defining the actual
+behavior for the timeline.
+****** TODO Timeline is currently not performant for a few reasons
+We need to button up this better, as this was the most recently added thing
+from the enter refactoring of the "application view"
+
+The table itself asks reframe to trigger the back pagination when the "start"
+is reached. This should probably also have a somewhat automatic trigger until
+size is reached, but the behavior may be impacted by the performant issue
+mentioned above. Should be easily sorted, however.
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(defn virtualized-timeline [events room-id]
+  (r/with-let [!start-index    (r/atom 1000000)
+               !prev-first-id  (r/atom nil)
+               !prev-count     (r/atom 0)
+               !initial-idx    (r/atom nil)
+               !at-bottom?     (r/atom true)
+               !virtuoso-ref   (r/atom nil)]
+    (let [event-array (to-array events)
+          cnt         (count event-array)
+          first-id    (some-> (aget event-array 0) :id)
+          loading?    @(re-frame/subscribe [:timeline/loading-more? room-id])]
+
+      (when (and (nil? @!initial-idx) (pos? cnt))
+        (reset! !initial-idx (dec (+ @!start-index cnt))))
+
+      (when (and @!prev-first-id (not= first-id @!prev-first-id) (> cnt @!prev-count))
+        (swap! !start-index - (- cnt @!prev-count)))
+
+      (reset! !prev-first-id first-id)
+      (reset! !prev-count cnt)
+
+      [:div.timeline-messages
+       (when loading?
+         [:div.timeline-loading-overlay
+          [:div.spinner]])
+
+       (when-not @!at-bottom?
+         [:button.jump-to-bottom
+          {:on-click #(.scrollToIndex @!virtuoso-ref #js {:index (dec (+ @!start-index cnt))
+                                                          :behavior "smooth"})}
+          "Jump to Present"])
+
+       [:> Virtuoso
+        {:key room-id
+         :ref #(reset! !virtuoso-ref %)
+         :data event-array
+         :firstItemIndex @!start-index
+         :initialTopMostItemIndex @!initial-idx
+         :alignToBottom true
+         :increaseViewportBy 400
+         :atBottomThreshold 100
+         :atBottomStateChange #(reset! !at-bottom? %)
+         :followOutput (fn [at-bottom] (if at-bottom "auto" false))
+         :isScrolling (fn [scrolling?]
+                        (when scrolling?
+                          ))
+         :startReached (fn []
+                         (log/debug "Start reached for" room-id)
+                         (re-frame/dispatch [:sdk/back-paginate room-id]))
+         :computeItemKey (fn [_ item] (:id item))
+         :itemContent (fn [_ item]
+                        (r/as-element
+                         [:li.timeline-item {:key (:id item)}
+                          [event-tile item]]))}] ])))
+#+end_src
+
+
+**** Timeline Component
+
+The timeline component itself. It subscribes to the active room id
+and the active room's metadata. This way we can easily and effortless
+update the timeline via reframe being told when the Rust SDK has
+received an update.
+***** TODO dig into the display-name
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(defn timeline [& {:keys [compact? hide-header?]}]
+  (let [active-id    @(re-frame/subscribe [:rooms/active-id])
+        room-meta    @(re-frame/subscribe [:rooms/active-metadata])
+        events       @(re-frame/subscribe [:timeline/current-events])
+        display-name (when active-id (or (when room-meta (.-name room-meta)) active-id))]
+    [:div.timeline-container
+     {:style {:display "flex"
+              :flex-direction "column"
+              :height "100%"
+              :overflow "hidden"}}
+
+     (when-not hide-header?
+       [room-header {:display-name display-name
+                     :compact?     compact?
+                     :active-id    active-id}])
+
+     (if-not active-id
+       [:div.timeline-empty "Select a room to start chatting."]
+       [:<>
+        [virtualized-timeline events active-id]
+        [message-input]])]))
+#+end_src
+
+
+
+
+**** CSS Dump
+
+I will segment these another time
+
+#+begin_src css :tangle ../../../css/timeline.css
+.virtuoso-list {
+    flex: 1;
+    height: 100% !important;
+    width: 100%;
+}
+
+.timeline-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c7086;
+}
+
+.timeline-item {
+    list-style: none;
+    margin-bottom: 4px;
+    min-height: 36px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-anchor: none;
+}
+
+.message {
+    padding: 2px 16px;
+    margin-bottom: 0;
+}
+
+.message:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.sender {
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-right: 8px;
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
+.timeline-system-event {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: #7f849c;
+    margin: 4px 0;
+    user-select: none;
+}
+
+.system-icon {
+    margin-right: 6px;
+    opacity: 0.7;
+}
+
+.media-container {
+    position: relative;
+    overflow: hidden;
+    margin-top: 4px;
+    width: 100%;
+    display: block;
+}
+
+.media-image {
+    max-width: 400px;
+    max-height: 300px;
+    background-color: #1a1a1a;
+    border-radius: 8px;
+}
+
+.media-sticker {
+    max-width: 180px;
+    max-height: 180px;
+    background-color: transparent;
+}
+
+.media-video {
+    max-width: 450px;
+    max-height: 350px;
+    background-color: #000;
+    border-radius: 8px;
+}
+
+.media-content-absolute {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.timeline-input-outer {
+    flex: 0 0 auto;
+    padding: 10px 16px 24px 16px;
+    background-color: #313338;
+    z-index: 10;
+}
+
+.timeline-input-wrapper {
+    background-color: #383a40;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 44px;
+}
+
+
+
+.timeline-input-outer {
+  position: relative;
+  padding: 0 16px 16px 16px;
+  background: var(--bg-primary);
+}
+
+.timeline-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: #383a40;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.timeline-input-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+}
+
+.timeline-editor-container {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.input-context-banner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background: #2b2d31;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.context-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.context-cancel-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.2s, background 0.2s;
+}
+
+.context-cancel-btn:hover {
+  color: var(--text-highlight);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.composer-attachments {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+.message-render-wrapper {
+    display: inline;
+}
+
+.timeline-edited-label {
+    font-size: 0.7rem;
+    color: var(--text-muted, #888);
+    font-style: italic;
+    margin-left: 5px;
+    opacity: 0.6;
+    user-select: none;
+    white-space: nowrap;
+}
+
+
+
+.timeline-reply-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  background: rgba(0, 0, 0, 0.03);
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  border-left: 3px solid var(--accent-color, #aaa);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  max-width: 100%;
+}
+
+
+.timeline-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.message-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.timeline-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+}
+
+.timeline-messages {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.timeline-messages ul,
+.timeline-messages li {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.timeline-message {
+    position: relative;
+    border-bottom: none !important;
+    display: flex;
+    flex-direction: row;
+    padding: 12px 20px;
+    gap: 14px;
+    transition: background 0.1s ease;
+}
+
+
+.timeline-message:hover {
+    background: var(--bg-hover);
+}
+
+.timeline-message:hover .message-hover-toolbar {
+    display: flex;
+}
+
+.message-hover-toolbar {
+    position: absolute;
+    top: -12px;
+    right: 16px;
+    display: none;
+    background: #2b2d31;
+    border: 1px solid #1e1f22;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 10;
+    overflow: hidden;
+}
+
+.toolbar-btn {
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 16px;
+    color: #b5bac1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s;
+}
+
+.toolbar-btn:hover {
+    background: #404249;
+    color: #dbdee1;
+}
+
+@media (max-width: 768px) {
+    .message-hover-toolbar {
+        display: none !important;
+    }
+}
+
+.timeline-avatar-wrapper {
+    flex-shrink: 0;
+    width: 32px;
+}
+
+.timeline-content-wrapper {
+    flex: 1;
+    min-width: 0;
+}
+
+.timeline-header {
+    display: flex;
+    align-items: baseline;
+       margin-bottom: 4px;
+}
+
+.timeline-sender-name {
+    font-weight: 700;
+    color: var(--text-highlight);
+    cursor: pointer;
+}
+
+.timeline-sender-name:hover {
+    text-decoration: underline;
+}
+
+.timeline-timestamp {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+
+.timeline-body {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text-main);
+}
+
+
+.timeline-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    background: linear-gradient(to bottom, var(--bg-primary) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+.timeline-emotes {
+    display: inline-block;
+    vertical-align: middle;
+    height: 1.4em;
+    width: auto;
+    margin: 0 0.15em;
+    object-fit: contain;
+}
+
+.jump-to-bottom {
+    position: absolute;
+    bottom: 16px;
+    right: 24px;
+    background: var(--brand-color, #5865f2);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s ease, background 0.2s ease;
+    z-index: 100;
+}
+
+.jump-to-bottom:hover {
+    transform: translateY(-2px);
+    background: #4752c4;
+}
+
+.jump-to-bottom:active {
+    transform: translateY(0);
+}
+
+
+.jump-to-bottom::before {
+    content: "↓";
+    font-weight: bold;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+@media (prefers-color-scheme: dark) {
+  .timeline-reply-banner {
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: #555;
+    color: #aaa;
+  }
+}
+
+.timeline-reply-banner:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  .timeline-reply-banner:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+
+
+.emoji-pack-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--background-modifier-accent, #1e1f22);
+}
+
+.emoji-pack-title {
+  color: var(--header-primary, #f2f3f5);
+  font-weight: 600;
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.emoji-mode-switch {
+  display: flex;
+  background-color: var(--background-tertiary, #1e1f22);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.emoji-mode-switch button {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, #b5bac1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.emoji-mode-switch button:hover:not(.active) {
+  background-color: var(--background-modifier-hover, #2b2d31);
+  color: var(--text-normal, #dbdee1);
+}
+
+.emoji-mode-switch button.active {
+  background-color: var(--brand-experiment, #5865f2);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.reply-indicator {
+  font-weight: 700;
+  opacity: 0.5;
+  user-select: none;
+}
+
+.reply-content {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  overflow: hidden;
+  width: 100%;
+}
+
+.reply-sender {
+  font-weight: 600;
+  color: var(--text-primary, inherit);
+  flex-shrink: 0;
+}
+
+.reply-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+.timeline-upload-btn,
+.timeline-emoji-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    opacity: 0.6;
+    filter: grayscale(100%);
+    transition: opacity 0.2s ease, filter 0.2s ease, transform 0.1s ease;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.timeline-upload-btn:hover,
+.timeline-emoji-btn:hover {
+    opacity: 1;
+    filter: grayscale(0%);
+}
+
+.timeline-editor-container .ProseMirror {
+  outline: none;
+  color: var(--text-main);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+
+
+
+.reactions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0 0 48px;
+ }
+
+.reaction-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 8px;
+    background: #2b2d31;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.reaction-custom {
+    width: 16px;
+    height: 16px;
+    display: block;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+}
+
+.reaction-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: #b5bac1;
+    line-height: 1;
+}
+
+.reaction-pill:hover {
+    background: #37393f;
+    border-color: #4e5058;
+}
+
+
+
+
+
+
+
+#+end_src
+
+
+
+

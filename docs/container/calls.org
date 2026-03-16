@@ -1,0 +1,572 @@
+
+** Calling
+
+
+**** Preface
+
+At long last we've gotten to one of the features I've been excited to bring in.
+I suspect the solution I write for this in Clojurescript with Re-frame will be
+magnitudes simpler.
+
+
+**** Events
+
+
+***** Imports
+#+begin_src clojurescript :tangle ../../src/container/call/events.cljs
+(ns container.call.events
+  (:require [re-frame.core :as rf]
+            [taoensso.timbre :as log]
+            [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
+#+end_src
+
+
+***** Reframe bits
+#+begin_src clojurescript :tangle ../../src/container/call/events.cljs
+(defn click-iframe-button! [iframe-ref test-id]
+  (when-let [iframe @iframe-ref]
+    (let [doc (or (.-contentDocument iframe)
+                  (.. iframe -contentWindow -document))]
+      (if-let [btn (.querySelector doc (str "[data-testid='" test-id "']"))]
+        (.click btn)
+        (log/error "Could not find button with test-id:" test-id)))))
+
+
+
+(defn send-widget-action! [db action data]
+  (let [is-primary? (get-in db [:call :primary-iframe?] true)
+        iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
+    (when-let [iframe @iframe-ref]
+      (let [widget-id  (str "element-call-" (get-in db [:call :active-room-id]))
+            req-id     (str action "-" (.now js/Date))
+            msg        #js {:api       "toWidget"
+                            :action    action
+                            :widgetId  widget-id
+                            :requestId req-id
+                            :data      (clj->js data)}]
+        (try
+          (.postMessage (.-contentWindow iframe) msg "*")
+          (catch :default e
+            (log/error "Failed to send action" action "to iframe:" e)))))))
+
+
+(rf/reg-event-fx
+ :call/hangup
+ (fn [{:keys [db]} [_ opts]]
+   (log/info "Call: Sending hangup action to widget...")
+   (let [wipe?       (get opts :wipe-state? true)
+         is-primary? (get-in db [:call :primary-iframe?] true)
+         iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
+     (send-widget-action! db "im.vector.hangup" {})
+     (when-let [iframe @iframe-ref]
+       (set! (.-src iframe) "about:blank"))
+     (if wipe?
+       {:dispatch [:call/teardown]}
+       {}))))
+
+(rf/reg-event-fx
+ :call/toggle-audio
+ (fn [{:keys [db]} _]
+   (let [audio-enabled? (get-in db [:call :audio-enabled?] true)
+         video-enabled? (get-in db [:call :video-enabled?] false)
+         new-state      (not audio-enabled?)]
+     (send-widget-action! db "io.element.device_mute"
+                          {:audio_enabled new-state
+                           :video_enabled video-enabled?})
+     {:db (assoc-in db [:call :audio-enabled?] new-state)})))
+
+(rf/reg-event-fx
+ :call/toggle-video
+ (fn [{:keys [db]} _]
+   (let [audio-enabled? (get-in db [:call :audio-enabled?] true)
+         video-enabled? (get-in db [:call :video-enabled?] false)
+         new-state      (not video-enabled?)]
+     (send-widget-action! db "io.element.device_mute"
+                          {:audio_enabled audio-enabled?
+                           :video_enabled new-state})
+     {:db (assoc-in db [:call :video-enabled?] new-state)})))
+
+
+
+
+(rf/reg-event-fx
+ :call/toggle-deafen
+ (fn [{:keys [db]} _]
+   (let [currently-deafened? (get-in db [:call :deafened?] false)
+         new-deafen-state    (not currently-deafened?)
+         is-primary?         (get-in db [:call :primary-iframe?] true)
+         iframe-ref          (if is-primary? primary-iframe-ref backup-iframe-ref)]
+     (apply-iframe-sound-state! iframe-ref (not new-deafen-state))
+
+     {:db (assoc-in db [:call :deafened?] new-deafen-state)})))
+
+
+
+(rf/reg-event-fx
+ :call/toggle-screen-share
+ (fn [{:keys [db]} _]
+   (let [is-primary? (get-in db [:call :primary-iframe?] true)
+         iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
+     (click-iframe-button! iframe-ref "incall_screenshare")
+     {}))
+)
+
+(rf/reg-event-fx
+ :call/open-settings
+ (fn [{:keys [db]} _]
+   (let [is-primary? (get-in db [:call :primary-iframe?] true)
+         iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
+     (when-let [iframe @iframe-ref]
+       (let [doc (or (.-contentDocument iframe) (.. iframe -contentWindow -document))
+             btn (.querySelector doc "button[aria-labelledby=':rt:']")]
+         (if btn (.click btn) (log/error "Settings button not found"))))
+     {})))
+
+(rf/reg-event-db
+ :call/toggle-chat
+ (fn [db _]
+   (update-in db [:call :chat-open?] not)))
+
+(rf/reg-event-db
+ :call/toggle-iframe
+ (fn [db _]
+   (update-in db [:call :primary-iframe?] not)))
+
+(rf/reg-event-fx
+ :call/teardown
+ (fn [{:keys [db]} _]
+   (log/info "Call: Tearing down persistent call layer")
+   (let [client (get-in db [:call :embedded-client])]
+     (when client
+       (.destroy client)))
+   (when-let [p-iframe @primary-iframe-ref] (set! (.-src p-iframe) "about:blank"))
+   (when-let [b-iframe @backup-iframe-ref] (set! (.-src b-iframe) "about:blank"))
+
+   {:db (-> db
+            (assoc-in [:call :embedded-client] nil)
+            (assoc-in [:call :active-room-id] nil)
+            (assoc-in [:call :is-active?] false)
+            (assoc :main-focus :timeline))}))
+
+(rf/reg-event-db
+ :call/set-active-room
+ (fn [db [_ room-id]]
+   (log/info "Call: Setting active room to" room-id)
+   (-> db
+       (assoc-in [:call :active-room-id] room-id)
+       (assoc-in [:call :audio-enabled?] true)
+       (assoc-in [:call :video-enabled?] false))))
+
+(rf/reg-event-db
+ :call/set-active
+ (fn [db [_ active?]]
+   (assoc-in db [:call :is-active?] active?)))
+
+
+(rf/reg-event-db
+ :call/update-media-state
+ (fn [db [_ {:keys [audio video]}]]
+   (-> db
+       (assoc-in [:call :audio-enabled?] audio)
+       (assoc-in [:call :video-enabled?] video))))
+
+(rf/reg-sub :call/deafened? (fn [db _] (get-in db [:call :deafened?] false)))
+(rf/reg-sub :call/screen-sharing? (fn [db _] (get-in db [:call :screen-sharing?] false)))
+(rf/reg-sub :call/audio-enabled? (fn [db _] (get-in db [:call :audio-enabled?] true)))
+(rf/reg-sub :call/video-enabled? (fn [db _] (get-in db [:call :video-enabled?] false)))
+(rf/reg-sub :call/chat-open?     (fn [db _] (get-in db [:call :chat-open?] false)))
+(rf/reg-sub :call/state (fn [db _] (:call db)))
+(rf/reg-sub :call/active-room (fn [db _] (get-in db [:call :active-room-id])))
+(rf/reg-sub :call/is-active? (fn [db _] (get-in db [:call :is-active?])))
+(rf/reg-sub
+ :call/is-primary-iframe?
+ (fn [db _]
+   (get-in db [:call :primary-iframe?] true)))
+#+end_src
+
+
+
+**** Call Container
+
+For now we'll write out a simple iframe with some reframe.
+We set up two iframes because technically you can have two 'states' at once.
+Being in a call and viewing the lobby of another call. Without two iframes
+this is not a smooth experience for the user.
+
+***** Components
+
+#+begin_src clojurescript :tangle ../../src/container/call/call_container.cljs
+(ns container.call.call-container
+  (:require [reagent.core :as r]
+            [taoensso.timbre :as log]
+            [re-frame.core :as rf]
+            [re-frame.db :as rf-db]))
+
+(defonce primary-iframe-ref (r/atom nil))
+(defonce backup-iframe-ref  (r/atom nil))
+(defonce host-rect (r/atom nil))
+
+
+(defn apply-iframe-sound-state! [iframe-ref sound-on?]
+  (when-let [iframe @iframe-ref]
+    (try
+      (when-let [doc (or (.-contentDocument iframe) (.. iframe -contentWindow -document))]
+        (doseq [el (js/Array.from (.querySelectorAll doc "audio, video"))]
+          (set! (.-muted el) (not sound-on?))))
+      (catch :default e
+        (log/error "Failed to apply sound state:" e)))))
+
+(defn attach-iframe-observers! [iframe-ref]
+  (letfn [(check-dom []
+            (when-let [iframe @iframe-ref]
+              (try
+                (let [doc (or (.-contentDocument iframe) (.. iframe -contentWindow -document))]
+                  (if doc
+                    (do
+                      (let [media-observer (js/MutationObserver.
+                                            (fn [_]
+                                              (let [deafened? (get-in @rf-db/app-db [:call :deafened?] false)]
+                                                (when deafened?
+                                                  (apply-iframe-sound-state! iframe-ref false)))))]
+                        (.observe media-observer (.-body doc) #js {:childList true :subtree true}))
+                      (if-let [share-btn (.querySelector doc "[data-testid='incall_screenshare']")]
+                        (let [share-observer (js/MutationObserver.
+                                              (fn [_]
+                                                (let [is-active? (= (.getAttribute share-btn "aria-pressed") "true")]
+                                                  (rf/dispatch [:call/set-screen-sharing is-active?]))))]
+                          (.observe share-observer share-btn #js {:attributes true :attributeFilter #js ["class" "aria-pressed"]}))
+                        (log/warn "Screen share button not found; observer not attached.")))
+                    (js/setTimeout check-dom 500)))
+                (catch :default _
+                  (js/setTimeout check-dom 500)))))]
+    (check-dom)))
+
+
+(defn persistent-call-container []
+  (let [call-state   @(rf/subscribe [:call/state])
+        primary?     (get call-state :primary-iframe? true)
+        rect         @host-rect
+        active-style (if rect
+                       {:position "fixed" :top (str (:top rect) "px") :left (str (:left rect) "px")
+                        :width (str (:width rect) "px") :height (str (:height rect) "px")
+                        :border "none" :pointer-events "auto" :display "block"}
+                       {:border "none" :display "none"})
+        hidden-style {:border "none" :display "none"}]
+    [:div.persistent-call-layer
+     {:style {:position "fixed" :top 0 :left 0 :width "100%" :height "100%"
+              :pointer-events "none" :z-index 99
+              :display (if (and (:mobile? call-state) (:chat-open? call-state)) "none" "block")}}
+     [:iframe
+      {:ref     #(reset! primary-iframe-ref %)
+       :title   "Persistent Element Call Primary"
+       :style   (if primary? active-style hidden-style)
+       :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
+       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen; speaker-selection;"
+       :on-load #(attach-iframe-observers! primary-iframe-ref)
+       :src     "about:blank"}]
+     [:iframe
+      {:ref     #(reset! backup-iframe-ref %)
+       :title   "Persistent Element Call Backup"
+       :style   (if-not primary? active-style hidden-style)
+       :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
+       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen; speaker-selection;"
+       :on-load #(attach-iframe-observers!   backup-iframe-ref)
+       :src     "about:blank"}]]))
+
+#+end_src
+
+***** CSS
+
+#+begin_src css :tangle ../../css/calls.css
+
+  .hide-on-desktop {
+      display: flex !important;
+  }
+  .hide-on-mobile {
+      display: none !important;
+  }
+
+  @media (min-width: 768px) {
+      .hide-on-desktop {
+          display: none !important;
+      }
+      .hide-on-mobile {
+          display: flex !important;
+      }
+      .call-participant-item:hover {
+          background-color: var(--hover-bg);
+          border-radius: 4px;
+      }
+  }
+  .persistent-call-layer {
+      pointer-events: none;
+      z-index: 0;
+  }
+#+end_src
+
+**** Call View
+
+#+begin_src clojurescript :tangle ../../src/container/call/call_view.cljs
+(ns container.call.call-view
+  (:require [reagent.core :as r]
+            [re-frame.core :as rf]
+            [goog.functions :as gf]
+            [container.reusable :refer [room-header]]
+            [container.call.call-container :refer [host-rect]]))
+
+(defn call-view [room-id]
+  (let [host-ref    (r/atom nil)
+        observer    (r/atom nil)
+        room-meta @(rf/subscribe [:rooms/active-metadata])
+        display-name (or (some-> room-meta .-name) room-id)
+        sync-pos! (gf/debounce
+                   (fn []
+                     (when-let [el @host-ref]
+                       (let [rect (.getBoundingClientRect el)]
+                         (reset! host-rect
+                                 {:top (.-top rect)
+                                  :left (.-left rect)
+                                  :width (.-width rect)
+                                  :height (.-height rect)}))))
+                   50)]
+
+    (r/create-class
+     {:component-did-mount
+      (fn []
+        (when-let [el @host-ref]
+          (sync-pos!)
+          (let [ro (js/ResizeObserver. sync-pos!)]
+            (.observe ro el)
+            (reset! observer ro))
+          (.addEventListener js/window "scroll" sync-pos! true)))
+
+      :component-will-unmount
+      (fn []
+        (when-let [ro @observer]
+          (.disconnect ro))
+        (.removeEventListener js/window "scroll" sync-pos! true)
+        (reset! host-rect nil))
+:reagent-render
+      (fn [room-id]
+        [:div.call-view-host
+         {:style {:width "100%"
+                  :height "100%"
+                  :display "flex"
+                  :flex-direction "column"
+                  :position "relative"}}
+         [room-header {:display-name display-name
+                       :active-id    room-id
+                       :compact?     false}]
+         [:div.call-video-area
+          {:ref #(reset! host-ref %)
+           :style {:flex 1
+                   :width "100%"
+                   :background "#000"
+                   :pointer-events "none"}}]])
+
+      #_:reagent-render
+      #_(fn [room-id]
+        [room-header {:display-name display-name
+                      :active-id    room-id
+                      :compact?     true}]
+        [:div.call-view-host
+         {:ref #(reset! host-ref %)
+          :style {:width "100%"
+                  :height "100%"
+                  :position "relative"
+                  :pointer-events "none"}}])
+
+
+      })
+    ))
+#+end_src
+
+
+**** Call Core
+
+This is the center piece of our calling logic. What actually
+facilitates the iframe and the widget in the rust-sdk.
+
+#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+(ns container.call.core
+  (:require
+   [re-frame.core :as rf]
+   [re-frame.db :as rf-db]
+   [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref]]
+   [container.call.call-view :as call-view]
+   ["generated-compat" :as sdk]
+   [taoensso.timbre :as log]
+   [clojure.string :as str]))
+
+#+end_src
+
+
+We need to then actually build the capabilities for the widget
+This is quite delicate and can be a source of the wasm crashing
+if not sent correctly.
+#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+(def capabilities-provider
+  #js {:acquireCapabilities
+       (fn [requested-caps]
+         (try
+           (let [db @rf-db/app-db
+                 client (:client db)
+                 user-id (.userId client)
+                 device-id (or (some-> client .session .-deviceId) "paradise-web")]
+             (log/debug "UniFFI is calling synchronously for permissions...")
+             (sdk/getElementCallRequiredPermissions user-id device-id))
+           (catch :default e
+             (log/error "Capabilities provider crashed!" e)
+             #js {:read #js [] :send #js []})))})
+#+end_src
+
+While widget logic could be more... abstract we frankly only care about
+calling currently. Full widget support can be easily added later.
+
+Now after a bit of trial and error we manage to get element-call to be properly
+served from Vite and cooperate with shadow-cljs
+
+From this point we can start staging the actual ElementCallWidget inside the
+rust-sdk and coercing it to communicate with the Element call iframe over
+the post message transport mechanism.
+
+Now the iframe itself expects a raw-url for embedding, so we need to make
+sure the shape is what element-call expects to see.
+
+Beyond that, there isn't too much on our end to do. Seems the rust-sdk is
+already written to handle the interfacing for us. So no gross widget driver
+in Paradise!
+(At least not directly in the code haha).
+#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+(rf/reg-event-fx
+ :call/init-widget
+ (fn [{:keys [db]} [_ room-id opts]]
+   (let [client           (:client db)
+         room-obj         (or (get-in db [:rooms :active-room-obj])
+                              (when client (.getRoom client room-id)))
+
+         current-primary? (get-in db [:call :primary-iframe?] true)
+         new-primary?     (not current-primary?)
+         target-iframe    (if new-primary? @primary-iframe-ref @backup-iframe-ref)
+         join-directly?   (:join-directly? opts true)]
+
+     (if-not room-obj
+       (do (log/error "Cannot init widget: Room object is null") {})
+       (let [is-encrypted? (if (fn? (.-isEncrypted room-obj))
+                             (.isEncrypted room-obj)
+                             (.-isEncrypted room-obj))
+             encryption-sys (if is-encrypted?
+                              (.-PerParticipantKeys sdk/EncryptionSystem)
+                              (.-Unencrypted sdk/EncryptionSystem))
+             intent-str     (if join-directly? "start_call" "join_existing")
+             skip-lobby-str (if join-directly? "true" "false")
+             local-url      (str (.. js/window -location -origin) "/element-call/index.html")
+             props          #js {:elementCallUrl local-url
+                                 :widgetId       (str "element-call-" room-id)
+                                 :encryption     (new encryption-sys)}
+             config         #js {:intent (if join-directly?
+                                           (.-StartCall sdk/Intent)
+                                           js/undefined)
+                                 :hideHeader true}
+             settings       (sdk/newVirtualElementCallWidget props config)
+             driver-bundle  (sdk/makeWidgetDriver settings)
+             driver         (.-driver driver-bundle)
+             handle         (.-handle driver-bundle)]
+
+         (-> (.run driver room-obj capabilities-provider)
+             (.then #(log/info "Widget driver stopped."))
+             (.catch #(log/error "Widget driver crashed:" %)))
+         (let [raw-url        (.-rawUrl settings)
+               client-user-id (.userId client)
+               hs-url         (get-in db [:homeserver-url] nil)
+               device-id      (or (some-> client .session .-deviceId) "paradise-web")
+               actual-id      (str "element-call-" room-id)
+               base           (str/replace raw-url #"\?.*$|\#.*$" "")
+               widget-query   (str "?widgetId=" (js/encodeURIComponent actual-id)
+                                   "&parentUrl=" (js/encodeURIComponent (.. js/window -location -origin))
+                                   "&userId=" (js/encodeURIComponent client-user-id)
+                                   "&deviceId=" (js/encodeURIComponent device-id)
+                                   "&baseUrl=" (js/encodeURIComponent hs-url))
+               app-fragment (str "#/?intent=" intent-str
+                                 "&skipLobby=" skip-lobby-str
+                                 "&roomId=" (js/encodeURIComponent room-id)
+                                 "&perParticipantE2EE=" (if is-encrypted? "true" "false")
+                                 "&theme=dark&lang=en")
+               final-url      (str base widget-query app-fragment)]
+           (when final-url
+             (set! (.-src target-iframe) final-url))
+           {:db (-> db
+                    (assoc-in [:call :active-room-id] room-id)
+                    (assoc-in [:call :widget-handle] handle)
+                    (assoc-in [:call :widget-url] final-url)
+                    (assoc-in [:call :primary-iframe?] new-primary?)
+                    (assoc-in [:call :encrypted?] is-encrypted?))
+            :dispatch [:call/start-native-message-pump room-id new-primary?]}))))))
+#+end_src
+
+
+Here we need to outline how we actually expect to do the interfacing with the
+iframe. For the most part we don't have to touch it, but for a small few
+communications between the widget... we need to make sure the rust-sdk
+doesn't get anything weird. If it does, it'll crash.
+
+So we make sure no nulls or strange structures. The iframe might be a bit
+picky so we also opt to just lie to it and send it data back as
+an acknowledgment.
+#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+(rf/reg-event-fx
+ :call/start-native-message-pump
+ (fn [{:keys [db]} [_ room-id is-primary?]]
+   (let [handle (get-in db [:call :widget-handle])]
+     (if-not handle
+       (do (log/error "No widget handle found!") {})
+       (do
+         (letfn [(recv-loop []
+                   (-> (.recv handle)
+                       (.then (fn [msg-string]
+                                (if (and msg-string (not= msg-string "null"))
+                                  (do
+                                    (when-let [iframe (if is-primary? @primary-iframe-ref @backup-iframe-ref)]
+                                      (.postMessage (.-contentWindow iframe)
+                                                    (js/JSON.parse msg-string)
+                                                    "*"))
+                                    (js/setTimeout recv-loop 0))
+                                  (js/setTimeout recv-loop 50))))
+                       (.catch #(log/error "Recv loop crashed:" %))))]
+           (recv-loop))
+         (.addEventListener js/window "message"
+                            (fn [event]
+                              (when (= (.-origin event) (.. js/window -location -origin))
+                                (let [raw-data   (.-data event)
+                                      action     (str (.-action raw-data))
+                                      req-id     (.-requestId raw-data)
+                                      widget-id  (.-widgetId raw-data)
+                                      msg-string (js/JSON.stringify raw-data)]
+                                  (cond
+                                    ;; --- NEW: Sync Media State ---
+                                    (= action "io.element.device_mute")
+                                    (let [d (.-data raw-data)]
+                                      (rf/dispatch [:call/update-media-state
+                                                    {:audio (.-audio_enabled d)
+                                                     :video (.-video_enabled d)}]))
+
+                                    (str/starts-with? action "io.element.")
+                                    (do
+                                      (log/debug "Manually ACKing custom action:" action)
+                                      (when-let [iframe (if is-primary? @primary-iframe-ref @backup-iframe-ref)]
+                                        (let [ack #js {:api       "toWidget"
+                                                       :action    action
+                                                       :requestId req-id
+                                                       :widgetId  widget-id
+                                                       :response  #js {}
+                                                       :data      #js {}}]
+                                          (.postMessage (.-contentWindow iframe) ack "*")))
+                                      (-> (.send handle msg-string)
+                                          (.catch #(log/error "Rust rejected custom action:" %))))
+
+                                    :else
+                                    (-> (.send handle msg-string)
+                                        (.catch #(log/error "Rust rejected standard message:" %))))))))
+         {})))))
+#+end_src
+

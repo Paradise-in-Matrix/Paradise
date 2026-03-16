@@ -1,0 +1,544 @@
+
+** Timeline Item
+
+
+**** Preface
+It is convenient to define the actual items that make up a timeline.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(ns container.timeline.item
+  (:require [promesa.core :as p]
+            [re-frame.core :as re-frame]
+            [taoensso.timbre :as log]
+            [clojure.string :as str]
+            [re-frame.db :as db]
+            ["react-virtuoso" :refer [Virtuoso]]
+            [reagent.core :as r]
+            [reagent.dom.client :as rdom]
+            [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date]]
+            [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
+            [container.reusable :refer [room-header]]
+            [input.base :refer [message-input inline-editor]]
+            [navigation.rooms.room-summary :refer [build-room-summary]]
+            [client.diff-handler :refer [apply-matrix-diffs]]
+            ["generated-compat" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent]]
+            ))
+#+end_src
+
+
+**** Reifying a Rust Timeline Item object
+
+So this isn't dissimilar to room-summary... Effectively we're pulling
+the Rust object a part and creating a Clojure map from it.
+I did this mainly to make it easier to debug, but it'll also
+help anyone later who wants to make changes to aspects of the timeline.
+
+****** TODO We should segment content and describe it better
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn reify-item [ffi-item]
+  (let [raw-id (.uniqueId ffi-item)
+        id-str (if raw-id (or (.-id raw-id) raw-id) (str "virt-" (hash ffi-item)))
+        event (.asEvent ffi-item)
+        virtual (.asVirtual ffi-item)]
+    (cond event
+          (let [sender-profile (.-senderProfile event)
+                inner-profile  (when sender-profile (.-inner sender-profile))
+                sender-avatar  (or (when inner-profile (.-avatarUrl inner-profile))
+                                   (.-sender event))
+                sender-name    (or (when inner-profile (.-displayName inner-profile))
+                                   (.-sender event))
+                sender-id      (.-sender event)
+                is-editable?   (.-isEditable event)
+                is-own?        (.-isOwn event)
+                e-t-id         (.-eventOrTransactionId event)
+                e-t-tag        (.-tag e-t-id)
+                e-t-inner      (.-inner e-t-id)
+                real-id        (if (= e-t-tag "EventId")
+                                 (.-eventId e-t-inner)
+                                 (.-transactionId e-t-inner))
+                content        (.-content event)
+                content-tag    (.-tag content)
+                content-inner  (.-inner content)
+                content-inner-content (when content-inner (.-content content-inner))
+                reactions (when-let [reactions-raw (and content-inner-content (.-reactions content-inner-content))]
+                            (mapv (fn [r]
+                                    (let [emoji   (get r "key")
+                                          senders (get r "senders")]
+                                      [emoji (count senders)]))
+                                  (js->clj reactions-raw)))
+
+                _ (js/console.log event)
+            ;;            _ (js/console.log reactions)
+;;            _ (log/debug reactions)
+;;            _ (js/console.log content-inner)
+                read-by (try
+                          (mapv #(.-sender %) (.readReceipts ffi-item))
+                          (catch :default _ []))]
+
+            {:id                      real-id
+             :internal-id             id-str
+             :event-or-transaction-id e-t-id
+             :type                    :event
+             :sender-name             sender-name
+             :sender-id               sender-id
+             :sender-avatar           sender-avatar
+             :ts                      (js/Number (.-timestamp event))
+             :reactions               reactions
+             :read-by                 read-by
+             :is-own?                 is-own?
+             :is-editable?            is-editable?
+             :content-tag             content-tag
+             :content (case content-tag
+
+                        "MsgLike"
+                        (let [msg-like-content (.-content content-inner)
+                              kind             (.-kind msg-like-content)
+                              kind-tag         (.-tag kind)
+                              kind-inner       (.-inner kind)]
+                          {:tag kind-tag
+                           :in-reply-to
+                           (when-let [reply-ffi (.-inReplyTo msg-like-content)]
+                         ;; (.eventId ...) calls the function, returning the real string!
+                             {:event-id (.eventId reply-ffi)})
+                           :inner (case kind-tag
+                                    "Message"
+                                    (let [actual        (.-content kind-inner)
+                                          m-type        (.-msgType actual)
+                                          m-tag         (.-tag m-type)
+                                          m-inner       (.-inner m-type)
+                                          m-content-obj (.-content m-inner)]
+                                      {:tag m-tag
+                                       :content (case m-tag
+                                                  ("Text" "Emote" "Notice")
+                                                  {:body (.-body m-content-obj)
+                                                   :is-edited? (.-isEdited actual)
+                                                   :html (some-> m-content-obj .-formatted .-body)}
+                                                  ("Image" "Video" "Audio" "File" "Sticker")
+                                                  (let [formatted (.-formattedCaption m-content-obj)
+                                                        info      (.-info m-content-obj)
+                                                        res       {:mimetype (some-> info .-mimetype)
+                                                                   :size     (some-> info .-size js/Number)}]
+                                                    {:tag         m-tag
+                                                     :ffi-content m-content-obj
+                                                     :source      (.-source m-content-obj)
+                                                     :caption     (.-caption m-content-obj)
+                                                     :html        (when formatted (.-body formatted))
+                                                     :info        (if (and info (.-width info))
+                                                                    (assoc res :w (js/Number (.-width info))
+                                                                           :h (js/Number (.-height info)))
+                                                                    res)})
+                                                  {:unsupported true})})
+                                    "Sticker"
+                                    {:source (.-source kind-inner)
+                                     :info   (when-let [info (.-info kind-inner)]
+                                               {:w (some-> info .-width js/Number)
+                                                :h (some-> info .-height js/Number)})}
+                                    nil)})
+                        "FailedToParseMessageLike"
+                        {:error      (.-error content-inner)
+                         :event-type (.-eventType content-inner)}
+
+                        "RoomMembership" {:change (some-> content-inner .-change .-name)}
+                        "ProfileChange"  {:id real-id}
+                        nil)})
+
+          virtual
+          {:id   id-str
+           :type :virtual
+           :tag  (.-tag virtual)
+           :ts   (some-> virtual .-inner .-ts js/Number)}
+
+          :else
+          {:id id-str :type :unknown})))
+
+#+end_src
+
+
+**** Item Reframe Events, Effects, and Subscriptions
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(re-frame/reg-event-fx
+ :sdk/send-reaction
+ (fn [{:keys [db]} [_ room-id msg-id shortcode]]
+   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
+     (if-not timeline
+       (log/error "No timeline found for reaction in room" room-id)
+       (try
+         (-> (.sendReaction timeline msg-id shortcode)
+             (.then #(log/info "Reaction sent:" shortcode))
+             (.catch #(log/error "Failed to send reaction:" %)))
+         (catch :default e
+           (log/error "FFI Reaction Panic:" e)))))
+   {}))
+
+(re-frame/reg-event-db
+ :msg/open-reaction-picker
+ (fn [db [_ room-id msg-id x y]]
+   (assoc db :active-reaction-picker {:room-id room-id :msg-id msg-id :x x :y y})))
+
+(re-frame/reg-event-db
+ :msg/close-reaction-picker
+ (fn [db _]
+   (dissoc db :active-reaction-picker)))
+
+(re-frame/reg-sub
+ :msg/active-reaction-picker
+ (fn [db _]
+   (:active-reaction-picker db)))
+
+
+(re-frame/reg-event-fx
+ :msg/delete
+ (fn [{:keys [db]} [_ room-id msg-id]]
+   (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
+     (-> (.redactEvent timeline msg-id nil nil)
+         (.then #(log/debug "Message deleted optimistically:" msg-id))
+         (.catch #(log/error "Failed to redact message:" %)))
+     (log/error "No timeline found in db for room:" room-id))
+   {}))
+
+
+(re-frame/reg-event-fx
+ :msg/reply
+ (fn [{:keys [db]} [_ room-id reply-to-msg-id text html]]
+   (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
+     (try
+       (let [content-obj (.messageEventContentFromHtml sdk text (or html text))]
+         (-> (.sendReply timeline content-obj reply-to-msg-id js/undefined)
+             (.then (fn [_]
+                      (log/debug "Reply sent to timeline")
+                      (re-frame/dispatch [:msg/clear-input-context])))
+             (.catch #(log/error "Failed to send reply:" %))))
+       (catch :default e
+         (log/error "FFI Reply Panic:" e)))
+     (log/error "No timeline found in db for room:" room-id))
+   {}))
+
+
+
+(re-frame/reg-event-fx
+ :msg/edit
+ (fn [{:keys [db]} [_ room-id item text html]]
+   (let [timeline (get-in db [:timeline-subs room-id :timeline])
+         {:keys [event-or-transaction-id]} item
+         msg-tag     (get-in item [:content :inner :tag])
+         msg-content (get-in item [:content :inner :content])]
+     (if-not timeline
+       (log/error "Timeline not found")
+       (try
+         (let [formatted (if-not (str/blank? html)
+                           #js {:format (.new (.-Html (.-MessageFormat sdk)))
+                                :body html}
+                           js/undefined)
+               without-relation
+               (if (contains? #{"Image" "Video" "Audio" "File"} msg-tag)
+                 (let [ffi-content (:ffi-content msg-content)
+                       updated-ffi (js/Object.assign #js {} ffi-content
+                                                     #js {:caption text
+                                                          :formattedCaption formatted})
+                       msg-type    (.new (aget MessageType msg-tag) #js {:content updated-ffi})
+                       global-msg  #js {:msgType msg-type :mentions #js {:userIds #js [] :room false}}]
+                   (.contentWithoutRelationFromMessage sdk global-msg))
+                 (.messageEventContentFromHtml sdk text (or html text)))
+
+               edited-content #js {:tag "RoomMessage"
+                                   :inner #js {:content without-relation}}]
+           (-> (.edit timeline event-or-transaction-id edited-content js/undefined)
+               (.then #(log/info (str msg-tag " edited successfully!")))
+               (.catch #(log/error "Timeline Edit Promise Failed:" %))))
+         (catch :default e
+           (log/error "FFI Edit Panic:" e))))
+     {})))
+#+end_src
+
+
+**** Hover and Context Menus for Items
+
+
+#+begin_src clojurescript :tangle ../../../../src/container/timeline/item.cljs
+(defn build-message-actions [item active-room current-user-id x y]
+  (let [
+        ;;_ (log/debug item)
+        ;;_ (log/debug current-user-id)
+        msg-id   (:id item)]
+    (cond-> [{:id "react"
+              :label "Add Reaction"
+              :icon "😀"
+              :action #(re-frame/dispatch [:msg/open-reaction-picker active-room msg-id x y])}
+
+             {:id "reply" :label "Reply" :icon "↩️"
+              :action #(re-frame/dispatch [:input/set-context active-room :reply item])}
+
+             (when (:is-own? item)
+               {:id "edit" :label "Edit Message" :icon "✏️"
+                :action #(re-frame/dispatch [:input/set-context active-room :edit item])})
+             {:id "thread" :label "Start Thread"  :icon "🧵" :action #(re-frame/dispatch [:msg/thread active-room msg-id])}
+             {:id "copy"   :label "Copy Text"     :icon "📋" :action #(js/navigator.clipboard.writeText (or (get-in item [:content :body]) ""))}
+             {:id "link"   :label "Copy Link"     :icon "🔗" :action #(js/console.log "Copy permalink for" msg-id)}
+             {:id "pin"    :label "Pin Message"   :icon "📌" :action #(re-frame/dispatch [:msg/pin active-room msg-id])}
+             {:id "source" :label "View Event"    :icon "🔍" :action #(re-frame/dispatch [:msg/view-source msg-id])}]
+      is-mine? (conj {:id "delete" :label "Delete"       :icon "🗑️" :class-name "danger" :action #(re-frame/dispatch [:msg/delete active-room msg-id])}))))
+#+end_src
+
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn message-hover-toolbar [item active-room current-user-id]
+  (let [msg-id   (:id item)]
+    [:div.message-hover-toolbar
+     [:div.toolbar-btn
+      {:title "Add Reaction"
+       :on-click (fn [e]
+                   (.preventDefault e)
+              (.stopPropagation e)
+              (let [mouse-x (.-clientX e)
+                    mouse-y (.-clientY e)]
+                (re-frame/dispatch [:msg/open-reaction-picker active-room msg-id mouse-x mouse-y])))} "😀"]
+     [:div.toolbar-btn
+      {:title "Reply"
+       :on-click #(re-frame/dispatch [:input/set-context active-room :reply item])} "↩️"]
+     (when (:is-own? item)
+       [:div.toolbar-btn
+        {:title "Edit"
+         :on-click #(re-frame/dispatch [:input/set-context active-room :edit item])} "✏️"])
+     [:div.toolbar-btn
+      {:title "More"
+       :on-click (fn [e]
+                   (.stopPropagation e)
+                   (let [mx (.-clientX e)
+                         my (.-clientY e)]
+                     (re-frame/dispatch
+                      [:context-menu/open
+                       {:x mx
+                        :y my
+                        :items (build-message-actions item active-room current-user-id mx my)}])))}
+      "•••"]
+     ]))
+#+end_src
+
+
+
+
+
+**** Message Content Rendering
+
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn message-text [{:keys [body html]}]
+   ;;(log/debug (sanitize-custom-html html))
+ ;; (log/debug html)
+  (if (seq html)
+    (into [:span.body.formatted] (sanitize-custom-html html))
+    [:span.body body]))
+#+end_src
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn async-media-wrapper [content {:keys [class default-ratio]} render-fn]
+  (r/with-let [client       @(re-frame/subscribe [:sdk/client])
+               media-source (:source content)
+               info         (:info content)
+               w (if (pos? (:w info)) (:w info) 400)
+               h (if (pos? (:h info)) (:h info) 400)
+               style        (if (and w h)
+                              {:aspect-ratio (str w " / " h)}
+                              {:aspect-ratio (str default-ratio)})
+               !blob-url    (r/atom nil)
+               _ (when (and client media-source)
+                   (p/let [bytes (.getMediaContent client media-source)
+                           blob  (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
+                           url   (js/URL.createObjectURL blob)]
+                     (reset! !blob-url url)))]
+    (let [url @!blob-url]
+      [:div.media-container {:class class :style style}
+       (if url
+         (render-fn url (or (:caption content) (:filename content) "media") "media-content-absolute")
+         [:div.message-image-placeholder
+          [:div.spinner]])])
+    (finally
+      (when-let [url @!blob-url]
+        (js/URL.revokeObjectURL url)))))
+#+end_src
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn image-message [content]
+  [:div.image-attachment-container
+   [async-media-wrapper content {:class "media-image" :default-ratio 1.33}
+    (fn [url _ class-name]
+      [:img {:src url
+             :alt (:caption content)
+             :class class-name
+             :loading "lazy"
+             :on-click #(re-frame/dispatch [:ui/open-image-preview url])
+             :style {:cursor "zoom-in"}}])]
+   (when (seq (:caption content))
+     [:div.media-caption
+      [message-text content]])])
+#+end_src
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn video-message [content]
+  (async-media-wrapper content {:class "media-video" :default-ratio 1.77}
+    (fn [url _ class-name]
+      [:video {:src url :controls true :class class-name}])))
+#+end_src
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn sticker-message [content]
+  (async-media-wrapper content {:class "media-sticker" :default-ratio 1.0}
+    (fn [url alt class-name]
+      [:img {:src url :alt alt :class class-name :loading "lazy"}])))
+#+end_src
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn file-message [{:keys [caption source info]}]
+  [:div.file-attachment
+   [:a {:href (mxc->url source) :target "_blank" :className "file-link"}
+    [:span.file-icon "📁"]
+    [:span.file-name (or caption "Download File")]
+    (when-let [size (:size info)]
+      [:span.file-size (str "(" (quot size 1024) " KB)")])]])
+#+end_src
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn render-message-content [msg-type-tag content-map in-reply-to reply-msg]
+  (let [is-edited? (:is-edited? content-map)]
+    [:div.message-render-container
+     (when in-reply-to
+       [:div.timeline-reply-banner
+        [:div.reply-indicator "↳"]
+        [:div.reply-content
+         (if reply-msg
+           [:<>
+            [:span.reply-sender (:sender-name reply-msg)]
+            [:span.reply-preview (get-in reply-msg [:content :inner :content :body] "Media message")]]
+           [:span.reply-preview "Loading original message..."])]])
+
+     (case msg-type-tag
+       "Text"    [message-text content-map]
+       "Image"   [image-message content-map]
+       "Video"   [video-message content-map]
+       "Sticker" [sticker-message content-map]
+       "File"    [file-message content-map]
+       [:span.body (str "Unsupported message type: " msg-type-tag)])
+     (when is-edited?
+       [:span.timeline-edited-label "(edited)"])]))
+#+end_src
+
+
+
+
+**** The Event Tile Component
+
+This is a very, very sloppy event-tile for now. We can probably make this less
+silly later, but it does good enough to actually render the message and the
+individual's display name.
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn system-event-view [icon text]
+  [:div.timeline-system-event
+   [:span.system-icon icon]
+   [:span.system-text text]])
+
+(defn date-divider [ts]
+  [:div.timeline-date-separator
+   [:div.separator-line]
+   [:span.separator-text (format-divider-date ts)]
+   [:div.separator-line]])
+
+(defn event-tile [item]
+  (let [{:keys [id sender-name sender-avatar content-tag content type reactions read-by ts is-own?]} item
+        active-room @(re-frame/subscribe [:rooms/active-id])
+        my-profile  @(re-frame/subscribe [:sdk/profile])
+        my-id       (:user-id my-profile)
+        edit-context @(re-frame/subscribe [:input/context active-room])
+        is-editing-this? (and (= (:mode edit-context) :edit)
+                              (= (-> edit-context :target :id) id))
+        _ (log/debug item)
+        open-menu-fn (fn [mx my]
+                       (re-frame/dispatch
+                        [:context-menu/open
+                         {:x mx :y my
+                          :items (build-message-actions item active-room my-id mx my)}]))]
+    (if (= type :virtual)
+      (case (:tag item)
+        "DateDivider" [date-divider (:ts item)]
+        [system-event-view "-" "Timeline Separator"])
+      [swipe-to-action-wrapper
+       {:can-edit? is-own?
+        :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
+        :wrapper-props (merge (long-press-props open-menu-fn)
+                              {:class "timeline-message"})}
+       [:div.timeline-avatar-wrapper
+        (when (= content-tag "MsgLike")
+          [avatar {:id id :name sender-name :url (mxc->url sender-avatar {:width 64 :height 64 :method "crop"}) :size 32 :status :online :shape :none}])]
+
+       [:div.timeline-content-wrapper
+        (when (= content-tag "MsgLike")
+          [message-hover-toolbar item active-room my-id])
+
+        (cond
+          (= content-tag "MsgLike")
+          (let [{:keys [tag inner in-reply-to]} content
+                reply-id  (:event-id in-reply-to)
+                reply-msg (when reply-id @(re-frame/subscribe [:timeline/event-by-id active-room reply-id]))]
+            [:<>
+             [:div.timeline-header
+              [:span.timeline-sender-name sender-name]]
+             [:div.timeline-body
+              (cond
+                is-editing-this? [inline-editor item active-room]
+                (= tag "Sticker") [render-message-content "Sticker" inner in-reply-to reply-msg]
+                (= tag "Redacted") [:span.redacted "This message was deleted."]
+                (= tag "UnableToDecrypt") [:span.decryption-error "Unable to decrypt message."]
+                (= tag "Message")
+                (let [{m-tag :tag m-content :content} inner]
+                  [render-message-content m-tag m-content in-reply-to reply-msg])
+                :else [:span.unknown (str "Unknown message kind: " tag)])]])
+
+          (= content-tag "RoomMembership")
+          [system-event-view "->" (str sender-name " membership changed.")]
+
+          (= content-tag "ProfileChange")
+          [system-event-view "@" (str sender-name " changed their profile.")]
+
+          :else
+          [system-event-view "[!]" (str "Unknown event type: " content-tag)])
+
+(when (or (seq reactions) (seq read-by))
+  [:div.timeline-metadata
+
+   (when (seq reactions)
+     [:div.reactions-row
+      (for [[emoji count] reactions]
+        ^{:key emoji}
+        [:span.reaction-pill
+         (if (clojure.string/starts-with? emoji "mxc://")
+           [:img.reaction-custom {:src (mxc->url emoji {:width 32 :height 32 :method "crop"})}]
+           [:span.reaction-emoji emoji])
+         [:span.reaction-count count]])
+      ])
+   (when (seq read-by)
+     [:div.read-receipts-row
+      [:span.receipt-count (str "✓ " (count read-by))]])])
+        #_(when (or (seq reactions) (seq read-by))
+          [:div.timeline-metadata
+           (when (seq reactions)
+             [:div.reactions-row
+              (for [[emoji count] reactions]
+                ^{:key emoji}
+                [:span.reaction-pill
+                 {:on-click #(re-frame/dispatch [:msg/toggle-reaction id emoji])}
+                 (str emoji " " count)])])
+           (when (seq read-by)
+             [:div.read-receipts-row
+              [:span.receipt-count (str "✓ " (count read-by))]])])
+        ]])))
+#+end_src
+
+
+
+
+
