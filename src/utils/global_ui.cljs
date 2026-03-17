@@ -108,7 +108,7 @@
 
 
 (defn satellite-overlay [child-component]
-  (let [picker-state @(re-frame/subscribe [:ui/active-satellite])]
+  (let [picker-state @(re-frame/subscribe [:msg/active-reaction-picker])]
     (when picker-state
       (let [{:keys [room-id msg-id x y]} picker-state
             width  320
