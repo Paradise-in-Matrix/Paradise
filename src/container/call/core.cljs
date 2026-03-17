@@ -117,7 +117,6 @@
                                       widget-id  (.-widgetId raw-data)
                                       msg-string (js/JSON.stringify raw-data)]
                                   (cond
-                                    ;; --- NEW: Sync Media State ---
                                     (= action "io.element.device_mute")
                                     (let [d (.-data raw-data)]
                                       (rf/dispatch [:call/update-media-state
