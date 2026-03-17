@@ -18,9 +18,9 @@ not (among many other indicators).
             [reagent.core :as r]
             ["react-virtuoso" :refer [Virtuoso]]
             [client.state :as state :refer [sdk-world]]
-            [room.room-list :refer [process-parent-queue!]]
+            [navigation.rooms.room-list :refer [process-parent-queue!]]
             [client.diff-handler :refer [apply-matrix-diffs apply-generic-diffs!]]
-            [spaces.settings :refer [sidebar-profile-mini]]
+            [overlays.settings :refer [sidebar-profile-mini]]
             [utils.helpers :refer [mxc->url]]
             [utils.global-ui :refer [avatar]]
             [taoensso.timbre :as log]))
