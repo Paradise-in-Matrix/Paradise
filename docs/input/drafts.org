@@ -1,8 +1,16 @@
 
+** Message Drafts
+
+
+**** Preface
+
 A key part of message sending is drafting. For now we're not going to implement any fancy
 multi-device draft syncing as it is overkill. Instead we want to ensure we provide a
 clean drafting implementation so that users just don't lose their drafts on navigation
 away.
+
+
+**** Imports
 
 #+begin_src clojurescript :tangle ../../src/input/drafts.cljs
 (ns input.drafts
@@ -14,6 +22,12 @@ away.
             ["react" :as react]
             ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
 #+end_src
+
+
+**** Handling Attachments
+
+
+***** Reifying Attachments
 
 Inside the sdk attachments can be handle more or less universally as long as we
 provide a nice implementation to do so. So it's easier to just have a method that
@@ -44,6 +58,8 @@ converts the attachment to a format we like to work with.
 #+end_src
 
 
+***** Preparing Attachments
+
 
 #+begin_src clojurescript :tangle ../../src/input/drafts.cljs
 (defn attachment-preview [room-id attachment index]
@@ -65,6 +81,11 @@ converts the attachment to a format we like to work with.
     {:on-click #(re-frame/dispatch [:composer/remove-attachment room-id index])}
     "✕"]])
 #+end_src
+
+
+***** CSS
+
+**** Massive Blob of Reframe Events
 
 #+begin_src clojurescript :tangle ../../src/input/drafts.cljs
   (re-frame/reg-event-fx
