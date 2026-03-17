@@ -160,20 +160,33 @@ The local session exists as a JS Object once retrieved that represents the Rust 
 Now we can provide our application initialization and attempt to restore the previous login session.
 If the previous login session is found, then we start-syncing and kick off the client's run.
 #+begin_src clojurescript :tangle ../../src/client/login.cljs
-(defn bootstrap! [on-complete]
-  (-> (p/let [_      (init-sdk!)
-              data?  (maybe-local-session)
-              client (when data?
-                       (restore-client! (.-session data?)
-                                        (.-passphrase data?)
-                                        (.-storeId data?)))
-              _ (log/debug data?)
-              ]
-        (on-complete client data?))
-      (p/catch (fn [e]
-                 (log/error "Bootstrap/Restore failed:" e)
-                 (on-complete nil)))))
+
+(defn get-specific-session [target-user-id]
+  (p/let [store    (SessionStore.)
+          sessions (.loadSessions store)]
+    (or (aget sessions target-user-id) nil)))
+
+(defn bootstrap! 
+  ([on-complete]
+   (bootstrap! nil on-complete))
+  ([target-user-id on-complete]
+   (-> (p/let [_      (init-sdk!)
+               data?  (if target-user-id
+                        (get-specific-session target-user-id)
+                        (maybe-local-session))
+               client (when data?
+                        (restore-client! (.-session data?)
+                                         (.-passphrase data?)
+                                         (.-storeId data?)))]
+         (log/debug "Restored session for:" (if data? (.. data? -session -userId) "None"))
+         (on-complete client data?))
+       (p/catch (fn [e]
+                  (log/error "Bootstrap/Restore failed:" e)
+                  (on-complete nil))))))
+
 #+end_src
+
+
 
 There is a bit to be desired in the actual interop. It is, of course, functional enough. We may wish
 to search for a better solution for it though. I feel it could be more succinct.
