@@ -9,7 +9,7 @@ to map out. So it isn't the cleanest, but for now it is sufficient.
 **** Imports
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_summary.cljs
-(ns room.room-summary
+(ns navigation.rooms.room-summary
   (:require [promesa.core :as p]
             [clojure.string :as str]
             [taoensso.timbre :as log]
