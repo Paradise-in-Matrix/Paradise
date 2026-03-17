@@ -83,6 +83,45 @@ We standardize on the name prefix closura-store-.
 #+end_src
 
 
+There is a need to provide the token to the service workers if we're to
+provide rich message data to the user. Using the IndexedDB is convenient
+here as we can provide multi-account notification support without much
+overhead by baking the preparation into the session handling.
+It should be noted that the vulnerability is the same here as it would be
+in the local storage. Any cross site scripting attack will impact either,
+so the choice to do this isn't inherently worse.
+#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+(defn- sync-to-sw-vault! [sessions-obj]
+  (let [user-keys (js/Object.keys sessions-obj)]
+    (when (pos? (.-length user-keys))
+      (let [request (.open js/indexedDB "sw-vault" 1)]
+        (set! (.-onupgradeneeded request)
+              (fn [e]
+                (let [db (.. e -target -result)]
+                  (.createObjectStore db "tokens" #js {:keyPath "userId"}))))
+        (set! (.-onsuccess request)
+              (fn [e]
+                (let [db (.. e -target -result)
+                      tx (.transaction db #js ["tokens"] "readwrite")
+                      store (.objectStore tx "tokens")]
+                  (.clear store)
+                  (doseq [user-id user-keys]
+                    (let [data (aget sessions-obj user-id)
+                          session (aget data "session")
+                          token (aget session "accessToken")
+                          device-id (aget session "deviceId")
+                          hs-url (aget session "homeserverUrl")]
+                      (.put store #js {:userId    user-id
+                                       :token      token
+                                       :deviceId  device-id
+                                       :hsUrl     hs-url
+                                       :updatedAt (js/Date.now)}))))))))))
+
+
+
+#+end_src
+
+
 *** Implementation Logic
 
 These functions form the "brain" of the store.
