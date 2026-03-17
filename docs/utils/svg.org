@@ -343,4 +343,13 @@ An icon for the member list
 #+end_src
 
 
+And a 'more options' icon
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn more-vertical [props]
+  [icon-base (merge {:width "20px" :height "20px"} props)
+   [:circle {:cx "12" :cy "12" :r "1"}]
+   [:circle {:cx "12" :cy "5" :r "1"}]
+   [:circle {:cx "12" :cy "19" :r "1"}]])
+#+end_src
+
 
