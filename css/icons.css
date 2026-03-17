@@ -52,12 +52,27 @@
     transform-origin: center;
 }
 
-@keyframes search-scan {
-      0%, 100% { transform: translate(0, 0); }
-      25% { transform: translate(-1.5px, -1.5px); }
-      75% { transform: translate(1px, 1px); }
+@keyframes search-drift {
+    0%   { transform: translate(0, 0); }
+    25%  { transform: translate(1.5px, -1px); }
+    50%  { transform: translate(0, 1.5px); }
+    75%  { transform: translate(-1.5px, -0.5px); }
+    100% { transform: translate(0, 0); }
 }
 
 .animate-scan:hover {
-      animation: search-scan 0.6s ease-in-out infinite;
+    animation: search-drift 3s ease-in-out infinite;
+}
+
+@keyframes pin-sink {
+      0%   { transform: translateY(0) scale(1); }
+      100% { transform: translateY(1.5px) scale(0.92); }
+}
+
+.animate-sink {
+   transition: transform 0.2s ease-out;
+}
+
+.animate-sink:hover {
+    animation: pin-sink 0.3s ease-out forwards;
 }
