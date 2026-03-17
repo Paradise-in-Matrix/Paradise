@@ -1,5 +1,8 @@
 
-*** The Service Worker
+** The Service Worker
+
+
+**** Preface
 
 So a web-based matrix client usually follows the pattern of using service workers
 to provide long-lived functionality. This includes background behavior when we
@@ -7,6 +10,12 @@ say use it even as a native app or a PWA on phones. It is through the service
 worker that we can asynchronously fetch images from the server or deliver push notifications.
 It is safe to say that the service worker is a very important component to
 most web applications, not just web-based Matrix clients.
+
+
+**** Service Worker
+
+
+***** Imports
 
 Now workbox-precaching is set up through Vite (but is its own npm package mind you).
 This is an elegant way to ensure our caching mechanism is working well.
@@ -19,6 +28,9 @@ We do not want the user to download the WASM ever again unless we change it.
             ))
 #+end_src
 
+
+***** Message Event
+
 The message event is how the client communicates with the service worker.
 It passes 'messages' to the service worker and the service worker passes
 'messages' to the client. It is not too dissimilar to postMessage for
@@ -26,6 +38,8 @@ communicating with iframes.
 
 https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
 
+
+****** Workbench cache and constants
 
 Now we go a bit further and store the client-id of the session in-case
 later we wish to provide multi-session functionality more implicitly.
@@ -40,6 +54,7 @@ hand we have the home-server and the token used too.
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
   (precacheAndRoute manifest))
 
+****** Event
 
 (.addEventListener js/self "message"
   (fn [event]
@@ -55,6 +70,9 @@ hand we have the home-server and the token used too.
           (reset! session-resolvers []))))))
 #+end_src
 
+
+****** Session waiting
+
 We need to wait until a session is available to start performing fetches.
 Without this, the user could end up seeing broken images purely from their
 client loading too fast and trying to fetch.
@@ -66,6 +84,8 @@ client loading too fast and trying to fetch.
                    (swap! session-resolvers conj resolve)))))
 #+end_src
 
+
+****** Vault Token Retrieval
 
 Now this is great if we want to do simple behavior, but the moment we expect
 long-living persistence we might wish to instead check against the IndexedDB
@@ -103,6 +123,7 @@ with the access token.
 
 
 
+****** Old cache management
 
 
 If possible we want to manage the cache and we want to also make sure we don't
@@ -129,6 +150,8 @@ encrypt the disk at rest (Full Disk Encryption).
         (prune-cache! name max-items)))))
 #+end_src
 
+
+***** Fetch Event
 
 The fetch event is vital for the client to asynchronously 'fetch' images from a
 server so that we may allow the client to worry simply on the elements it can
@@ -189,6 +212,9 @@ For any other browser fetch we want to simply return it back to the browser to h
           :else nil)))))
 #+end_src
 
+
+***** Install Event
+
 The install event is the first event in the lifecycle of a service worker.
 Once this goes off the service worker starts to come alive.
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
@@ -196,6 +222,9 @@ Once this goes off the service worker starts to come alive.
   (fn [event]
     (.skipWaiting js/self)))
 #+end_src
+
+
+***** Activate Event
 
 So the service worker needs to be 'activated' and then once activated we want to
 immediately claim all clients so we can start fetching for them.
@@ -213,7 +242,8 @@ to grow too large.
 
 
 
-**** Push Notifications
+***** Push Notifications
+
 So an important part to the service worker use is providing the web application
 a way to receive notifications from the background. The general standard implementation
 is WebPush denoted below:
@@ -320,6 +350,9 @@ this functional first.
              :tag    (or room-id "matrix-chat")
              :data   #js {:room_id room-id}}))))
 
+
+***** Push Event
+
 (js/self.addEventListener "push"
   (fn [event]
     (let [data (try (.. event -data json) (catch :default _ nil))]
@@ -331,6 +364,8 @@ this functional first.
                     hs-url  (some-> session .-hs_url)]
               (show-smart-notification data token hs-url))))))))
 
+
+***** Notification Click Event
 
 (js/self.addEventListener "notificationclick"
   (fn [event]
@@ -350,8 +385,7 @@ this functional first.
 #+end_src
 
 
-
-
+***** Shadow-CLJS Nuance
 
 Shadow-cljs seems to be a bit opinionated in how it generates the service worker file.
 That and the documentation for web-workers isn't amazingly clear, nonetheless it does
@@ -362,8 +396,14 @@ sw.js/
 
 Not a large issue, but one I felt needed to be clarified to avoid potential confusion.
 
+
+**** Service Worker Handler
+
 Now below we have our actual service worker handler. This is where we'll define any service worker
 logic that is to be used from the main application itself.
+
+***** Imports
+
 #+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
 (ns service-worker-handler
   (:require
@@ -371,6 +411,9 @@ logic that is to be used from the main application itself.
             [re-frame.db :as db]
             [re-frame.core :as re-frame]))
 #+end_src
+
+
+***** Registering the Service Worker
 
 The major functionality we need is to register the service worker itself.
 We do so while passing off the session token so that the service worker
@@ -420,6 +463,8 @@ may immediately begin to render our images.
                            (try-sync!))))))
 #+end_src
 
+
+***** Syncing to the Service Worker with Reframe
 
 Now, since we're using reframe we want to ensure we're providing our rendering
 implementation an easy way to inform updates to the service worker.
