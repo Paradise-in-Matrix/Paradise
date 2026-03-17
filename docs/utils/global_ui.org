@@ -412,7 +412,7 @@ provide an avatar color.
                         "?")
           bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))]
       [:div.avatar-wrapper
-       {:class [:avatar-wrapper (kname shape)]
+       {:class (kname shape)
         :style {:width size :height size}}
        [:div.avatar-placeholder-layer
         {:style {:background-color bg-color}}
