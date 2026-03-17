@@ -1,8 +1,12 @@
+
+** Build Hooks
+
 There are some operations that we need to perform before compilation.
 Shadow-cljs offers a tool called Build Hooks in which you can
 do certain tasks at different points in the lifecycle of the build and
 of the program itself.
 
+**** Imports
 
 #+begin_src clojurescript :tangle ../src/build_hooks.clj
 (ns build-hooks
@@ -12,12 +16,17 @@ of the program itself.
 #+end_src
 
 
-** Prebuild file preperation
+
+**** Prebuild file preperation
 
 
 This allows us to ensure the wasm winds up in the deploy files for Vite to serve out.
 Since we're mixing ShadowCLJS and Vite we often just want ShadowCLJS to only
 worry about the code itself.
+
+
+***** WASM
+
 #+begin_src clojurescript :tangle ../src/build_hooks.clj
 (defn copy-wasm
   {:shadow.build/stage :flush}
@@ -31,6 +40,8 @@ worry about the code itself.
   build-state)
 #+end_src
 
+
+***** i18n
 
 However, for dynamic resource allocation... Vite doesn't have a great way to do this
 So instead we want to do this BEFORE ShadowCLJS compiles even so that we can be
@@ -55,4 +66,19 @@ sure our translation files are present in time.
       (spit "src/client/i18n_map.cljs" content))
     build-state))
 #+end_src
+
+
+***** Themes
+
+
+
+***** CSS files
+
+
+
+***** Root files
+
+
+
+***** Element call
 
