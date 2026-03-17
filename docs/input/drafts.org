@@ -60,6 +60,30 @@ converts the attachment to a format we like to work with.
 
 ***** Preparing Attachments
 
+#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
+(defn prepare-attachment [sdk att]
+  (let [mime      (or (:mime att) "application/octet-stream")
+        file-info #js {:mimetype mime
+                       :size (js/BigInt (.-byteLength (:buffer att)))
+                       :thumbnailInfo js/undefined
+                       :thumbnailSource js/undefined}
+        source    (.. sdk -UploadSource -Data
+                      (new #js {:bytes (:buffer att)
+                                :filename (:filename att)}))]
+    {:source source
+     :info   file-info
+     :type   (cond
+               (str/starts-with? mime "image/") "Image"
+               (str/starts-with? mime "video/") "Video"
+               (str/starts-with? mime "audio/") "Audio"
+               :else                            "File")}))
+#+end_src
+
+
+**** Attachment Preview Component
+
+
+***** Component
 
 #+begin_src clojurescript :tangle ../../src/input/drafts.cljs
 (defn attachment-preview [room-id attachment index]
@@ -289,3 +313,5 @@ converts the attachment to a format we like to work with.
  (fn [db [_ room-id]]
    (get-in db [:composer room-id :loaded-text] "")))
 #+end_src
+
+
