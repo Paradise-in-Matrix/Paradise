@@ -5,11 +5,11 @@
    [container.call.core]
    [container.call.call-view :refer [call-view]]
    [container.timeline.base :refer [timeline]]
+   [container.members :refer [member-list]]
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [reagent.core :as r]
    [reagent.dom.client :as rdom]))
-
 
 #_(defn call-view []
   [:div.call-view {:style {:padding "20px" :background "#222" :color "#fff" :height "100%"}}
@@ -21,7 +21,7 @@
    [:h2 "Thread Context"]
    [:button {:on-click #(re-frame/dispatch [:ui/set-main-focus :timeline])} "Back to Timeline"]])
 
-(defn member-list []
+#_(defn member-list []
   [:div.member-list-wrapper
    [:ul.member-items
     [:li "@alice:matrix.org"]
@@ -32,6 +32,15 @@
    [:h3 "Active Threads"]
    [:div "Thread 1..."]
   [:div "Thread 2..."]])
+
+(defn search []
+  [:div.search
+   [search {:width "48px" :height "48px" :style {:margin-bottom "16px" :opacity 0.5}}]
+   [:div "Search messages in this room"]])
+
+(defn pins []
+  [:div.pin [pins {:width "48px" :height "48px" :style {:margin-bottom "16px" :opacity 0.5}}]
+   [:div "No pinned messages in this room"]])
 
 
 (defn container []
@@ -83,10 +92,8 @@
                :timeline [timeline :compact? true :hide-header? true]
                :members  [member-list]
                :threads  [thread-list]
-      ;;:search   [search-view]
-      ;;:pins     [pins-view]
+               :search   [search]
+               :pins     [pins]
                )]])
-
            ])
-
 )
