@@ -1,9 +1,12 @@
-
+** Diff Handling
 
 So the diffs inside the Rust SDK actually are all in the same form,
 so instead of handling them independently we can define one method that
 handles all of them and allows it to be informed of the parse method
 the mechanism wishes to use
+
+**** Imports
+
 
 #+begin_src clojurescript :tangle ../../src/client/diff_handler.cljs
 (ns client.diff-handler
@@ -14,6 +17,7 @@ the mechanism wishes to use
    [promesa.core :as p]
    [re-frame.core :as re-frame]))
 
+**** Diff Processing
 
 (defn apply-matrix-diffs [current-items updates parse-fn]
   (let [initial-items (vec (or current-items []))]
@@ -50,6 +54,8 @@ the mechanism wishes to use
             (p/recur (inc i) (vec (or new-items items)))))
         (vec items)))))
 
+
+**** Applying Generic Diffs
 
 
 #+end_src
