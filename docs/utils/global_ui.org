@@ -404,12 +404,13 @@ provide an avatar color.
 
 (defn avatar [{:keys [id name url size status shape] :or {size 32 shape :circle}}]
   (r/with-let [!broken? (r/atom false)]
-    (let [len      (count name)
-          target   (if (= shape :space) 2 1)
-          initials (if (> len 0)
-                     (subs name 0 (min len target))
-                     "?")
-          bg-color (if (= shape :none) "transparent" (get-avatar-color id name))]
+    (let [show-image? (and url (not @!broken?))
+          len         (count name)
+          target      (if (#{:space :squircle :square} shape) 2 1)
+          initials    (if (> len 0)
+                        (subs name 0 (min len target))
+                        "?")
+          bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))]
       [:div.avatar-wrapper
        {:class [:avatar-wrapper (kname shape)]
         :style {:width size :height size}}
