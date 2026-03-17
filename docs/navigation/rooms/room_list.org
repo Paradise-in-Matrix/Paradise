@@ -1066,3 +1066,140 @@ component.
 **** CSS (Needs testing)
 
 
+#+begin_src css
+.room-drawer-header {
+    display: flex;
+    align-items: center;
+    padding: 18px 8px 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #8e9297;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.1s ease-in-out;
+}
+
+.room-drawer-header:hover {
+    color: #ffffff;
+}
+
+.drawer-arrow {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    line-height: 12px;
+    margin-right: 4px;
+    font-size: 8px;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #6a6d71;
+}
+
+.room-drawer-header.collapsed .drawer-arrow {
+    transform: rotate(-90deg);
+}
+
+
+
+.filter-bar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    background-color: #2b2d31;
+    border-bottom: 1px solid #1e1f22;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.filter-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-btn {
+    background: transparent;
+    color: #949ba4;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    cursor: pointer;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.15s ease-in-out;
+}
+
+.filter-btn:hover {
+    background-color: #35373c;
+    color: #dbdee1;
+}
+
+.filter-btn.active {
+    background-color: #404249;
+    color: #ffffff;
+    border-color: transparent;
+}
+
+.sidebar-rooms {
+    width: 240px;
+    flex-shrink: 0;
+    background-color: #2b2d31;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+}
+
+.sidebar-rooms {
+    width: 240px;
+    flex-shrink: 0;
+    background-color: #2b2d31;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+}
+
+.room-header {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 48px;
+    border-bottom: 1px solid #1e1f22;
+    background: #313338;
+    min-width: 0;
+}
+
+@media (max-width: 768px) {
+    .sidebar-rooms {
+        width: calc(100vw - 72px);
+        max-width: 240px;
+      }
+}
+
+
+.room-layout {
+    flex: 1;
+    height: 100vh;
+    display: grid;
+    overflow: hidden;
+}
+
+.room-header {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 48px;
+    border-bottom: 1px solid #1e1f22;
+    background: #313338;
+    min-width: 0;
+}
+
+.room-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 1 auto;
+}
+
+
+#+end_src
