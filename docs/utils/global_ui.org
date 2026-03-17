@@ -414,9 +414,18 @@ provide an avatar color.
       [:div.avatar-wrapper
        {:class (kname shape)
         :style {:width size :height size}}
+       (when-not show-image?
+         [:div.avatar-placeholder-layer
+          {:style {:background-color bg-color}}
+          (when-not (= shape :none)
+            [:span.avatar-text
+             {:style {:font-size (str (/ size (if (= shape :circle) 2.2 2.5)) "px")}}
+             initials])])
+
+       (when show-image?
          [:img.avatar-img-layer
-          {:src url
-           :alt ""
+          {:src      url
+           :alt      ""
            :on-error #(reset! !broken? true)}])])))
 
 
