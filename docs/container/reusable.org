@@ -54,8 +54,6 @@ so we'll keep them nicely collected here.
 
 ***** Room Header Component
 
-******* TODO Swap icons for SVGs
-
 #+begin_src clojurescript :tangle ../../src/container/reusable.cljs
 (defn room-header [{:keys [display-name compact? active-id]}]
   (let [main-focus    @(re-frame/subscribe [:container/main-focus])
