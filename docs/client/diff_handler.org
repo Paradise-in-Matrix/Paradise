@@ -19,6 +19,11 @@ the mechanism wishes to use
 
 **** Diff Processing
 
+The Rust SDK more or less only uses the following options for diffs, so it
+is sensible to handle all the potential diff options in one location in
+a generic manner.
+
+#+begin_src clojurescript :tangle ../../src/client/diff_handler.cljs
 (defn apply-matrix-diffs [current-items updates parse-fn]
   (let [initial-items (vec (or current-items []))]
     (p/loop [i 0
