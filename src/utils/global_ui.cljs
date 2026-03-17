@@ -186,27 +186,29 @@
 
 (defn avatar [{:keys [id name url size status shape] :or {size 32 shape :circle}}]
   (r/with-let [!broken? (r/atom false)]
-    (let [len      (count name)
-          target   (if (= shape :space) 2 1)
-          initials (if (> len 0)
-                     (subs name 0 (min len target))
-                     "?")
-          bg-color (if (= shape :none) "transparent" (get-avatar-color id name))]
+    (let [show-image? (and url (not @!broken?))
+          len         (count name)
+          target      (if (#{:space :squircle :square} shape) 2 1)
+          initials    (if (> len 0)
+                        (subs name 0 (min len target))
+                        "?")
+          bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))]
       [:div.avatar-wrapper
-       {:class [:avatar-wrapper (kname shape)]
+       {:class (kname shape)
         :style {:width size :height size}}
-       [:div.avatar-placeholder-layer
-        {:style {:background-color bg-color}}
-        (when-not (= shape :none)
-          [:span.avatar-text {:style {:font-size (str (/ size (if (= shape :space) 2.5 2.2)) "px")}}
-           initials])]
+       (when-not show-image?
+         [:div.avatar-placeholder-layer
+          {:style {:background-color bg-color}}
+          (when-not (= shape :none)
+            [:span.avatar-text
+             {:style {:font-size (str (/ size (if (= shape :circle) 2.2 2.5)) "px")}}
+             initials])])
 
-       (when (and url (not @!broken?))
+       (when show-image?
          [:img.avatar-img-layer
-          {:src url
-           :alt ""
+          {:src      url
+           :alt      ""
            :on-error #(reset! !broken? true)}])])))
-
 
 
 
