@@ -304,6 +304,32 @@ Next up, phone icon
 
 
 
+Pins!
+
+We can make it "press down" on hover without too much effort either.
+
+#+begin_src css :tangle ../../css/icons.css
+@keyframes pin-sink {
+      0%   { transform: translateY(0) scale(1); }
+      100% { transform: translateY(1.5px) scale(0.92); }
+}
+
+.animate-sink {
+   transition: transform 0.2s ease-out;
+}
+
+.animate-sink:hover {
+    animation: pin-sink 0.3s ease-out forwards;
+}
+#+end_src
+
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn pins [props]
+  [icon-base (merge {:width "20px" :height "20px"} props)
+   [:path {:d "M12 17v5"}]
+   [:path {:d "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"}]] )
+#+end_src
+
 
 
 
