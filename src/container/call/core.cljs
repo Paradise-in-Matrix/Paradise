@@ -77,7 +77,10 @@
                                  "&roomId=" (js/encodeURIComponent room-id)
                                  "&perParticipantE2EE=" (if is-encrypted? "true" "false")
                                  "&theme=dark&lang=en")
-               final-url      (str base widget-query app-fragment)]
+               final-url      (str base widget-query app-fragment)
+               _ (log/debug app-fragment)
+               _ (log/debug final-url)
+               ]
            (when final-url
              (set! (.-src target-iframe) final-url))
            {:db (-> db
