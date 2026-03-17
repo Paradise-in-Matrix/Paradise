@@ -271,6 +271,11 @@ Now a little bit of a pan motion for the icon to give it a nice little feel.
 #+end_src
 
 
+**** Room Header Icons
+
+Room Headers need some identifiable icons to inform users of their functionality
+at a glance.
+
 We'll need a nice search icon, so let's plant that here too.
 #+begin_src clojurescript :tangle ../../src/utils/svg.cljs
 (defn search [props]
