@@ -18,6 +18,10 @@ const copyFiles = {
         {
             src: 'themes/*',
             dest: 'themes'
+        },
+        {
+            src: 'css/*',
+            dest: 'css'
         }
     ]
 }
