@@ -159,7 +159,20 @@ final-id   (or store-id   (when existing (aget existing "storeId")))]
   (aset sessions user-id #js {:session session
                               :passphrase final-pass
                               :storeId final-id})
-  (save-raw-sessions-js! sessions))))
+  (save-raw-sessions-js! sessions)
+  (sync-to-sw-vault! sessions)
+  )))
+#+end_src
+
+#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+(defn- clear-sw-vault-user! [user-id]
+  (let [request (.open js/indexedDB "sw-vault" 1)]
+    (set! (.-onsuccess request)
+          (fn [e]
+            (let [db (.. e -target -result)
+                  tx (.transaction db #js ["tokens"] "readwrite")
+                  store (.objectStore tx "tokens")]
+              (.delete store user-id))))))
 #+end_src
 
 Removes the specific user's database and metadata.
