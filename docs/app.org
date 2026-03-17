@@ -394,96 +394,23 @@ providing the encapsulation and parsing for us.
       :logged-in
       [:<>
        [persistent-call-container]
-
        [:div.app-root {:class (when sidebar-open? "sidebars-open")}
         [spaces-sidebar]
         [room-list]
-
         (when sidebar-open?
           [:div.mobile-overlay {:on-click #(re-frame/dispatch [:ui/set-sidebar false])}])
-
-        [:div.room-layout
-         {:style {:display "grid"
-                  :flex "1"
-                  :min-width "0"
-                  :grid-template-columns (if side-panel "1fr 350px" "1fr")
-                  :height "100%"}}
-
-         [:div.main-content
-          (case main-focus
-            :call     [call-view active-room]
-            :thread   [thread-view]
-            :timeline [timeline])]
-
-         (when-let [panel side-panel]
-           [:div.sidebar
-            {:style {:display "flex"
-                     :flex-direction "column"
-                     :height "100%"
-                     :background "var(--surface-1)"
-                     :border-left "1px solid var(--border-color)"}}
-            (when (contains? #{:members :threads :search :pins :timeline} panel)
-              [:div.sidebar-header
-               {:style {:display "flex"
-                        :align-items "center"
-                        :justify-content "space-between"
-                        :padding "0 16px"
-                        :height "48px"
-                        :border-bottom "1px solid var(--border-color)"}}
-               [:h3.sidebar-title
-                {:style {:font-size "0.9rem" :text-transform "uppercase" :letter-spacing "0.05rem"}}
-                (case panel
-                  :members "Members"
-                  :threads "Threads"
-                  :search  "Search"
-                  :pins    "Pinned Messages"
-                  :timeline "")]
-               [:button.sidebar-close
-                {:style {:background "transparent" :border "none" :color "var(--text-secondary)" :cursor "pointer"}
-                 :on-click #(re-frame/dispatch [:container/set-side-panel nil])}
-                "✕"]])
-
-            [:div.sidebar-content
-             {:style {:flex 1 :overflow "hidden"}}
-             (case panel
-               :timeline [timeline :compact? true :hide-header? true]
-               :members  [member-list]
-               :threads  [thread-list]
-      ;;:search   [search-view]
-      ;;:pins     [pins-view]
-               )]])
-
-         #_(when-let [panel side-panel]
-             [:div.sidebar
-              [:div.sidebar-header
-               #_[:h3.sidebar-title
-                  (case panel
-                    :timeline "Room Chat"
-                    :members "Members"
-                    :threads "Threads")]
-               [:button.sidebar-close {:on-click #(re-frame/dispatch [:ui/set-side-panel nil])} "✕"]]
-
-              [:div.sidebar-content
-               (case panel
-                 :timeline [timeline :compact? false]
-                 :members  [member-list]
-                 :threads  [thread-list])]])]]
-
+        [container]
+        ]
        [settings-modal]
        [global-context-menu]
-
        [satellite-overlay
           (case active-type
             :emoji-picker emoji-sticker-board
             :user-info    user-summary-card
             nil)]
-
-;;       [global-reaction-picker]
-       [image-lightbox]]
+       [image-lightbox]
+       ]
       [:div "Unknown State"])))
-
-
-
 #+end_src
 
 
