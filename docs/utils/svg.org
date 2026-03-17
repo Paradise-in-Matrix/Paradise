@@ -257,14 +257,16 @@ Where as chat bubble? Simple.
 
 Now a little bit of a pan motion for the icon to give it a nice little feel.
 #+begin_src css :tangle ../../css/icons.css
-@keyframes search-scan {
-      0%, 100% { transform: translate(0, 0); }
-      25% { transform: translate(-1.5px, -1.5px); }
-      75% { transform: translate(1px, 1px); }
+@keyframes search-drift {
+    0%   { transform: translate(0, 0); }
+    25%  { transform: translate(1.5px, -1px); }
+    50%  { transform: translate(0, 1.5px); }
+    75%  { transform: translate(-1.5px, -0.5px); }
+    100% { transform: translate(0, 0); }
 }
 
 .animate-scan:hover {
-      animation: search-scan 0.6s ease-in-out infinite;
+    animation: search-drift 3s ease-in-out infinite;
 }
 #+end_src
 
