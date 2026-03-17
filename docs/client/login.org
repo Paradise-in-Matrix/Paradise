@@ -1,4 +1,7 @@
-#+TITLE: Matrix Client Login
+** Matrix Client Login
+
+
+**** Import
 
 #+begin_src clojurescript :tangle ../../src/client/login.cljs
 (ns client.login
@@ -17,6 +20,9 @@
    ["@element-hq/web-shared-components" :refer [RoomListView BaseViewModel]])
   (:require-macros [utils.macros :refer [ocall oget]]))
 #+end_src
+
+
+**** Initialize WASM
 
 This serves as a ready check for the WASM (and our global sdk-world).
 We can not start the application until the WASM has loaded.
