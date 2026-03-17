@@ -233,7 +233,7 @@ them collected together
 
 #+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
 (defn satellite-overlay [child-component]
-  (let [picker-state @(re-frame/subscribe [:ui/active-satellite])]
+  (let [picker-state @(re-frame/subscribe [:msg/active-reaction-picker])]
     (when picker-state
       (let [{:keys [room-id msg-id x y]} picker-state
             width  320
