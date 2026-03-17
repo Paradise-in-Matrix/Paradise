@@ -38,9 +38,9 @@
                                                   (rf/dispatch [:call/set-screen-sharing is-active?]))))]
                           (.observe share-observer share-btn #js {:attributes true :attributeFilter #js ["class" "aria-pressed"]}))
                         (log/warn "Screen share button not found; observer not attached.")))
-                    (js/setTimeout check-dom 500)))
+                    (js/setTimeout check-dom 400)))
                 (catch :default _
-                  (js/setTimeout check-dom 500)))))]
+                  (js/setTimeout check-dom 400)))))]
     (check-dom)))
 
 
