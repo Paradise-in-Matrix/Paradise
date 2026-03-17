@@ -53,9 +53,12 @@ hand we have the home-server and the token used too.
 (def cache-name "matrix-media-v1")
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
   (precacheAndRoute manifest))
+#+end_src
+
 
 ****** Event
 
+#+begin_src clojurescript :tangle ../src/service_worker.cljs
 (.addEventListener js/self "message"
   (fn [event]
     (let [data (.-data event)
@@ -95,7 +98,7 @@ multiple accounts at once reliably for even our notification purposes.
 Now the immediate thought is that because the Rust SDK pickles our data at
 rest we'd need some way to actually unlock it. So the second part of this
 is to create a small entry in our IndexedDB in which we create entries
-with the access token. 
+with the access token.
 
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
 (defn- get-token-from-vault [user-id]
@@ -120,7 +123,6 @@ with the access token.
                                  (resolve (some-> result .-token))))))))))
        (set! (.-onerror req) #(resolve nil))))))
 #+end_src
-
 
 
 ****** Old cache management
@@ -350,9 +352,12 @@ this functional first.
              :tag    (or room-id "matrix-chat")
              :data   #js {:room_id room-id}}))))
 
+#+end_src
+
 
 ***** Push Event
 
+#+begin_src clojurescript :tangle ../src/service_worker.cljs
 (js/self.addEventListener "push"
   (fn [event]
     (let [data (try (.. event -data json) (catch :default _ nil))]
@@ -363,10 +368,12 @@ this functional first.
                     token   (some-> session .-token)
                     hs-url  (some-> session .-hs_url)]
               (show-smart-notification data token hs-url))))))))
+#+end_src
 
 
 ***** Notification Click Event
 
+#+begin_src clojurescript :tangle ../src/service_worker.cljs
 (js/self.addEventListener "notificationclick"
   (fn [event]
     (let [notification (.-notification event)
@@ -401,6 +408,7 @@ Not a large issue, but one I felt needed to be clarified to avoid potential conf
 
 Now below we have our actual service worker handler. This is where we'll define any service worker
 logic that is to be used from the main application itself.
+
 
 ***** Imports
 
@@ -443,24 +451,6 @@ may immediately begin to render our images.
                                  (log/debug "SW requested navigation to room:" room-id)
                                  (re-frame/dispatch [:rooms/select room-id])))))))))
 
-
-
-#_(defn register-sw! [session]
-  (when (exists? js/navigator.serviceWorker)
-    (let [sw-container js/navigator.serviceWorker
-          try-sync!    (fn []
-                         (when (and (.-controller sw-container) session)
-                           (re-frame/dispatch [:auth/sync-sw-only session])))]
-
-      (-> (.register sw-container "/sw.js" #js {:type "module"})
-          (.then (fn [reg]
-                   (when (.-waiting reg)
-                     (.postMessage (.-waiting reg) #js {:type "SKIP_WAITING"})))))
-      (try-sync!)
-      (.addEventListener sw-container "controllerchange"
-                         (fn []
-                           (js/console.log "re-frame: SW Controller changed, syncing session...")
-                           (try-sync!))))))
 #+end_src
 
 
@@ -489,3 +479,5 @@ We may wish to break this apart a bit for re-usability, but for now this will do
          (js/console.error "re-frame: Failed to parse homeserver URL" e)))
      (js/console.warn "re-frame: SW controller not found"))))
 #+end_src
+
+
