@@ -429,7 +429,6 @@ provide an avatar color.
            :on-error #(reset! !broken? true)}])])))
 
 
-
 #+end_src
 
 
