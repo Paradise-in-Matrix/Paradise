@@ -352,4 +352,15 @@ And a 'more options' icon
    [:circle {:cx "12" :cy "19" :r "1"}]])
 #+end_src
 
+and a menu button
+#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+(defn menu [props]
+  [icon-base (merge {:width "20px" :height "20px"} props)
+   [:line {:x1 "4" :y1 "12" :x2 "20" :y2 "12"}]
+   [:line {:x1 "4" :y1 "6" :x2 "20" :y2 "6"}]
+   [:line {:x1 "4" :y1 "18" :x2 "20" :y2 "18"}]])
+#+end_src
+
+
+
 
