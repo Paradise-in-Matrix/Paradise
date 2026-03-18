@@ -282,11 +282,10 @@
      ]))
 
 (defn message-text [{:keys [body html]}]
-   ;;(log/debug (sanitize-custom-html html))
- ;; (log/debug html)
   (if (seq html)
     (into [:span.body.formatted] (sanitize-custom-html html))
-    [:span.body body]))
+    [:span.body (linkify-text body)]))
+
 
 (defn async-media-wrapper [content {:keys [class default-ratio]} render-fn]
   (r/with-let [client       @(re-frame/subscribe [:sdk/client])
