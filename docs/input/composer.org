@@ -221,8 +221,7 @@ so we stick with what the complex component expects.
                                                                :suggestion (user-mention-options)})
                                       (.configure Link #js {:openOnClick false
                                                             :autolink true
-                                                            :linkOnPaste true})
-                                      ]
+                                                            :linkOnPaste true})]
                      :content (or loaded-text "")
                      :editable (boolean active-id)
                      :onUpdate (fn [ctx]
