@@ -36,9 +36,7 @@
                      (let [type  (.-type node)
                            attrs (.-attrs node)
                            marks (.-marks node)
-                           
-                           ;; 1. Get the base content (text or emote)
-                           base-content 
+                           base-content
                            (cond
                              (= type "customEmote")
                              (let [render-vec (renderHtml #js {:HTMLAttributes attrs})
@@ -48,12 +46,9 @@
                                (str "<img data-mx-emoticon src=\"" mxc-uri "\""
                                     " alt=\":" shortcode ":\" title=\":" shortcode ":\""
                                     " style=\"" (aget html-attrs "style") "\">"))
-                             
                              (= type "text") (.-text node)
                              :else "")
-                           
-                           ;; 2. If the text has formatting (like a Link), wrap it!
-                           with-marks 
+                           with-marks
                            (if marks
                              (reduce (fn [html mark]
                                        (case (.-type mark)
@@ -67,43 +62,12 @@
                                      (js/Array.from marks))
                              base-content)]
                        with-marks))]
-    
     (str/join ""
       (map (fn [p]
              (str "<p>"
                   (str/join "" (map node->html (js/Array.from (or (.-content p) #js []))))
                   "</p>"))
            (js/Array.from json)))))
-
-  #_(defn- get-matrix-formatted-body [editor]
-  (let [json (.. editor getJSON -content)
-        node->html (fn node->html [node]
-                     (let [type (.-type node)
-                           attrs (.-attrs node)]
-                       (cond
-                         (= type "customEmote")
-                         (let [
-                               render-vec (renderHtml #js {:HTMLAttributes attrs})
-                               tag-name   (first render-vec)
-                               html-attrs (second render-vec)
-                               shortcode  (aget attrs "shortcode")
-                               mxc-uri    (url->mxc (aget attrs "src"))]
-                           (str "<" tag-name
-                                " data-mx-emoticon"
-                                " src=\"" mxc-uri "\""
-                                " alt=\":" shortcode ":\""
-                                " title=\":" shortcode ":\""
-                                " style=\"" (aget html-attrs "style") "\">")
-                           )
-                         (= type "text") (.-text node)
-                         :else "")))]
-    (str/join ""
-      (map (fn [p]
-             (str "<p>"
-                  (str/join "" (map node->html (js/Array.from (or (.-content p) #js []))))
-                  "</p>"))
-           (js/Array.from json)))))
-
 
 (def custom-emote
   (.create Node
@@ -192,8 +156,7 @@
                                                                :suggestion (user-mention-options)})
                                       (.configure Link #js {:openOnClick false
                                                             :autolink true
-                                                            :linkOnPaste true})
-                                      ]
+                                                            :linkOnPaste true})]
                      :content (or loaded-text "")
                      :editable (boolean active-id)
                      :onUpdate (fn [ctx]
