@@ -410,7 +410,10 @@
                               {:class "timeline-message"})}
        [:div.timeline-avatar-wrapper
         (when (= content-tag "MsgLike")
-          [avatar {:id id :name sender-name :url (mxc->url sender-avatar {:width 64 :height 64 :method "crop"}) :size 32 :status :online :shape :none}])]
+          [profile-popover-trigger popover-member custom-tags active-room
+           [avatar {:id sender :name sender-name
+                    :url (mxc->url sender-avatar)
+                    :size 32 :status :online :shape :none}]])]
 
        [:div.timeline-content-wrapper
         (when (= content-tag "MsgLike")
