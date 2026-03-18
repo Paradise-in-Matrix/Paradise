@@ -197,12 +197,34 @@ Just use Reagent.
 (defn sanitize-text [raw-text]
   (when raw-text
     (str/escape (str raw-text) {\& "&amp;" \< "&lt;" \> "&gt;" \" "&quot;" \' "&#39;"})))
+
+
+(defn linkify-text [text]
+  (if (str/blank? text)
+    text
+    (let [pattern #"https?://[^\s]+"
+          parts (str/split text pattern -1)
+          matches (re-seq pattern text)]
+      (if (empty? matches)
+        text
+        (into [:span]
+              (map-indexed
+               (fn [i part]
+                 (let [url (nth matches i nil)]
+                   (if url
+                     [:<> part [:a {:href url :target "_blank" :rel "noopener noreferrer"} url]]
+                     part)))
+               parts))))))
+
 #+end_src
 
 
-**** Date formatting
+**** Date / Time formatting
 
 We need to be able to convert timestamps to date otherwise people might not be too fond of reading them. Haha.
+
+***** Date
+
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
 (defn format-divider-date [ts]
   (let [date (js/Date. ts)
