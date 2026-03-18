@@ -784,7 +784,6 @@ view state.
 Stopped and just stubbed it in for now while I go back and clean up the CSS
 and file structures.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-
 (re-frame/reg-event-fx
  :rooms/select
  (fn [{:keys [db]} [_ room-id opts]]
@@ -796,7 +795,15 @@ and file structures.
          mobile?         (get-in db [:ui :mobile?])
          join-directly?  (if force-lobby? false (not mobile?))
          wipe-call-state? (not is-call-room?)
-         swapping-calls? (and active-call-id (not= active-call-id room-id) is-call-room?)]
+         swapping-calls? (and active-call-id (not= active-call-id room-id) is-call-room?)
+         current-side-panel (get-in db [:ui :side-panel])
+         _ (log/error )
+         _ (log/error current-side-panel)
+         side-panel-update  (if (and (= current-side-panel :timeline)
+                                     (= new-focus :timeline)
+                                     (not focus-override))
+                              nil
+                              current-side-panel)]
 
      (if (= current-room-id room-id)
        {:db (assoc-in db [:ui :sidebar-open?] false)}
@@ -816,8 +823,9 @@ and file structures.
                                  [:composer/load-draft room-id]
                                  [:container/set-main-focus new-focus]
                                  (when focus-override [:container/set-side-panel focus-override])
+                                 (when (and (= current-side-panel :timeline) (nil? side-panel-update))
+                                   [:container/set-side-panel nil])
                                  (when is-call-room? [:call/init-widget room-id {:join-directly? join-directly?}])])]
-
          {:db base-db
           :dispatch-n dispatches})))))
 
