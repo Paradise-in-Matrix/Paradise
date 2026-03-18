@@ -10,6 +10,7 @@
    [overlays.lightbox :refer [image-lightbox]]
   [auth.events :refer [login-screen]]
    [container.call.call-container :refer [persistent-call-container]]
+   [container.members :refer [global-profile-preview]]
    [input.emotes :refer [emoji-sticker-board]]
    [utils.global-ui :refer [global-reaction-picker global-context-menu satellite-overlay]]
    [client.login :refer [bootstrap!]]
@@ -153,6 +154,7 @@
         [container]
         ]
        [settings-modal]
+       [global-profile-preview]
        [global-context-menu]
        [satellite-overlay
           (case active-type
