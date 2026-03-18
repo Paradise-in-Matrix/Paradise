@@ -426,7 +426,9 @@
                 reply-msg (when reply-id @(re-frame/subscribe [:timeline/event-by-id active-room reply-id]))]
             [:<>
              [:div.timeline-header
-              [:span.timeline-sender-name sender-name]]
+              [profile-popover-trigger popover-member custom-tags active-room
+               [:span.timeline-sender-name sender-name]]
+              [:span.timeline-timestamp (format-time ts)]]
              [:div.timeline-body
               (cond
                 is-editing-this? [inline-editor item active-room]
