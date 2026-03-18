@@ -237,3 +237,15 @@ We need to be able to convert timestamps to date otherwise people might not be t
       is-yesterday "Yesterday"
       :else (.toLocaleDateString date js/undefined #js {:month "long" :day "numeric" :year "numeric"}))))
 #+end_src
+
+
+***** Time
+
+#+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
+(defn format-time [ts]
+  (when ts
+    (let [date (js/Date. ts)]
+      (.toLocaleTimeString date js/undefined #js {:hour "numeric" :minute "2-digit"}))))
+#+end_src
+
+
