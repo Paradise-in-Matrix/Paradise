@@ -447,34 +447,19 @@
           [system-event-view "@" (str sender-name " changed their profile.")]
 
           :else
-          [system-event-view "[!]" (str "Unknown event type: " content-tag)])
+          [system-event-view "!" (str "Unknown event type: " content-tag)])
 
-(when (or (seq reactions) (seq read-by))
-  [:div.timeline-metadata
-
-   (when (seq reactions)
-     [:div.reactions-row
-      (for [[emoji count] reactions]
-        ^{:key emoji}
-        [:span.reaction-pill
-         (if (clojure.string/starts-with? emoji "mxc://")
-           [:img.reaction-custom {:src (mxc->url emoji {:width 32 :height 32 :method "crop"})}]
-           [:span.reaction-emoji emoji])
-         [:span.reaction-count count]])
-      ])
-   (when (seq read-by)
-     [:div.read-receipts-row
-      [:span.receipt-count (str "✓ " (count read-by))]])])
-        #_(when (or (seq reactions) (seq read-by))
+        (when (or (seq reactions) (seq read-by))
           [:div.timeline-metadata
            (when (seq reactions)
              [:div.reactions-row
               (for [[emoji count] reactions]
                 ^{:key emoji}
                 [:span.reaction-pill
-                 {:on-click #(re-frame/dispatch [:msg/toggle-reaction id emoji])}
-                 (str emoji " " count)])])
+                 (if (clojure.string/starts-with? emoji "mxc://")
+                   [:img.reaction-custom {:src (mxc->url emoji {:width 32 :height 32 :method "crop"})}]
+                   [:span.reaction-emoji emoji])
+                 [:span.reaction-count count]])])
            (when (seq read-by)
              [:div.read-receipts-row
-              [:span.receipt-count (str "✓ " (count read-by))]])])
-        ]])))
+              [:span.receipt-count (str "✓ " (count read-by))]])])]])))
