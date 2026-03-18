@@ -1,6 +1,7 @@
 (ns utils.helpers
   (:require
    [clojure.string :as str]
+   [promesa.core :as p]
    [hickory.core :as h]
    [hickory.render :as hr]
    [clojure.walk :as walk]
@@ -167,6 +168,25 @@
   (when raw-text
     (str/escape (str raw-text) {\& "&amp;" \< "&lt;" \> "&gt;" \" "&quot;" \' "&#39;"})))
 
+
+(defn linkify-text [text]
+  (if (str/blank? text)
+    text
+    (let [pattern #"https?://[^\s]+"
+          parts (str/split text pattern -1)
+          matches (re-seq pattern text)]
+      (if (empty? matches)
+        text
+        (into [:span]
+              (map-indexed
+               (fn [i part]
+                 (let [url (nth matches i nil)]
+                   (if url
+                     [:<> part [:a {:href url :target "_blank" :rel "noopener noreferrer"} url]]
+                     part)))
+               parts))))))
+
+
 (defn format-divider-date [ts]
   (let [date (js/Date. ts)
         today (js/Date.)
@@ -177,3 +197,17 @@
       is-today "Today"
       is-yesterday "Yesterday"
       :else (.toLocaleDateString date js/undefined #js {:month "long" :day "numeric" :year "numeric"}))))
+
+(defn format-time [ts]
+  (when ts
+    (let [date (js/Date. ts)]
+      (.toLocaleTimeString date js/undefined #js {:hour "numeric" :minute "2-digit"}))))
+
+(defn fetch-state-event [homeserver token room-id event-type state-key]
+  (let [clean-hs (clojure.string/replace homeserver #"/+$" "")
+        key-path (if (empty? state-key) "" (str "/" state-key))
+        url      (str clean-hs "/_matrix/client/v3/rooms/" room-id "/state/" event-type key-path)]
+    (-> (p/let [resp (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
+          (when (.-ok resp)
+            (.json resp)))
+        (p/catch (constantly nil)))))
