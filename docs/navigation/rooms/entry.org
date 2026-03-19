@@ -682,7 +682,7 @@ need out.
                          [:context-menu/open
                           {:x mx :y my
                            :items (build-room-actions id room-name space? #_is-call?)}]))]
-      (log/error active-space)
+;;      (log/error active-space)
       (r/as-element
        [room-item {:id id
                    :name room-name
