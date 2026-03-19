@@ -1,0 +1,25 @@
+.timeline-upload-btn,
+.timeline-emoji-btn,
+.timeline-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    transition: color 0.2s;
+}
+
+.timeline-upload-btn:hover,
+.timeline-emoji-btn:hover {
+    color: var(--text-main);
+}
+
+.timeline-send-btn {
+    color: var(--accent-color);
+}
+
+.timeline-send-btn:hover {
+    filter: brightness(1.2);
+}
