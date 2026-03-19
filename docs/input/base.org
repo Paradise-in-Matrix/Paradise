@@ -210,8 +210,7 @@ https://matrix-org.github.io/matrix-rust-sdk/
          {})
 :else
        (try
-         (let [_       (log/debug "LIVE CONTEXT FROM DB:" context)
-               payload (.messageEventContentFromHtml sdk text (or html text))]
+         (let [payload (.messageEventContentFromHtml sdk text (or html text))]
            (if context
              (let [action     (:mode context)
                    raw-id-obj (-> context :target :event-or-transaction-id)
@@ -339,7 +338,7 @@ forward.
  :input/context
  (fn [db [_ room-id]]
    (get-in db [:input-context room-id])))
-/#+end_src
+#+end_src
 
 
 **** Inline Editor Component
@@ -379,7 +378,7 @@ be used.
                                                matrix-html (get-matrix-formatted-body ed)]
                                            (re-frame/dispatch [:msg/edit active-id item text matrix-html])
                                            (re-frame/dispatch [:input/clear-context active-id]))))} "save"]]]))))
-/#+end_src
+#+end_src
 
 
 **** Message Input Component
@@ -475,4 +474,4 @@ Ideally, we should break this apart more later.
                          (.stopPropagation e)
                          (swap! !picker-open? not))}
             "😀"]]]]))))
-/#+end_src
+#+end_src
