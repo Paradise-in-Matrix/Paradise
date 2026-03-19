@@ -9,6 +9,7 @@
             [input.autocomplete :refer [suggestion-menu]]
             [reagent.core :as r]
             [utils.helpers :refer [mxc->url]]
+            [utils.svg :as icons]
             ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
             ))
 
@@ -295,7 +296,8 @@
                  (-> ed .chain .focus
                      (.insertContent #js {:type "customEmote"
                                           :attrs #js {:shortcode shortcode
-                                                      :src (mxc->url url)}})
+                                                      :src (mxc->url url)
+                                                      :mxc url}})
                      .run))
                (reset! !picker-open? false))}])
          (when (and context (= (:mode context) :reply))
@@ -331,7 +333,7 @@
                                     (when (seq file-array)
                                       (re-frame/dispatch [:sdk/handle-file-drop active-id file-array]))
                                     (set! (.-value (.-target e)) "")))}]
-            "➕"]
+            [icons/plus]]
            [:div.timeline-editor-container
             [:> tiptap-component
              #js {:activeId active-id
@@ -351,4 +353,4 @@
             {:on-click (fn [e]
                          (.stopPropagation e)
                          (swap! !picker-open? not))}
-            "😀"]]]]))))
+            [icons/smiley]]]]]))))
