@@ -21,7 +21,7 @@ https://github.com/matrix-org/matrix-spec-proposals/pull/2545
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [reagent.core :as r]
-   [utils.helpers :refer [mxc->url]]
+   [utils.helpers :refer [mxc->url fetch-state-event fetch-room-state]]
    [utils.global-ui :refer [click-away-wrapper]]
    ["react" :as react]
    ))
