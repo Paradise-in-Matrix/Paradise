@@ -134,3 +134,22 @@
    [:line {:x1 "4" :y1 "12" :x2 "20" :y2 "12"}]
    [:line {:x1 "4" :y1 "6" :x2 "20" :y2 "6"}]
    [:line {:x1 "4" :y1 "18" :x2 "20" :y2 "18"}]])
+
+(defn plus [props]
+  [icon-base (merge {:width "20px" :height "20px"} props)
+   [:line {:x1 "12" :y1 "5" :x2 "12" :y2 "19"}]
+   [:line {:x1 "5" :y1 "12" :x2 "19" :y2 "12"}]])
+
+(defn smiley [props]
+  [icon-base (merge {:width "20px" :height "20px"} props)
+   [:circle {:cx "12" :cy "12" :r "9"}]
+   [:circle {:cx "9" :cy "9" :r "1" :fill "currentColor"}]
+   [:circle {:cx "15" :cy "9" :r "1" :fill "currentColor"}]
+   [:path {:d "M8 14s1.5 2 4 2 4-2 4-2"
+           :fill "none"
+           :stroke-linecap "round"}]])
+
+(defn send-icon [props]
+  [icon-base (merge {:width "20px" :height "20px"} props)
+   [:path {:d "M22 2L11 13"}]
+   [:path {:d "M22 2L15 22L11 13L2 9L22 2Z"}]])
