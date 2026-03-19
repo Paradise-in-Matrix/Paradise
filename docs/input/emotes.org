@@ -70,79 +70,103 @@ another space (unless the user has made them set as global).
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/input/emotes.cljs
-(re-frame/reg-event-fx
- :sdk/fetch-all-emotes
- (fn [{:keys [db]} _]
-   (if (empty? (:emoji/available-packs db))
-     (let [client (:client db)
-           session (when client (.session client))]
-       (if (and client session)
-         {:principle-fetch-emotes {:token (.-accessToken session)
-                                   :homeserver (.-homeserverUrl session)
-                                   :client client}}
-         (do (log/warn "No active session to fetch emotes.") {})))
-     {})))
+***** Helper Functions
 
+#+begin_src clojurescript :tangle ../../src/input/emotes.cljs
+(defn shape-emote-packs [room-id events]
+  (->> events
+       (filter #(= (:type %) "im.ponies.room_emotes"))
+       (map (fn [e] {:pack-id (or (not-empty (:state_key e)) room-id)
+                     :data (:content e)}))))
+
+(defn unwrap-rooms [raw-json]
+  (let [data (js->clj (js/JSON.parse raw-json) :keywordize-keys true)
+        rooms-map (:rooms data)]
+    (for [[rid packs] rooms-map
+          [pack-name _] packs]
+      [(name rid) (name pack-name)])))
+
+(defn fetch-emote-packs [homeserver token [rid pack-name]]
+  (-> (fetch-state-event homeserver token rid "im.ponies.room_emotes" pack-name)
+      (p/then (fn [json]
+                (when json
+                  {:pack-id pack-name :data json})))
+      (p/catch (fn [err] (log/error "Failed to fetch pack" pack-name err) nil))))
+#+end_src
+
+
+***** Reframe
+
+#+begin_src clojurescript :tangle ../../src/input/emotes.cljs
 (re-frame/reg-fx
  :principle-fetch-emotes
  (fn [{:keys [token homeserver client]}]
    (p/let [raw-json (.accountData client "im.ponies.emote_rooms")
-           data (js->clj (js/JSON.parse raw-json) :keywordize-keys true)
-           rooms-map (:rooms data)
-           fetch-targets (for [[rid packs] rooms-map
-                               [pack-name _] packs]
-                           [(name rid) (name pack-name)])
-           results (p/all
-                    (map (fn [[rid pack-name]]
-                           (let [clean-hs (str/replace homeserver #"/+$" "")
-                                 url (str clean-hs "/_matrix/client/v3/rooms/" rid "/state/im.ponies.room_emotes/" pack-name)]
-                             (-> (p/let [resp (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
-                                   (when (.-ok resp)
-                                     (p/let [json (.json resp)]
-                                       {:pack-id pack-name :data json})))
-                                 (p/catch (constantly nil)))))
-                         fetch-targets))]
-     (re-frame/dispatch [:sdk/save-all-emotes results]))))
+           fetch-targets (unwrap-rooms raw-json)
+           results (p/all (map #(fetch-emote-packs homeserver token %) fetch-targets))]
+     (re-frame/dispatch [:sdk/save-all-emotes :account nil (remove nil? results)]))))
 
+(re-frame/reg-fx
+ :principle-fetch-room-emotes-fx
+ (fn [{:keys [token homeserver source-type room-id]}]
+   (-> (fetch-room-state homeserver token room-id nil nil
+                         (partial shape-emote-packs room-id))
+       (p/then (fn [packs]
+                 (when (seq packs)
+                   (re-frame/dispatch [:sdk/save-all-emotes source-type room-id packs]))))
+       (p/catch #(log/error "Room fetch failed" room-id %)))))
 
-#_(re-frame/reg-event-db
- :sdk/save-all-emotes
- (fn [db [_ fetched-packs]]
-   (let [valid-packs (remove nil? fetched-packs)
-         structured-packs (into {}
-                                (for [{:keys [pack-id data]} valid-packs
-                                      :let [clj-data (js->clj data :keywordize-keys true)
-                                            pack-info (:pack clj-data)]]
-                                  [pack-id {:name   (or (:display_name pack-info) pack-id)
-                                            :avatar (:avatar_url pack-info)
-                                            :images (:images clj-data)}]))]
-     (log/info "Loaded" (count structured-packs) "packs!")
-     (assoc db :emoji/available-packs structured-packs))))
+(re-frame/reg-event-fx
+ :sdk/fetch-all-emotes
+ (fn [{:keys [db]} _]
+   (let [client (:client db)
+         session (some-> client (.session))]
+     (if (and client session)
+       {:principle-fetch-emotes {:token (.-accessToken session)
+                                 :homeserver (.-homeserverUrl session)
+                                 :client client}}
+       {}))))
+
+(re-frame/reg-event-fx
+ :sdk/fetch-room-emotes
+ (fn [{:keys [db]} [_ source-type room-id]]
+   (let [client (:client db)
+         session (some-> client (.session))]
+     (if (and session room-id)
+       {:principle-fetch-room-emotes-fx {:token (.-accessToken session)
+                                         :homeserver (.-homeserverUrl session)
+                                         :source-type source-type
+                                         :room-id room-id}}
+       {}))))
 
 (re-frame/reg-event-db
  :sdk/save-all-emotes
- (fn [db [_ fetched-packs]]
-   (let [valid-packs (remove nil? fetched-packs)
-         structured-packs (into {}
-                                (for [{:keys [pack-id data]} valid-packs
-                                      :let [clj-data    (js->clj data :keywordize-keys true)
+ (fn [db [_ source-type source-id fetched-packs]]
+   (let [structured-packs (into {}
+                                (for [{:keys [pack-id data]} (remove nil? fetched-packs)
+                                      :let [clj-data    (if (map? data) data (js->clj data :keywordize-keys true))
+                                            images      (:images clj-data)
                                             pack-info   (:pack clj-data)
                                             usage-set   (set (:usage pack-info []))
-                                            is-sticker? (contains? usage-set "sticker")]]
+                                            is-sticker? (contains? usage-set "sticker")]
+                                      :when (seq images)]
                                   [pack-id {:name             (or (:display_name pack-info) pack-id)
                                             :avatar           (:avatar_url pack-info)
-                                            :is-sticker-pack? is-sticker? 
-                                            :images           (:images clj-data)}]))]
-     (log/info "Loaded" (count structured-packs) "packs!")
-     (assoc db :emoji/available-packs structured-packs))))
+                                            :is-sticker-pack? is-sticker?
+                                            :images           images}]))]
+     (if (= source-type :account)
+       (assoc-in db [:emoji/packs :account] structured-packs)
+       (assoc-in db [:emoji/packs source-type source-id] structured-packs)))))
 
 (re-frame/reg-sub
- :emoji/all-packs
+ :emoji/active-set
  (fn [db _]
-   (get db :emoji/available-packs {})))
-
-
+   (let [active-space (:active-space-id db)
+         active-room (:active-room-id db)
+         account-packs (get-in db [:emoji/packs :account] {})
+         space-packs (when active-space (get-in db [:emoji/packs :space active-space] {}))
+         room-packs (when active-room (get-in db [:emoji/packs :room active-room] {}))]
+     (merge account-packs space-packs room-packs))))
 #+end_src
 
 
