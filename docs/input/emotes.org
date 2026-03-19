@@ -176,50 +176,6 @@ https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomids
                     :title    shortcode
                     :loading  "lazy"
                     :alt      shortcode}]])]]])]]))))
-
-
-  #_(defn emoji-sticker-board [{:keys [on-close on-insert-emoji on-send-sticker]}]
-  (re-frame/dispatch [:sdk/fetch-all-emotes])
-  (let [selected-pack-id (r/atom nil)]
-    (fn [{:keys [on-close on-insert-emoji on-send-sticker]}]
-      (let [packs @(re-frame/subscribe [:emoji/all-packs])
-            active-id  (or @selected-pack-id (first (keys packs)))
-            active-pack (get packs active-id)]
-        [click-away-wrapper
-         {:on-close on-close
-          :z-index 998}
-         [:div.emoji-popover
-          (if (empty? packs)
-            [:div.emoji-loading "Loading emotes..."]
-            [:div.emoji-container
-             [:div.emoji-sidebar
-              (for [[pack-id pack-data] packs]
-                (let [pname (or (:name pack-data) (str pack-id))
-                      avatar (:avatar pack-data)]
-                  [:div.sidebar-pack-item
-                   {:key      pack-id
-                    :class    (when (= active-id pack-id) "active")
-                    :on-click #(reset! selected-pack-id pack-id)
-                    :title    pname}
-                   (if avatar
-                     [:img.pack-icon {:src (mxc->url avatar)}]
-                     [:span.pack-text-icon (subs pname 0 (min 2 (count pname)))])]))]
-             [:div.emoji-grid-area
-              [:div.emoji-pack-title (or (:name active-pack) "Emotes")]
-              [:div.emoji-grid
-               (for [[shortcode item] (get active-pack :images {})]
-                 [:div.emoji-cell
-                  {:key      shortcode
-                   :on-click (fn []
-                              ;; Check the pack, not the individual image item
-                              (if (:is-sticker-pack? active-pack)
-                                (on-send-sticker (:url item) shortcode (:info item))
-                                (on-insert-emoji shortcode (:url item))))}
-                  [:img.emoji-img
-                   {:src     (mxc->url (:url item))
-                    :title   shortcode
-                    :loading "lazy"
-                    :alt     shortcode}]])]]])]]))))
 #+end_src
 
 
