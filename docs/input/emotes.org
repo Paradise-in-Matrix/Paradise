@@ -133,15 +133,14 @@ https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomids
   (let [selected-pack-id (r/atom nil)
         sticker-mode?    (r/atom false)]
     (fn [{:keys [on-close on-insert-emoji on-send-sticker]}]
-      (let [packs @(re-frame/subscribe [:emoji/all-packs])
+      (let [packs       @(re-frame/subscribe [:emoji/active-set])
             active-id   (or @selected-pack-id (first (keys packs)))
             active-pack (get packs active-id)]
         [click-away-wrapper
-         {:on-close on-close
-          :z-index 998}
+         {:on-close on-close :z-index 998}
          [:div.emoji-popover
           (if (empty? packs)
-            [:div.emoji-loading "Loading emotes..."]
+            [:div.emoji-loading "No emotes found for this space."]
             [:div.emoji-container
              [:div.emoji-sidebar
               (for [[pack-id pack-data] packs]
@@ -163,12 +162,13 @@ https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3roomsroomids
                           :on-click #(reset! sticker-mode? false)} "Inline"]
                 [:button {:class    (when @sticker-mode? "active")
                           :on-click #(reset! sticker-mode? true)} "Sticker"]]]
+
               [:div.emoji-grid
                (for [[shortcode item] (get active-pack :images {})]
                  [:div.emoji-cell
                   {:key      shortcode
                    :on-click (fn []
-                               (if @sticker-mode?
+                               (if (or @sticker-mode? (:is-sticker-pack? active-pack))
                                  (on-send-sticker (:url item) shortcode (:info item))
                                  (on-insert-emoji shortcode (:url item))))}
                   [:img.emoji-img
