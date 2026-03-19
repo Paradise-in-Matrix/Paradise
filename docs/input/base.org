@@ -287,8 +287,6 @@ forward.
                           (keyword? alt-text) (name alt-text)
                           (string? alt-text) alt-text
                           :else "Sticker")
-
-             ;; 2. Clean JS Object with no nulls
              info-obj (js-obj "mimetype" (or (:mimetype info) "image/png"))
              _        (when (:w info) (aset info-obj "w" (js/Number (:w info))))
              _        (when (:h info) (aset info-obj "h" (js/Number (:h info))))
@@ -341,7 +339,7 @@ forward.
  :input/context
  (fn [db [_ room-id]]
    (get-in db [:input-context room-id])))
-#+end_src
+/#+end_src
 
 
 **** Inline Editor Component
@@ -381,7 +379,7 @@ be used.
                                                matrix-html (get-matrix-formatted-body ed)]
                                            (re-frame/dispatch [:msg/edit active-id item text matrix-html])
                                            (re-frame/dispatch [:input/clear-context active-id]))))} "save"]]]))))
-#+end_src
+/#+end_src
 
 
 **** Message Input Component
@@ -477,4 +475,4 @@ Ideally, we should break this apart more later.
                          (.stopPropagation e)
                          (swap! !picker-open? not))}
             "😀"]]]]))))
-#+end_src
+/#+end_src
