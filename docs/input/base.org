@@ -25,6 +25,7 @@ too much detail it is headless, so we can theme and customize it without much fr
             [input.autocomplete :refer [suggestion-menu]]
             [reagent.core :as r]
             [utils.helpers :refer [mxc->url]]
+            [utils.svg :as icons]
             ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
             ))
 #+end_src
@@ -387,6 +388,8 @@ This is the main composer the user will interact with.
 It is important that this provides a clean and fluid experience.
 Ideally, we should break this apart more later.
 
+***** Component
+
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
 (defn message-input []
   (r/with-let [!picker-open? (r/atom false)
@@ -417,7 +420,8 @@ Ideally, we should break this apart more later.
                  (-> ed .chain .focus
                      (.insertContent #js {:type "customEmote"
                                           :attrs #js {:shortcode shortcode
-                                                      :src (mxc->url url)}})
+                                                      :src (mxc->url url)
+                                                      :mxc url}})
                      .run))
                (reset! !picker-open? false))}])
          (when (and context (= (:mode context) :reply))
@@ -453,7 +457,7 @@ Ideally, we should break this apart more later.
                                     (when (seq file-array)
                                       (re-frame/dispatch [:sdk/handle-file-drop active-id file-array]))
                                     (set! (.-value (.-target e)) "")))}]
-            "➕"]
+            [icons/plus]]
            [:div.timeline-editor-container
             [:> tiptap-component
              #js {:activeId active-id
@@ -473,5 +477,38 @@ Ideally, we should break this apart more later.
             {:on-click (fn [e]
                          (.stopPropagation e)
                          (swap! !picker-open? not))}
-            "😀"]]]]))))
+            [icons/smiley]]]]]))))
 #+end_src
+
+***** CSS
+
+#+begin_src css :tangle ../../css/base-composer.css
+.timeline-upload-btn,
+.timeline-emoji-btn,
+.timeline-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    transition: color 0.2s;
+}
+
+.timeline-upload-btn:hover,
+.timeline-emoji-btn:hover {
+    color: var(--text-main);
+}
+
+.timeline-send-btn {
+    color: var(--accent-color);
+}
+
+.timeline-send-btn:hover {
+    filter: brightness(1.2);
+}
+
+#+end_src
+
+
