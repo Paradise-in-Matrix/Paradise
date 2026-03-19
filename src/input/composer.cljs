@@ -82,12 +82,20 @@
         :atom true
         :addAttributes (fn [] #js {:src #js {:default nil}
                                    :shortcode #js {:default nil}})
+        :renderText (fn [^js props]
+              (let [shortcode (str (.. props -node -attrs -shortcode))]
+                (if (and (seq shortcode)
+                         (not (str/starts-with? shortcode ":")))
+                  (str ":" shortcode ":")
+                  (if (seq shortcode)
+                    shortcode
+                    ":emote:"))))
         :parseHTML (fn []
                      #js [#js {:tag "img[data-emote]"}
                           #js {:tag "img[data-mx-emoticon]"}
                           #js {:tag "img"
                                :getAttrs (fn [^js node]
-                                           #js {:src (.getAttribute node "src")
+                                           #js {:src (.getAttribute node "mxc")
                                                 :shortcode (or (.getAttribute node "alt")
                                                                (.getAttribute node "title"))})}])
         :renderHTML renderHtml}))
