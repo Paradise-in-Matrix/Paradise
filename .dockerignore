@@ -6,3 +6,7 @@ resources/public
 .shadow-cljs
 build
 dist
+.lsp
+.cpcache
+.clj-kondo
+docs
