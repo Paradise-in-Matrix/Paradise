@@ -265,6 +265,26 @@ that is currently on screen.
 
 ***** Reframe Events and Subscriptions
 
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(re-frame/reg-event-fx
+ :room/mark-read
+ (fn [{:keys [db]} [_ room-id event-id]]
+   (let [client (:client db)
+         room (.getRoom client room-id)]
+     (when (and room event-id)
+       (log/error room)
+       (-> (.sendReadReceipt room event-id "m.read")
+           (p/catch #(log/error "Failed to send receipt" %))))
+     {})))
+
+(re-frame/reg-event-db
+ :msg/mark-visible
+ (fn [db [_ event-id]]
+   (if-let [room-id (:active-room-id db)]
+     (assoc-in db [:read-receipts :pending room-id] event-id)
+     db)))
+#+end_src
+
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
