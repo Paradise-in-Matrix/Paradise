@@ -201,11 +201,12 @@ typing-listener #js {:call (fn [user-ids]
 
 (re-frame/reg-event-db
  :sdk/save-timeline-sub
- (fn [db [_ room-id timeline tl-handle pag-handle]]
+ (fn [db [_ room-id timeline tl-handle pag-handle typing-handle]]
    (assoc-in db [:timeline-subs room-id]
-             {:timeline timeline
-              :tl-handle tl-handle
-              :pag-handle pag-handle})))
+             {:timeline      timeline
+              :tl-handle     tl-handle
+              :pag-handle    pag-handle
+              :typing-handle typing-handle})))
 
 (re-frame/reg-event-fx
  :sdk/back-paginate
