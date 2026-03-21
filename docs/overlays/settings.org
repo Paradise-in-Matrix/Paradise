@@ -265,7 +265,7 @@ navigational components.
 #+end_src
 
 
-***** Verification tab
+**** Verification tab
 
 Simple verification tab for now
 
