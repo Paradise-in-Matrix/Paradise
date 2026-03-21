@@ -1,3 +1,24 @@
+  .followers-indicator {
+      font-size: 0.75rem;
+      color: var(--cp-text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      user-select: none;
+      height: 24px;
+      transition: opacity 0.2s ease-in-out;
+      opacity: 0;
+  }
+
+  .followers-indicator.is-visible {
+      opacity: 1;
+  }
+
+  .followers-indicator .text {
+      line-height: 1;
+}
+
 .virtuoso-list {
     flex: 1;
     height: 100% !important;
@@ -34,7 +55,6 @@
 .timeline-item {
     list-style: none;
     margin-bottom: 4px;
-    min-height: 36px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -116,12 +136,6 @@
     object-fit: contain;
 }
 
-.timeline-input-outer {
-    flex: 0 0 auto;
-    padding: 10px 16px 24px 16px;
-    background-color: #313338;
-    z-index: 10;
-}
 
 .timeline-input-wrapper {
     background-color: #383a40;
@@ -136,7 +150,7 @@
 
 .timeline-input-outer {
   position: relative;
-  padding: 0 16px 16px 16px;
+  padding: 0 16px 2px 16px;
   background: var(--bg-primary);
 }
 
@@ -238,6 +252,20 @@
 }
 
 
+.timeline-body p {
+    margin-block-start: 0;
+    margin-block-end: 0;
+    margin-inline-start: 0;
+    margin-inline-end: 0;
+    display: block;
+    line-height: 1.5;
+}
+
+.timeline-body p + p {
+    margin-top: 8px;
+}
+
+
 .timeline-container {
     display: flex;
     flex-direction: column;
@@ -276,12 +304,22 @@
 
 .timeline-message {
     position: relative;
-    border-bottom: none !important;
     display: flex;
     flex-direction: row;
-    padding: 12px 20px;
     gap: 14px;
     transition: background 0.1s ease;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.timeline-message.is-merged {
+    padding-top: 2px;
+}
+
+.timeline-message:hover {
+    background: var(--cp-bg-hover);
 }
 
 
@@ -295,7 +333,7 @@
 
 .message-hover-toolbar {
     position: absolute;
-    top: -12px;
+    top: -4px;
     right: 16px;
     display: none;
     background: #2b2d31;
@@ -341,7 +379,7 @@
 .timeline-header {
     display: flex;
     align-items: baseline;
-       margin-bottom: 4px;
+     margin-bottom: 4px;
 }
 
 .timeline-sender-name {
