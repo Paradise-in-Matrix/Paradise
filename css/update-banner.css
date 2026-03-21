@@ -1,0 +1,27 @@
+
+.global-update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999999;
+  background: var(--accent-primary);
+  color: white;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.global-update-banner button {
+  background: white;
+  color: var(--accent-primary);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
