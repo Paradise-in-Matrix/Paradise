@@ -633,6 +633,33 @@ individual's display name.
 #+end_src
 
 
+***** Event Tile Lifecycle
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn event-tile [item]
+  (r/with-let [node-ref (r/atom nil)
+               observe-node (fn [node]
+                              (when (and node (not= (:type item) :virtual))
+                                (.observe @visibility-observer node)))
+               unobserve-node (fn [node]
+                                (when (and node (not= (:type item) :virtual))
+                                  (.unobserve @visibility-observer node)))]
+    (let [rendered-item [event-tile-render item]
+          ]
+      [:div {:ref (fn [el]
+                    (when el
+                      (reset! node-ref el)
+                      (observe-node el)))
+             :data-event-id (:id item)
+             }
+       rendered-item])
+    (finally
+      (when-let [node @node-ref]
+        (unobserve-node node)))))
+;;
+;;
+
+#+end_src
 
 
 
