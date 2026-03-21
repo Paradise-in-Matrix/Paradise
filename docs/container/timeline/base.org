@@ -149,7 +149,26 @@ export enum DateDividerMode {
                      timeline        (.timelineWithConfiguration room config)
                      listener        #js {:onUpdate (fn [diffs] (apply-timeline-diffs! room-id diffs))}
 
+
+
+typing-listener #js {:call (fn [user-ids]
+                                     (log/error "TYPING UPDATE:" user-ids)
+                                     (re-frame/dispatch [:sdk/update-typing-users room-id user-ids]))}
+        typing-handle-1 (.subscribeToTypingNotifications room typing-listener)
+        _ (log/error "First handle registered:" typing-handle-1)
+        _ (js/setTimeout
+            (fn []
+              (log/error "Registering second 'kick' subscriber for room:" room-id)
+              (.subscribeToTypingNotifications room typing-listener))
+            5000)
+
+
+
+
                      timeline-handle (.addListener timeline listener)
+
+
+
                      pag-listener    #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])}
                      pag-handle      (.subscribeToBackPaginationStatus timeline pag-listener)
                      ]
