@@ -8,10 +8,12 @@
    [navigation.spaces.bar :refer [spaces-sidebar]]
    [overlays.settings :refer [settings-modal]]
    [overlays.lightbox :refer [image-lightbox]]
-  [auth.events :refer [login-screen]]
+   [auth.events :refer [login-screen]]
    [container.call.call-container :refer [persistent-call-container]]
    [container.members :refer [global-profile-preview]]
+   [client.config :refer [load-config check-remote-version]]
    [input.emotes :refer [emoji-sticker-board]]
+   [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker global-context-menu satellite-overlay]]
    [client.login :refer [bootstrap!]]
    [navigation.rooms.room-list :refer [room-list]]
@@ -36,7 +38,9 @@
    :auth-status :checking
    :login-error nil
    :client nil
-   })
+   :config {:version "0.0.0"}
+   :update-available? false}
+   )
 
 (re-frame/reg-event-db
  :initialize-db
@@ -100,6 +104,67 @@
    (get-in db [:ui :mobile?] false)))
 
 
+(re-frame/reg-event-db
+ :app/config-loaded
+ (fn [db [_ config]]
+   (assoc db :config config
+             :update-available? false)))
+
+(re-frame/reg-event-fx
+ :app/poll-version
+ (fn [{:keys [db]} [_ manual?]]
+   (let [current-v (get-in db [:config :version])]
+     (when current-v
+       (-> (check-remote-version)
+           (p/then (fn [remote-v]
+                     (cond
+                       (and remote-v (not= remote-v current-v))
+                       (re-frame/dispatch [:app/update-detected])
+                       manual?
+                       (js/alert (str "You are up to date! (v" current-v ")"))))))
+     {}))))
+
+(re-frame/reg-event-db
+ :app/update-detected
+ (fn [db _]
+   (assoc db :update-available? true)))
+
+(re-frame/reg-event-fx
+ :app/apply-update
+ (fn [_ _]
+   (if (exists? js/navigator.serviceWorker)
+     (-> (.getRegistration js/navigator.serviceWorker)
+         (.then (fn [reg]
+                  (let [waiting-sw (.-waiting reg)]
+                    (if waiting-sw
+                      (do
+                        (log/info "Telling new SW to activate...")
+                        (.postMessage waiting-sw #js {:type "SKIP_WAITING"})
+                        (js/setTimeout #(.reload js/location true) 300))
+                      (do
+                        (log/info "No waiting SW found, hard reloading...")
+                        (.reload js/location true)))))))
+     (.reload js/location true))
+   {}))
+
+(re-frame/reg-sub
+ :app/update-available?
+ (fn [db _]
+   (:update-available? db false)))
+
+(re-frame/reg-sub
+ :app/version
+ (fn [db _]
+   (get-in db [:config :version] "Unknown")))
+
+
+(re-frame/reg-sub
+ :i18n/tr
+ (fn [db _]
+   (let [locale (:locale db)
+         dictionary (:dictionary db)]
+     (partial tempura/tr {:dict dictionary} [locale :en]))))
+
 
 
 (re-frame/reg-fx
@@ -138,6 +203,7 @@
 (defn main-layout []
   (let [auth-status   @(re-frame/subscribe [:auth/status])
         sidebar-open? @(re-frame/subscribe [:ui/sidebar-open?])
+        update-ready?   @(re-frame/subscribe [:app/update-available?])
         ]
 
     (case auth-status
@@ -145,6 +211,12 @@
       (:logged-out :authenticating) [login-screen]
       :logged-in
       [:<>
+       (when update-ready?
+         [:div.global-update-banner
+          [:span "A new version of the app is available!"]
+          [:button {:on-click #(re-frame/dispatch [:app/apply-update])}
+           "Refresh"]])
+
        [persistent-call-container]
        [:div.app-root {:class (when sidebar-open? "sidebars-open")}
         [spaces-sidebar]
@@ -187,20 +259,21 @@
 
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
-  (let [params  (js/URLSearchParams. js/window.location.search)
-        room-id (.get params "room")]
-    (re-frame/dispatch [:app/bootstrap])
-    (when room-id
-      (js/console.log "App started with room-id:" room-id)
-      (re-frame/dispatch [:rooms/select room-id])
-      (let [new-url (.. js/window -location -pathname)]
-        (.replaceState js/window.history #js {} "" new-url))))
-  (mount-root))
-
-#_(defn ^:export init []
-  (re-frame/dispatch-sync [:initialize-db])
-  (re-frame/dispatch [:app/bootstrap])
-   (mount-root))
+  (-> (load-config)
+      (p/then (fn [config]
+                (re-frame/dispatch-sync [:app/config-loaded config])
+                (log/info "Config loaded:" config)
+                (let [params  (js/URLSearchParams. js/window.location.search)
+                      room-id (.get params "room")]
+                  (re-frame/dispatch [:app/bootstrap])
+                  (when room-id
+                    (log/info "App started with room-id:" room-id)
+                    (re-frame/dispatch [:rooms/select room-id])
+                    (let [new-url (.. js/window -location -pathname)]
+                      (.replaceState js/window.history #js {} "" new-url))))
+                (mount-root)
+                (js/setInterval #(re-frame/dispatch [:app/poll-version false]) (* 1000 60 15))))
+      (p/catch #(log/error "Failed to load config.edn" %))))
 
 
 (defn ^:after-load re-render []
