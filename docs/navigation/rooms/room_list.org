@@ -729,6 +729,8 @@ and file structures.
  (fn [{:keys [db]} [_ room-id opts]]
    (let [current-room-id (:active-room-id db)
          active-call-id  (get-in db [:call :active-room-id])
+         already-loaded? (get-in db [:room-members room-id :data])
+         loading?        (get-in db [:room-members room-id :loading?])
          is-call-room?   (room-type-call? db room-id)
          force-lobby?    (:force-lobby? opts)
          focus-override  (:focus-override opts)
@@ -760,6 +762,7 @@ and file structures.
                                 [(when current-room-id [:sdk/cleanup-timeline current-room-id])
                                  (when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
                                  [:sdk/boot-timeline room-id]
+                                 (when (not (or already-loaded? loading?)) [:room/fetch-members room-id])
                                  [:sdk/fetch-room-emotes :room room-id]
                                  [:composer/load-draft room-id]
                                  [:container/set-main-focus new-focus]
