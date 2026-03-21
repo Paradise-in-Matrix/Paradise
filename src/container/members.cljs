@@ -59,7 +59,7 @@
                                          :membership   membership
                                          :power-level  pl
                                          :display-name (or display-name user-id)
-                                         :sort-name    (clojure.string/lower-case (or display-name local-part))
+                                         :sort-name    (str/lower-case (or display-name local-part))
                                          :avatar-url   (when (.-avatarUrl m) (mxc->url (.-avatarUrl m)))}))))
                             (vec))]
      (-> db
@@ -100,11 +100,11 @@
     (re-frame/subscribe [:room/member-sort-type room-id])])
  (fn [[members query f-type s-type] _]
    (let [by-type (filter #(= (:membership %) f-type) members)
-         filtered (if (clojure.string/blank? query)
+         filtered (if (str/blank? query)
                     by-type
-                    (let [q (clojure.string/lower-case query)]
-                      (filter #(or (clojure.string/includes? (:sort-name %) q)
-                                   (clojure.string/includes? (clojure.string/lower-case (:user-id %)) q))
+                    (let [q (str/lower-case query)]
+                      (filter #(or (str/includes? (:sort-name %) q)
+                                   (str/includes? (str/lower-case (:user-id %)) q))
                               by-type)))]
      (case s-type
        :alphabetical (sort-by :sort-name filtered)
@@ -374,10 +374,10 @@ homeserver (.-homeserverUrl session)]
          :placeholder "Search members..."
          :value query
          :on-change #(re-frame/dispatch [:room/set-member-filter active-room (.. % -target -value)])}]
-       (when-not (clojure.string/blank? query)
+       (when-not (str/blank? query)
          [:button.member-search-clear-btn
           {:on-click #(re-frame/dispatch [:room/set-member-filter active-room ""])}
-          "✕"])]
+          [icons/exit]])]
 
       [:div.member-dropdown-row
        [:select.member-dropdown
