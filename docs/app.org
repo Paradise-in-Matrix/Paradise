@@ -291,6 +291,7 @@ Making sure this is dynamic, but abstract is important for now.
 @import "keyframes.css";
 @import "member-list.css";
 @import "base-composer.css";
+@import "update-banner.css";
 
 /*
 @import "../themes/cordlike.css";
