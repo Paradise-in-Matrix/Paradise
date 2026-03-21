@@ -67,7 +67,7 @@ just keep this to defining the look and feel itself.
 Now Tiptap has the HTTPS URL inside of the message box, but we can't send that
 so below is a helper function that converts the node BACK to Mxc on send.
 #+begin_src clojurescript :tangle ../../src/input/composer.cljs
-(defn- get-matrix-formatted-body [editor]
+(defn get-matrix-formatted-body [editor]
   (let [json (.. editor getJSON -content)
         node->html (fn node->html [node]
                      (let [type  (.-type node)
