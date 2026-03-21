@@ -401,7 +401,8 @@ Ideally, we should break this apart more later.
             attachments @(re-frame/subscribe [:composer/attachments active-id])
             loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])
             context     @(re-frame/subscribe [:input/context active-id])
-            _ (log/debug context)]
+            ]
+
         [:div.timeline-input-outer
          [suggestion-menu
           (fn [item]
