@@ -23,7 +23,7 @@ we've made interop with the WASM bindings.
             [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-readers join-names]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
-            [container.timeline.item :refer [event-tile reify-item]]
+            [container.timeline.item :refer [event-tile wrap-item]]
             [container.reusable :refer [room-header]]
             [input.base :refer [message-input inline-editor]]
             [navigation.rooms.room-summary :refer [build-room-summary]]
@@ -50,7 +50,7 @@ rooms.
                    (fn [prev-promise]
                      (-> prev-promise
                          (p/then (fn [current-events]
-                                   (apply-matrix-diffs current-events updates reify-item)))
+                                   (apply-matrix-diffs current-events updates wrap-item)))
                          (p/then (fn [next-events]
                                    (log/debug "Timeline diffs finished")
                                    (re-frame/dispatch [:sdk/update-timeline room-id next-events])
