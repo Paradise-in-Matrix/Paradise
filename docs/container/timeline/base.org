@@ -882,7 +882,7 @@ I will segment these another time
 
 .message-hover-toolbar {
     position: absolute;
-    top: -12px;
+    top: -4px;
     right: 16px;
     display: none;
     background: #2b2d31;
