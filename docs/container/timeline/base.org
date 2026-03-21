@@ -246,20 +246,30 @@ is an edit)
  :timeline/current-events
  (fn [db _]
    (let [active-room (:active-room-id db)
-         raw-events  (get-in db [:timeline active-room] [])]
-     (->> raw-events
-          (reduce (fn [acc e]
-                    (let [id-key   (or (:internal-id e) (:id e))
-                          existing (get acc id-key)]
-                      (if (and existing
-                               (not (:is-edited? e))
-                               (<= (:ts e) (:ts existing)))
-                        acc
-                        (assoc acc id-key e))))
-                  {})
-          (vals)
-          (sort-by :ts)
-          (vec)))))
+         raw-events  (get-in db [:timeline active-room] [])
+         sorted-events (->> raw-events
+                            (reduce (fn [acc e]
+                                      (let [id-key   (or (:internal-id e) (:id e))
+                                            existing (get acc id-key)]
+                                        (if (and existing
+                                                 (not (:is-edited? e))
+                                                 (<= (:ts e) (:ts existing)))
+                                          acc
+                                          (assoc acc id-key e))))
+                                    {})
+                            (vals)
+                            (sort-by :ts))]
+     (first
+      (reduce
+       (fn [[acc prev-event] curr-event]
+         (let [merge? (and prev-event
+                           (= (:type curr-event) :event)
+                           (= (:type prev-event) :event)
+                           (= (:sender-id curr-event) (:sender-id prev-event))
+                           (< (- (:ts curr-event) (:ts prev-event)) 300000))]
+           [(conj acc (assoc curr-event :merge-with-prev? merge?)) curr-event]))
+       [[] nil]
+       sorted-events)))))
 #+end_src
 
 
