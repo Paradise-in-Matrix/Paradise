@@ -604,7 +604,6 @@ I will segment these another time
 .timeline-item {
     list-style: none;
     margin-bottom: 4px;
-    min-height: 36px;
     display: flex;
     flex-direction: column;
     justify-content: center;
