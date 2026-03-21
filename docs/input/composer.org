@@ -173,10 +173,12 @@ https://tiptap.dev/docs/editor/core-concepts/extensions
                                                         (if (and files (pos? (.-length files)))
                                                           (do
                                                             (.preventDefault event)
+                                                            (.focus view)
                                                             (when-let [on-files (.. this -options -onFiles)]
                                                               (on-files files))
                                                             true)
                                                           false)))}}})]))}))
+
 #+end_src
 
 
