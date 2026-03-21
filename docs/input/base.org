@@ -430,7 +430,7 @@ Ideally, we should break this apart more later.
             [:div.context-info
              [:span (str "Replying to " (truncate-name (-> context :target :sender-name) 32))]]
             [:button.context-cancel-btn
-             {:on-click #(re-frame/dispatch [:input/clear-context active-id])} "✖"]])
+             {:on-click #(re-frame/dispatch [:input/clear-context active-id])} [icons/exit]]])
 
          [:div.timeline-input-wrapper
           (when (seq attachments)
