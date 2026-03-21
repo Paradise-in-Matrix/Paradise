@@ -12,3 +12,16 @@
       (p/then #(.text %))
       (p/then #(read-string %))))
 #+end_src
+
+
+This is to ensure that we never cache this fetch... so we
+can always update the version if needed.
+#+begin_src clojurescript :tangle ../../src/client/config.cljs
+(defn check-remote-version []
+  (let [url (str "./config.edn?t=" (.getTime (js/Date.)))]
+    (-> (js/fetch url #js {:cache "no-store"})
+        (p/then #(.text %))
+        (p/then #(read-string %))
+        (p/then :version)
+        (p/catch (fn [_] nil)))))
+#+end_src
