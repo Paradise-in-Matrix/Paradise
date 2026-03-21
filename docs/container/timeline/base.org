@@ -699,7 +699,7 @@ I will segment these another time
 
 .timeline-input-outer {
   position: relative;
-  padding: 0 16px 16px 16px;
+  padding: 0 16px 2px 16px;
   background: var(--bg-primary);
 }
 
