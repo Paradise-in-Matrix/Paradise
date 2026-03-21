@@ -296,6 +296,31 @@ is an edit)
 #+end_src
 
 
+**** Chat Follower Indicators
+
+
+When no readers are present we use a line break that won't get optimized
+away.
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(defn followers-indicator [active-room]
+  (let [reader-ids  @(re-frame/subscribe [:timeline/latest-readers])
+        members-map @(re-frame/subscribe [:room/members-map active-room])
+        has-readers? (boolean (seq reader-ids))
+        names (when has-readers?
+                (map (fn [id] (or (:display-name (get members-map id)) id))
+                     reader-ids))]
+    [:div.followers-indicator
+     {:class (when has-readers? "is-visible")}
+     (when has-readers?
+       [icons/double-check {:width "14px" :height "14px"}])
+     [:span.text
+      (if has-readers?
+        (format-readers names)
+        "\u00A0")]
+     ]))
+#+end_src
+
 **** Virtuoso Timeline Component
 
 Similar to Spaces and RoomLists we do a Virtuoso component here.
