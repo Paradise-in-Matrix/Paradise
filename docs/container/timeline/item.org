@@ -350,10 +350,9 @@ read receipts. This prevents any sort of spamming to the home server.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn build-message-actions [item active-room current-user-id x y]
-  (let [
-        ;;_ (log/debug item)
-        ;;_ (log/debug current-user-id)
-        msg-id   (:id item)]
+  (let [msg-id   (:id item)
+        is-mine? (or (:is-own? item)
+                     (= (:sender item) current-user-id))]
     (cond-> [{:id "react"
               :label "Add Reaction"
               :icon "😀"
