@@ -487,6 +487,7 @@ providing the encapsulation and parsing for us.
 (defn main-layout []
   (let [auth-status   @(re-frame/subscribe [:auth/status])
         sidebar-open? @(re-frame/subscribe [:ui/sidebar-open?])
+        update-ready?   @(re-frame/subscribe [:app/update-available?])
         ]
 
     (case auth-status
