@@ -282,7 +282,6 @@ Making sure this is dynamic, but abstract is important for now.
 @import "space.css";
 @import "space-icons.css";
 @import "calls.css";
-@import "container.css";
 @import "attachments.css";
 @import "drafts.css";
 @import "global.css";
