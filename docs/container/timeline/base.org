@@ -349,6 +349,75 @@ the user may be typing and it'll bump the composer when it appears.
 }
 #+end_src
 
+
+**** Typing Indicators
+
+Typing notifications or typing indicators provide the user visual feedback when someone is typing.
+They are rather straight forward in the rust-sdk thankfully, so we just subscribe to the room's listener.
+As I started writing this I realized we could actually treat the area we use for read-by like Emacs
+uses the mini-buffer. A nice status indicator.
+
+***** Reframe Subscriptions and Events
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+
+
+(re-frame/reg-event-db
+ :sdk/clear-stale-typing
+ (fn [db [_ room-id]]
+   (let [data (get-in db [:typing-users room-id])]
+     (if (and data (> (- (js/Date.now) (:last-update data)) 6000))
+       (update db :typing-users dissoc room-id)
+       db))))
+
+
+
+(re-frame/reg-event-db
+ :sdk/update-typing-users
+ (fn [db [_ room-id user-ids]]
+   (let [users (js->clj user-ids)]
+     (if (empty? users)
+       (dissoc-in db [:typing-users room-id])
+       (do
+         (js/setTimeout
+          #(re-frame/dispatch [:sdk/clear-stale-typing room-id])
+          6500)
+         (assoc-in db [:typing-users room-id]
+                   {:users users
+                    :last-update (js/Date.now)}))))))
+
+(re-frame/reg-event-db
+ :sdk/clear-stale-typing
+ (fn [db [_ room-id]]
+   (let [data (get-in db [:typing-users room-id])]
+     (if (and data (> (- (js/Date.now) (:last-update data)) 6000))
+       (update db :typing-users dissoc room-id)
+       db))))
+
+(re-frame/reg-event-fx
+ :sdk/update-typing-users
+ (fn [{:keys [db]} [_ room-id user-ids]]
+   (let [users (js->clj user-ids)]
+     (if (empty? users)
+       {:db (update db :typing-users dissoc room-id)}
+       {:db (assoc-in db [:typing-users room-id]
+                      {:users users
+                       :last-update (js/Date.now)})
+        :dispatch-later [{:ms 7000
+                          :dispatch [:sdk/clear-stale-typing room-id]}]}))))
+
+
+
+(re-frame/reg-sub
+ :room/typing-users
+ (fn [db [_ room-id]]
+   (let [data (get-in db [:typing-users room-id])]
+     (if (and data
+              (< (- (js/Date.now) (:last-update data)) 6000))
+       (:users data)
+       []))))
+
+#+end_src
 **** Virtuoso Timeline Component
 
 Similar to Spaces and RoomLists we do a Virtuoso component here.
