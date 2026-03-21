@@ -1,7 +1,10 @@
 
+
+
 #+begin_src clojurescript :tangle ../../src/client/config.cljs
 (ns client.config
   (:require [cljs.reader :refer [read-string]]
+   [taoensso.timbre :as log]
             [promesa.core :as p]))
 
 (defn load-config []
