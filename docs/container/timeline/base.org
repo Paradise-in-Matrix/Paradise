@@ -928,7 +928,7 @@ I will segment these another time
 .timeline-header {
     display: flex;
     align-items: baseline;
-       margin-bottom: 4px;
+     margin-bottom: 4px;
 }
 
 .timeline-sender-name {
