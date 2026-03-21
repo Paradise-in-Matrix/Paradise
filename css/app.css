@@ -12,7 +12,6 @@
 @import "space.css";
 @import "space-icons.css";
 @import "calls.css";
-@import "container.css";
 @import "attachments.css";
 @import "drafts.css";
 @import "global.css";
@@ -123,6 +122,7 @@ html, body {
     margin-right: 12px;
     cursor: pointer;
 }
+
 
 @media (max-width: 768px) {
     .mobile-menu-btn {
