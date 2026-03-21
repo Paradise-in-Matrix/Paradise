@@ -98,8 +98,31 @@ each of these later.
  :sdk/update-pagination-status
  (fn [db [_ room-id status]]
    (assoc-in db [:timeline-pagination room-id] status)))
+Something important to note is that for arbitrarily large rooms we should instead
+not load the read receipts. It will cause non-negligible performance issues.
+****** TODO Check room size before loading timeline and flip read receipts based on member count
+
+#+begin_src javascript
+export enum TimelineFilter_Tags {
+    All = "All",
+    OnlyMessage = "OnlyMessage",
+    EventTypeFilter = "EventTypeFilter"
+}
 
 
+export enum TimelineFocus_Tags {
+    Live = "Live",
+    Event = "Event",
+    Thread = "Thread",
+    PinnedEvents = "PinnedEvents"
+}
+
+export enum DateDividerMode {
+    Daily,
+    Monthly
+}
+
+#+end_src
 (re-frame/reg-event-fx
  :sdk/boot-timeline
  (fn [{:keys [db]} [_ room-id]]
