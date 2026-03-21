@@ -202,6 +202,31 @@
     (let [date (js/Date. ts)]
       (.toLocaleTimeString date js/undefined #js {:hour "numeric" :minute "2-digit"}))))
 
+(defn truncate-name [name max-len]
+  (if (> (count name) max-len)
+    (str (subs name 0 max-len) "...")
+    name))
+
+(defn join-names [names]
+  (let [cnt (count names)]
+    (case cnt
+      0 ""
+      1 (first names)
+      2 (str (first names) " and " (second names))
+      3 (str (first names) ", " (second names) ", and " (first (last names)))
+      (str (first names) ", " (second names) ", and " (- cnt 2) " others"))))
+
+
+(defn format-readers [names]
+  (let [joined (join-names names)]
+    (if (empty? joined)
+      nil
+      (str joined (if (= 1 (count names))
+                    " is following the conversation"
+                    " are following")))))
+
+
+
 (defn fetch-state-event [homeserver token room-id event-type state-key]
   (let [clean-hs (clojure.string/replace homeserver #"/+$" "")
         key-path (if (empty? state-key) "" (str "/" state-key))
