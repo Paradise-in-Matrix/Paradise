@@ -173,9 +173,13 @@ typing-listener #js {:call (fn [user-ids]
                      pag-handle      (.subscribeToBackPaginationStatus timeline pag-listener)
                      ]
                (.paginateBackwards timeline 5)
-             (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline timeline-handle pag-handle]))
+
+               (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline timeline-handle pag-handle typing-handle])
+               )
              (.catch #(js/console.error "Boot failed:" %))))
        {}))))
+#+end_src
+
 
 (re-frame/reg-event-fx
  :sdk/preload-timelines
