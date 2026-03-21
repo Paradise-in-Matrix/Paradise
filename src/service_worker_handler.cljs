@@ -1,7 +1,9 @@
 (ns service-worker-handler
   (:require
             [taoensso.timbre :as log]
+            [client.config :refer [check-remote-version]]
             [re-frame.db :as db]
+            [promesa.core :as p]
             [re-frame.core :as re-frame]))
 
 (defn register-sw! [session]
@@ -18,8 +20,19 @@
       (try-sync!)
       (.addEventListener sw-container "controllerchange"
                          (fn []
-                           (log/debug "re-frame: SW Controller changed, syncing session...")
-                           (try-sync!)))
+                           (log/debug "re-frame: SW Controller changed, checking version...")
+                           (try-sync!)
+                           (-> (check-remote-version)
+                               (p/then (fn [remote-v]
+                                         (let [db @db/app-db
+                                               current-v (get-in db [:config :version] "0.0.0")]
+                                           (when (and remote-v
+                                                      (not= (str remote-v) (str current-v))
+                                                      (not= (str current-v) "0.0.0"))
+                                             (log/info "SW Update: Version mismatch detected" remote-v "vs" current-v)
+                                             (re-frame/dispatch [:app/update-detected])))))
+                               (p/catch (fn [err]
+                                          (log/error "SW Update: Failed to check version" err))))))
       (.addEventListener sw-container "message"
                          (fn [event]
                            (let [data (.-data event)]
