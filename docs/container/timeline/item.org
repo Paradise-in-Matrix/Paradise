@@ -543,8 +543,8 @@ individual's display name.
    [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
-(defn event-tile [item]
-  (let [{:keys [id sender sender-name sender-avatar content-tag content type reactions read-by ts is-own?]} item
+(defn event-tile-render [item]
+  (let [{:keys [id sender sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
         active-room @(re-frame/subscribe [:rooms/active-id])
         my-profile  @(re-frame/subscribe [:sdk/profile])
         my-id       (:user-id my-profile)
