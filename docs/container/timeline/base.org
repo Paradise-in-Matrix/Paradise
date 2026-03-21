@@ -853,12 +853,22 @@ I will segment these another time
 
 .timeline-message {
     position: relative;
-    border-bottom: none !important;
     display: flex;
     flex-direction: row;
-    padding: 12px 20px;
     gap: 14px;
     transition: background 0.1s ease;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.timeline-message.is-merged {
+    padding-top: 2px;
+}
+
+.timeline-message:hover {
+    background: var(--cp-bg-hover);
 }
 
 
