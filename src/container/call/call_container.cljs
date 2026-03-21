@@ -63,7 +63,7 @@
        :title   "Persistent Element Call Primary"
        :style   (if primary? active-style hidden-style)
        :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
-       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen; speaker-selection;"
+       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
        :on-load #(attach-iframe-observers! primary-iframe-ref)
        :src     "about:blank"}]
      [:iframe
@@ -71,6 +71,6 @@
        :title   "Persistent Element Call Backup"
        :style   (if-not primary? active-style hidden-style)
        :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
-       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen; speaker-selection;"
+       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
        :on-load #(attach-iframe-observers!   backup-iframe-ref)
        :src     "about:blank"}]]))
