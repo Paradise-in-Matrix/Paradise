@@ -24,7 +24,7 @@ too much detail it is headless, so we can theme and customize it without much fr
             [input.emotes :refer [emoji-sticker-board]]
             [input.autocomplete :refer [suggestion-menu]]
             [reagent.core :as r]
-            [utils.helpers :refer [mxc->url]]
+            [utils.helpers :refer [mxc->url truncate-name]]
             [utils.svg :as icons]
             ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
             ))
