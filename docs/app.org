@@ -201,6 +201,15 @@ https://day8.github.io/re-frame/application-state/
  (fn [db _]
    (get-in db [:config :version] "Unknown")))
 
+
+(re-frame/reg-sub
+ :i18n/tr
+ (fn [db _]
+   (let [locale (:locale db)
+         dictionary (:dictionary db)]
+     (partial tempura/tr {:dict dictionary} [locale :en]))))
+
+
 #+end_src
 
 
