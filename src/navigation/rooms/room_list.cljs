@@ -246,65 +246,6 @@
 
 
 
-(defonce !bg-room-mutex (atom (p/resolved nil)))
-
-(defn apply-bg-rooms-diffs! [updates]
-  (swap! !bg-room-mutex
-         (fn [prev-promise]
-           (p/then prev-promise
-                   (fn []
-                     (let [db @re-frame.db/app-db
-                           current-rooms (get db :bg-rooms-array #js [])
-                           old-cache (get db :rooms-unfiltered-cache {})
-                           space-service (:space-service db)
-                           client (:client db)]
-                       (-> (apply-matrix-diffs current-rooms updates #(parse-room client space-service %))
-                           (p/then (fn [next-rooms]
-                                     (doseq [r next-rooms]
-                                       (let [id (or (.-id r) (.-roomId r) (aget r "roomId"))]
-                                         (when-let [old-room (get old-cache id)]
-                                           (when-let [pid (aget old-room "first-parent-id")]
-                                             (aset r "parents" (aget old-room "parents"))
-                                             (aset r "first-parent-id" pid)))))
-                                     (re-frame/dispatch-sync [:room-list/set-bg-rooms-sync next-rooms])
-                                     (doseq [r next-rooms]
-                                       (when-not (aget r "first-parent-id")
-                                         (let [id (or (.-id r) (.-roomId r) (aget r "roomId"))]
-                                           (enqueue-parent-check! id))))
-                                     (process-parent-queue!)))
-                           (p/catch (fn [err]
-                                      (log/error "Global Diff Panic:" err)
-                                      nil)))))))))
-
-
-
-(re-frame/reg-event-db
- :room-list/set-bg-rooms-sync
- (fn [db [_ rooms-list]]
-   (let [rooms-map (reduce (fn [acc r]
-                             (let [id (or (.-id r) (.-roomId r) (aget r "roomId"))]
-                               (assoc acc id r)))
-                           {}
-                           rooms-list)]
-     (assoc db
-            :bg-rooms-array rooms-list
-            :rooms-unfiltered-cache rooms-map))))
-
-(re-frame/reg-event-db
- :room-list/save-bg-list-handle
- (fn [db [_ result]]
-   (assoc db
-     :bg-room-list-result result
-     :bg-room-list-controller (.controller result))))
-
-(re-frame/reg-event-fx
- :room-list/bg-rooms-diff
- (fn [_ [_ updates]]
-   (apply-bg-rooms-diffs! updates)
-   {}))
-
-
-
 
 
 (defn start-room-list-sync! [room-list]
@@ -529,6 +470,8 @@
  (fn [{:keys [db]} [_ room-id opts]]
    (let [current-room-id (:active-room-id db)
          active-call-id  (get-in db [:call :active-room-id])
+         already-loaded? (get-in db [:room-members room-id :data])
+         loading?        (get-in db [:room-members room-id :loading?])
          is-call-room?   (room-type-call? db room-id)
          force-lobby?    (:force-lobby? opts)
          focus-override  (:focus-override opts)
@@ -560,6 +503,7 @@
                                 [(when current-room-id [:sdk/cleanup-timeline current-room-id])
                                  (when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
                                  [:sdk/boot-timeline room-id]
+                                 (when (not (or already-loaded? loading?)) [:room/fetch-members room-id])
                                  [:sdk/fetch-room-emotes :room room-id]
                                  [:composer/load-draft room-id]
                                  [:container/set-main-focus new-focus]
