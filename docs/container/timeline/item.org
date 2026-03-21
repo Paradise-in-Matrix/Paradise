@@ -255,7 +255,16 @@ help anyone later who wants to make changes to aspects of the timeline.
 #+end_src
 
 
-**** Hover and Context Menus for Items
+
+**** Global Observer
+
+We need a way to inform the server that we have *read* a message.
+This is generally done by providing a read receipt to the message
+that is currently on screen.
+
+
+***** Reframe Events and Subscriptions
+
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
