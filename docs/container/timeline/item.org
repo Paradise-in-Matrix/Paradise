@@ -43,6 +43,7 @@ help anyone later who wants to make changes to aspects of the timeline.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn reify-item [ffi-item]
+(defn wrap-item [ffi-item]
   (let [raw-id (.uniqueId ffi-item)
         id-str (if raw-id (or (.-id raw-id) raw-id) (str "virt-" (hash ffi-item)))
         event (.asEvent ffi-item)
