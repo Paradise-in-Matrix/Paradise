@@ -189,21 +189,20 @@ This determines the 'submit' behavior for the editor.
 #+begin_src clojurescript :tangle ../../src/input/composer.cljs
 (def submit-extension
   (.create Extension
-    #js {:name "submitExtension"
-         :addOptions (fn [] #js {:onSend nil})
-         :addKeyboardShortcuts
-         (fn []
-           (this-as this
-             #js {"Enter" (fn [context]
-                            (let [editor (.-editor context)
-                                  text (.getText editor)
-                                  html (.getHTML editor)
-                                  on-send (.. this -options -onSend)]
-                              (when (and on-send (not (str/blank? text)))
-                                (on-send text html)
-                                (.commands.clearContent editor true))
-                              true))
-                  "Shift-Enter" (fn [] false)}))}))
+           #js {:name "submitExtension"
+                :addOptions (fn [] #js {:onSend nil})
+                :addKeyboardShortcuts
+                (fn []
+                  (this-as this
+                           #js {"Enter" (fn [context]
+                                          (let [editor  (.-editor context)
+                                                text    (.getText editor)
+                                                html    (.getHTML editor)
+                                                on-send (.. this -options -onSend)]
+                                            (when (and on-send (on-send text html))
+                                              (.commands.clearContent editor true))
+                                            true))
+                                "Shift-Enter" (fn [] false)}))}))
 #+end_src
 
 
