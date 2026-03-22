@@ -71,10 +71,10 @@
     build-state))
 
 (defn include-root-files
-  {:shadow.build/stage :flush}
+  {:shadow.build/stage :compile-prepare}
   [build-state & args]
   (let [resource-dir "build/"
-        root-files   ["index.html" "config.edn"]]
+        root-files   ["index.html" "config.edn" "i18n.edn"]]
     (doseq [f root-files
             :let [source (io/file f)
                   target (io/file resource-dir f)]]
