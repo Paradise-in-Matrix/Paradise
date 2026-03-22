@@ -31,7 +31,7 @@ worry about the code itself.
   {:shadow.build/stage :flush}
   [build-state & args]
   (let [source (io/file "node_modules/ffi-bindings/src/generated-compat/wasm-bindgen/index_bg.wasm")
-        target (io/file "build/generated-compat/wasm-bindgen/index_bg.wasm")]
+        target (io/file "build/ffi-bindings/wasm-bindgen/index_bg.wasm")]
     (when (.exists source)
       (io/make-parents target)
       (io/copy source target)
