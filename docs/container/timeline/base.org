@@ -277,19 +277,7 @@ is an edit)
                                     {})
                             (vals)
                             (sort-by :ts))]
-     (first
-      (reduce
-       (fn [[acc prev-event] curr-event]
-         (let [merge? (and prev-event
-                           (= (:type curr-event) :event)
-                           (= (:type prev-event) :event)
-                           (= (:sender-id curr-event) (:sender-id prev-event))
-                           (< (- (:ts curr-event) (:ts prev-event)) 300000))]
-           [(conj acc (assoc curr-event :merge-with-prev? merge?)) curr-event]))
-       [[] nil]
-       sorted-events)))))
-
-
+     (enrich-timeline-items sorted-events))))
 
 (re-frame/reg-sub
  :timeline/latest-readers
