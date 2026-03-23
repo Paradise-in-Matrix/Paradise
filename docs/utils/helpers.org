@@ -227,16 +227,19 @@ We need to be able to convert timestamps to date otherwise people might not be t
 ***** Date
 
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
-(defn format-divider-date [ts]
+(defn format-divider-date [tr ts]
   (let [date (js/Date. ts)
         today (js/Date.)
         is-today (= (.toDateString date) (.toDateString today))
         yesterday (doto (js/Date.) (.setDate (- (.getDate today) 1)))
         is-yesterday (= (.toDateString date) (.toDateString yesterday))]
     (cond
-      is-today "Today"
-      is-yesterday "Yesterday"
-      :else (.toLocaleDateString date js/undefined #js {:month "long" :day "numeric" :year "numeric"}))))
+      is-today (tr [:settings.language-time/today])
+      is-yesterday (tr [:settings.language-time/yesterday])
+      :else (.toLocaleDateString date js/undefined
+                                 #js {:month "long"
+                                      :day "numeric"
+                                      :year "numeric"}))))
 #+end_src
 
 
