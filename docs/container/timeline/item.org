@@ -68,11 +68,13 @@ help anyone later who wants to make changes to aspects of the timeline.
                 content-tag    (.-tag content)
                 content-inner  (.-inner content)
                 content-inner-content (when content-inner (.-content content-inner))
+
                 reactions (when-let [reactions-raw (and content-inner-content (.-reactions content-inner-content))]
                             (mapv (fn [r]
-                                    (let [emoji   (get r "key")
-                                          senders (get r "senders")]
-                                      [emoji (count senders)]))
+                                    (let [emoji      (get r "key")
+                                          senders    (get r "senders")
+                                          sender-ids (set (map #(get % "senderId") senders))]
+                                      [emoji (count senders) sender-ids]))
                                   (js->clj reactions-raw)))
 
                 read-by (let [receipts (.-readReceipts event)]
