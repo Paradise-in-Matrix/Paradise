@@ -139,6 +139,19 @@ help anyone later who wants to make changes to aspects of the timeline.
                                                {:w (some-> info .-width js/Number)
                                                 :h (some-> info .-height js/Number)})}
                                     nil)})
+                        "State"
+                        (let [state-content (.-content content-inner)
+                              state-tag     (.-tag state-content)
+                              state-inner   (.-inner state-content)]
+                          {:tag   state-tag
+                           :inner (case state-tag
+                                    "RoomPinnedEvents"
+                                    {:change (some-> state-inner .-change)}
+                                    "RoomAvatar"
+                                    {:url (some-> state-inner .-url)}
+                                    "RoomName"
+                                    {:name (some-> state-inner .-name)}
+                                    {:raw-inner state-inner})})
                         "FailedToParseMessageLike"
                         {:error      (.-error content-inner)
                          :event-type (.-eventType content-inner)}
