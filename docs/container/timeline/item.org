@@ -179,18 +179,23 @@ help anyone later who wants to make changes to aspects of the timeline.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (re-frame/reg-event-fx
- :sdk/send-reaction
- (fn [{:keys [db]} [_ room-id msg-id shortcode]]
+ :sdk/toggle-reaction
+ (fn [{:keys [db]} [_ room-id event-or-transaction-id emoji-key]]
    (let [timeline (get-in db [:timeline-subs room-id :timeline])]
      (if-not timeline
        (log/error "No timeline found for reaction in room" room-id)
        (try
-         (-> (.sendReaction timeline msg-id shortcode)
-             (.then #(log/info "Reaction sent:" shortcode))
-             (.catch #(log/error "Failed to send reaction:" %)))
+         (log/error event-or-transaction-id)
+         (-> (.toggleReaction timeline event-or-transaction-id emoji-key)
+             (.then (fn [added?]
+                      (if added?
+                        (log/info "Reaction added:" emoji-key)
+                        (log/info "Reaction removed:" emoji-key))))
+             (.catch #(log/error "Failed to toggle reaction:" %)))
          (catch :default e
-           (log/error "FFI Reaction Panic:" e)))))
+           (log/error "FFI Reaction Toggle Panic:" e)))))
    {}))
+
 
 (re-frame/reg-event-db
  :msg/open-reaction-picker
