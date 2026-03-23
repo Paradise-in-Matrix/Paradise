@@ -412,51 +412,23 @@ We definitely want some color though.
 
 #+begin_src clojurescript :tangle ../../src/container/members.cljs
 (defn member-item [m custom-tags active-room]
-  (r/with-let [!hover-timer (atom nil)
-               clear-timer! #(when @!hover-timer
-                               (js/clearTimeout @!hover-timer)
-                               (reset! !hover-timer nil))]
-    (let [pl         (:power-level m)
-          tag-data   (get custom-tags (keyword (str pl)))
-          role-name  (:name tag-data)
-          role-color (or (:color tag-data) "var(--text-primary)")
-          icon-url   (some-> tag-data :icon :key mxc->url)]
-      [:div.member-item
-       {:on-mouse-enter (fn [e]
-                          (let [rect (.getBoundingClientRect (.-currentTarget e))
-                                px (- (.-left rect) 260)
-                                py (.-top rect)]
-                            (clear-timer!)
-                            (reset! !hover-timer
-                                    (js/setTimeout
-                                     #(re-frame/dispatch [:profile-preview/open
-                                                          {:x px :y py :member m :tags custom-tags}])
-                                     400))))
-        :on-mouse-leave (fn []
-                          (clear-timer!)
-                          (re-frame/dispatch [:profile-preview/close]))
-        :on-context-menu (fn [e]
-                           (.preventDefault e)
-                           (.stopPropagation e)
-                           (clear-timer!)
-                           (re-frame/dispatch [:profile-preview/close])
-                           (re-frame/dispatch
-                            [:context-menu/open
-                             {:x (.-clientX e)
-                              :y (.-clientY e)
-                              :items (build-member-actions m active-room)}]))}
-       [avatar {:id (:user-id m) :name (:display-name m) :url (:avatar-url m) :size 32}]
-       [:div.member-item-info
-        [:div.member-item-name-row
-         [:span.member-item-name {:style {:color role-color}} (:display-name m)]
-         (when role-name
-           [:div.member-item-role-badge {:style {:color role-color :border (str "1px solid " role-color)}}
-            (when icon-url
-              [:img.member-item-role-icon {:src icon-url}])
-            role-name])]
-        [:span.member-item-user-id (:user-id m)]]])))
-
-
+  (let [pl         (:power-level m)
+        tag-data   (get custom-tags (keyword (str pl)))
+        role-name  (:name tag-data)
+        role-color (or (:color tag-data) "var(--text-primary)")
+        icon-url   (some-> tag-data :icon :key mxc->url)]
+    [profile-popover-trigger m custom-tags active-room :left
+     [:div.member-item
+      [avatar {:id (:user-id m) :name (:display-name m) :url (:avatar-url m) :size 32}]
+      [:div.member-item-info
+       [:div.member-item-name-row
+        [:span.member-item-name {:style {:color role-color}} (:display-name m)]
+        (when role-name
+          [:div.member-item-role-badge {:style {:color role-color :border (str "1px solid " role-color)}}
+           (when icon-url
+             [:img.member-item-role-icon {:src icon-url}])
+           role-name])]
+       [:span.member-item-user-id (:user-id m)]]]]))
 #+end_src
 
 
