@@ -100,7 +100,7 @@ converts the attachment to a format we like to work with.
         [:span.mime-label (last (str/split mime #"/"))]]
        :else
        [:div.preview-file
-        [:span "📄"]
+        [icons/file]
         [:span.file-name filename]]))
    [:button.remove-attachment
     {:on-click #(re-frame/dispatch [:composer/remove-attachment room-id index])}
@@ -191,7 +191,7 @@ converts the attachment to a format we like to work with.
          (log/info "Saving reified draft for room:" room-id)
          (.setComposerDraft timeline draft file-info))
        (catch :default e
-         (js/console.error "Draft Reification Failure:" e)))
+         (log/error "Draft Reification Failure:" e)))
      {})))
 
 (re-frame/reg-event-db
