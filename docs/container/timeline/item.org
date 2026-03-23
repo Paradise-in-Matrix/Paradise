@@ -606,7 +606,6 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 
-**** TODO Replace icon
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn file-message [{:keys [caption source info]}]
   [:div.file-attachment
