@@ -26,24 +26,26 @@ actual UI components themselves.
 #+begin_src clojurescript :tangle ../src/app.cljs
 (ns app
   (:require
- [re-frame.core :as re-frame]
+   [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [reagent.core :as r]
    [reagent.dom.client :as rdom]
    [navigation.spaces.bar :refer [spaces-sidebar]]
-   [overlays.settings :refer [settings-modal]]
-   [overlays.lightbox :refer [image-lightbox]]
+   [overlays.settings]
+   [overlays.lightbox]
+   [overlays.profiles]
+   [overlays.reactions]
    [auth.events :refer [login-screen]]
    [container.call.call-container :refer [persistent-call-container]]
    [container.members :refer [global-profile-preview]]
-   [client.config :refer [load-config check-remote-version]]
-   [input.emotes :refer [emoji-sticker-board]]
+   [client.config :refer [load-config check-remote-version load-i18n]]
    [taoensso.tempura :as tempura :refer [tr]]
-   [utils.global-ui :refer [global-reaction-picker global-context-menu satellite-overlay]]
+   [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay]]
+   [utils.macros :refer [i18n-data]]
    [client.login :refer [bootstrap!]]
    [navigation.rooms.room-list :refer [room-list]]
-  [container.base :refer [container]]
+   [container.base :refer [container]]
    ))
 #+end_src
 
