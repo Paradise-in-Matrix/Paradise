@@ -268,15 +268,13 @@ We need a boot up screen for those moments where we're not quite ready.
 Making sure this is dynamic, but abstract is important for now.
 #+begin_src clojurescript :tangle ../src/app.cljs
 (defn booting-screen []
-  [:div.boot-container
-   [:div.boot-content
-    [:div.boot-logo-wrapper
-     [:div.paradise-logo "P"]]
-    [:div.boot-loading-text
-     [:span "Taking you to Paradise"]
-     [:span.dot-one "."]
-     [:span.dot-two "."]
-     [:span.dot-three "."]]]])
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.boot-container
+     [:div.boot-content
+      [:div.boot-logo-wrapper
+       [:div.paradise-logo "P"]]
+      [:div.boot-loading-text
+       [:span (tr [:boot/loading-text])]]]]))
 #+end_src
 
 
