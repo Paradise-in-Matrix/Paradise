@@ -244,6 +244,8 @@ this is not a smooth experience for the user.
 
 (defn persistent-call-container []
   (let [call-state   @(rf/subscribe [:call/state])
+        tr           @(rf/subscribe [:i18n/tr])
+
         primary?     (get call-state :primary-iframe? true)
         rect         @host-rect
         active-style (if rect
