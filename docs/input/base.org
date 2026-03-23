@@ -388,6 +388,9 @@ This is the main composer the user will interact with.
 It is important that this provides a clean and fluid experience.
 Ideally, we should break this apart more later.
 
+***** TODO Placeholder text isn't update on i18n language change
+
+
 ***** Component
 
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
