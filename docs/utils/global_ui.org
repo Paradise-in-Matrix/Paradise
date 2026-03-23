@@ -373,22 +373,35 @@ much simpler.
 
 
 #+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+
+
 (defn satellite-overlay [child-component]
   (let [picker-state @(re-frame/subscribe [:msg/active-reaction-picker])]
     (when picker-state
-      (let [{:keys [room-id msg-id x y]} picker-state
+      (let [{:keys [room-id event-or-transaction-id x y]} picker-state
             width  320
             height 380
             render-x (if (> (+ x width) js/window.innerWidth) (- x width) x)
             render-y (if (> (+ y height) js/window.innerHeight) (- y height) y)]
         [:div.satellite-overlay
          {:style {:left (str render-x "px")
-                  :top (str render-y "px")}}
+                  :top (str render-y "px")
+                  :position "fixed"
+                  :z-index 1000}}
          [:div.satellite-content
           [child-component
-           {:room-id room-id
-            :msg-id msg-id
-            :on-close #(re-frame/dispatch [:ui/close-satellite])}]]]))))
+           {:on-close #(re-frame/dispatch [:msg/close-reaction-picker])
+            :on-insert-native
+            (fn [unicode-char]
+              (re-frame/dispatch [:sdk/toggle-reaction room-id  event-or-transaction-id unicode-char])
+              (re-frame/dispatch [:msg/close-reaction-picker]))
+             :on-insert-emoji
+            (fn [shortcode url]
+              (re-frame/dispatch [:sdk/toggle-reaction room-id event-or-transaction-id  url])
+              (re-frame/dispatch [:msg/close-reaction-picker]))
+            :on-send-sticker
+            (fn [& _]
+              (log/warn "Cannot send stickers as a reaction!"))}]]]))))
 #+end_src
 
 #+begin_src css :tangle ../../css/global.css
