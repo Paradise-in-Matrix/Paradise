@@ -93,6 +93,26 @@
     flex-direction: column;
 }
 
+
+.satellite-overlay .emoji-popover {
+  position: relative !important;
+  bottom: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+}
+
+.satellite-content {
+  display: block;
+  width: 320px;
+  height: 380px;
+}
+
+
+
 @media (max-width: 768px) {
     .satellite-overlay {
         top: auto !important;
