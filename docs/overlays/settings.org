@@ -78,18 +78,26 @@ scaffolding.
 
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
-(re-frame/reg-event-fx
+#_(re-frame/reg-event-fx
  :settings/open
  (fn [{:keys [db]} _]
    {:db (assoc db :settings/open? true)
     :fx [[:dispatch [:settings/load-accounts]]]}))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
+ :settings/open
+ (fn [{:keys [db]} _]
+   {:fx [[:dispatch [:ui/open-modal :settings {}]]
+         [:dispatch [:settings/load-accounts]]]}))
+
+
+
+#_(re-frame/reg-event-db
  :settings/close
  (fn [db _]
    (assoc db :settings/open? false)))
 
-(re-frame/reg-sub
+#_(re-frame/reg-sub
  :settings/is-open?
  (fn [db _]
    (:settings/open? db false)))
