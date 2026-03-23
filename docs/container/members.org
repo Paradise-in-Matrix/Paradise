@@ -503,7 +503,8 @@ We definitely want some color though.
 #+begin_src clojurescript :tangle ../../src/container/members.cljs
 
 (defn member-list []
-  (let [active-room @(re-frame/subscribe [:rooms/active-id])
+  (let [tr           @(re-frame/subscribe [:i18n/tr])
+        active-room @(re-frame/subscribe [:rooms/active-id])
         custom-tags @(re-frame/subscribe [:room/power-level-tags active-room])
         query       @(re-frame/subscribe [:room/member-filter-query active-room])
         filter-type @(re-frame/subscribe [:room/member-filter-type active-room])
@@ -525,7 +526,7 @@ We definitely want some color though.
         [icons/search {:width "14px" :height "14px"}]]
        [:input.member-search-input
         {:type "text"
-         :placeholder "Search members..."
+         :placeholder (tr [:container.members/search-placeholder])
          :value query
          :on-change #(re-frame/dispatch [:room/set-member-filter active-room (.. % -target -value)])}]
        (when-not (str/blank? query)
@@ -537,23 +538,25 @@ We definitely want some color though.
        [:select.member-dropdown
         {:value filter-type
          :on-change #(re-frame/dispatch [:room/set-member-filter-type active-room (.. % -target -value)])}
-        [:option {:value "Join"}   (str "Joined (" (get counts "Join" 0) ")")]
-        [:option {:value "Invite"} (str "Invited (" (get counts "Invite" 0) ")")]
-        [:option {:value "Leave"}  (str "Left (" (get counts "Leave" 0) ")")]
-        [:option {:value "Ban"}    (str "Banned (" (get counts "Ban" 0) ")")]]
+        [:option {:value "Join"}   (tr [:container.members.filter/joined] [(get counts "Join" 0)])]
+        [:option {:value "Invite"} (tr [:container.members.filter/invited] [(get counts "Invite" 0)])]
+        [:option {:value "Leave"}  (tr [:container.members.filter/left] [(get counts "Leave" 0)])]
+        [:option {:value "Ban"}    (tr [:container.members.filter/banned] [(get counts "Ban" 0)])]
+        ]
 
        [:select.member-dropdown
         {:value (name sort-type)
          :on-change #(re-frame/dispatch [:room/set-member-sort active-room (keyword (.. % -target -value))])}
-        [:option {:value "power-level"} "Sort: Role"]
-        [:option {:value "alphabetical"} "Sort: Name"]
-        [:option {:value "latest"} "Sort: Latest"]]]]
+        [:option {:value "power-level"}  (tr [:container.members.sort/role])]
+        [:option {:value "alphabetical"} (tr [:container.members.sort/name])]
+        [:option {:value "latest"}       (tr [:container.members.sort/latest])]
+        ]]]
 
      (if loading?
-       [:div.member-list-loading "Loading members..."]
+       [:div.member-list-loading (tr [:container.members/loading])]
        [:div.member-list-scroll
         (if (empty? flat-members)
-          [:div.member-list-empty "No members found"]
+          [:div.member-list-empty (tr [:container.members/no-results])]
           [:> GroupedVirtuoso
            {:groupCounts (clj->js group-counts)
             :style {:height "100%" :width "100%"}
