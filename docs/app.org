@@ -526,15 +526,19 @@ providing the encapsulation and parsing for us.
           [:div.mobile-overlay {:on-click #(re-frame/dispatch [:ui/set-sidebar false])}])
         [container]
         ]
-       [settings-modal]
+       [modal-root]
+       [popover-root]
+       ;;      [settings-modal]
        [global-profile-preview]
        [global-context-menu]
-       [satellite-overlay
-          (case active-type
-            :emoji-picker emoji-sticker-board
-            :user-info    user-summary-card
-            nil)]
-       [image-lightbox]
+  ;;     [satellite-overlay
+        ;;  (case active-type
+        ;;    :emoji-picker
+;;        emoji-sticker-board
+          ;;  :user-info    user-summary-card
+       ;;     nil)
+    ;;   ]
+;;       [image-lightbox]
        ]
       [:div "Unknown State"])))
 #+end_src
