@@ -607,38 +607,39 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn file-message [{:keys [caption source info]}]
+(defn file-message [{:keys [caption source info]} tr]
   [:div.file-attachment
    [:a {:href (mxc->url source) :target "_blank" :className "file-link"}
-    [:span.file-icon "📁"]
-    [:span.file-name (or caption "Download File")]
+    [:span.file-icon [icons/file]]
+    [:span.file-name (or caption (tr [:container.timeline.status/file-download]))]
     (when-let [size (:size info)]
       [:span.file-size (str "(" (quot size 1024) " KB)")])]])
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn render-message-content [msg-type-tag content-map in-reply-to reply-msg]
+(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
      (when in-reply-to
        [:div.timeline-reply-banner
-        [:div.reply-indicator "↳"]
+        [:div.reply-indicator [icons/reply]]
         [:div.reply-content
          (if reply-msg
            [:<>
             [:span.reply-sender (:sender-name reply-msg)]
-            [:span.reply-preview (get-in reply-msg [:content :inner :content :body] "Media message")]]
-           [:span.reply-preview "Loading original message..."])]])
-
+            [:span.reply-preview
+             (get-in reply-msg [:content :inner :content :body]
+                     (tr [:container.timeline.status/media-preview]))]]
+           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
      (case msg-type-tag
        "Text"    [message-text content-map]
        "Image"   [image-message content-map]
        "Video"   [video-message content-map]
        "Sticker" [sticker-message content-map]
-       "File"    [file-message content-map]
-       [:span.body (str "Unsupported message type: " msg-type-tag)])
+       "File"    [file-message content-map tr]
+       [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
      (when is-edited?
-       [:span.timeline-edited-label "(edited)"])]))
+       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
 #+end_src
 
 
