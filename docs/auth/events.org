@@ -211,22 +211,23 @@ This needs to be broken up a good bit, but it'll suffice for now
                         :user ""
                         :pass ""})]
     (fn []
-      (let [error    @(re-frame/subscribe [:auth/error])
+      (let [tr       @(re-frame/subscribe [:i18n/tr])
+            error    @(re-frame/subscribe [:auth/error])
             status   @(re-frame/subscribe [:auth/status])
             accounts @(re-frame/subscribe [:settings/available-accounts])
             auth?    (= status :authenticating)]
         [:div.auth-page-container
          [:div.auth-card
           [:div.auth-header
-           [:h2 "Welcome to Paradise."]
-           [:p "Make yourself comfy."]]
+           [:h2 (tr [:auth/welcome])]
+           [:p (tr [:auth/subtitle])]]
 
           (when error
             [:div.auth-error-message error])
 
           (when (seq accounts)
             [:div.account-chooser.mb-6
-             [:h3.text-sm.font-bold.mb-2 "Continue as:"]
+             [:h3.text-sm.font-bold.mb-2 (tr [:auth/continue-as])]
              [:div.accounts-list
               (for [acc accounts]
                 ^{:key (:userId acc)}
@@ -235,35 +236,43 @@ This needs to be broken up a good bit, but it'll suffice for now
                           :border "1px solid var(--border)" :border-radius "8px"
                           :cursor "pointer" :margin-bottom "8px"}
                   :on-click #(re-frame/dispatch [:auth/switch-account (:userId acc)])}
-                 ;; Should probably use the actual avatar later. This'll do for now
-                 [:div.avatar-placeholder {:style {:margin-right "12px"}} "👤"]
+                 [:div.avatar-placeholder {:style {:margin-right "12px"}} [icons/user]]
                  [:div.account-details
                   [:div.account-id {:style {:font-weight "bold"}} (:userId acc)]
                   [:div.account-hs {:style {:font-size "0.8em" :color "gray"}} (:hs_url acc)]]])]
-             [:div.divider {:style {:text-align "center" :margin "16px 0" :color "gray"}} "— or log in to another —"]])
+             [:div.divider {:style {:text-align "center" :margin "16px 0" :color "gray"}}
+              (tr [:auth/divider])]])
 
           [:form.auth-form
            {:on-submit (fn [e]
                          (.preventDefault e)
                          (re-frame/dispatch [:auth/login (:hs @fields) (:user @fields) (:pass @fields)]))}
+
            [login-field
-            {:id "hs" :label "Homeserver" :value (:hs @fields)
+            {:id "hs" :label (tr [:auth.labels/homeserver]) :value (:hs @fields)
              :disabled auth? :on-change #(swap! fields assoc :hs (.. % -target -value))}]
 
            [login-field
-            {:id "user" :label "Username" :value (:user @fields)
+            {:id "user" :label (tr [:auth.labels/username]) :value (:user @fields)
              :disabled auth? :on-change #(swap! fields assoc :user (.. % -target -value))}]
 
            [login-field
-            {:id "pass" :label "Password" :type "password" :value (:pass @fields)
+            {:id "pass" :label (tr [:auth.labels/password]) :type "password" :value (:pass @fields)
              :disabled auth? :on-change #(swap! fields assoc :pass (.. % -target -value))}]
 
            [:button.btn-primary.w-full
             {:type "submit" :disabled auth?}
-            (if auth? "Logging in..." "Login")]
+            (if auth?
+              (tr [:auth.actions/logging-in])
+              (tr [:auth.actions/login]))]
 
            [:div.auth-footer
-            "Need an account? " [:a.link {:href "#"} "Register"]]]]]))))
+            (tr [:auth/footer-text])
+            [:a.link {:href "#"} (tr [:auth.actions/register])]]]]]))))
+
+
+
+
 #+end_src
 
 
