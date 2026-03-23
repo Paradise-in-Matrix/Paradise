@@ -26,7 +26,7 @@ too much detail it is headless, so we can theme and customize it without much fr
             [reagent.core :as r]
             [utils.helpers :refer [mxc->url truncate-name]]
             [utils.svg :as icons]
-            ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
+            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
             ))
 #+end_src
 
