@@ -313,6 +313,62 @@ much simpler.
    (:ui/active-popover db)))
 #+end_src
 
+
+#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#_(defn popover-root []
+  (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
+    (when active-popover
+      (let [{:keys [id props]} active-popover
+            _ (js/console.error props)
+            _ (log/error props)
+            {:keys [x y width height] :or {width 320 height 380}} props
+            close-fn #(re-frame/dispatch [:ui/close-popover])
+            Target   (popover-component id)
+            render-x (if (> (+ x width) js/window.innerWidth) (- x width) x)
+            render-y (if (> (+ y height) js/window.innerHeight) (- y height) y)]
+        [:<>
+         [:div.popover-backdrop
+          {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
+           :on-click close-fn
+           :on-context-menu (fn [e] (.preventDefault e) (close-fn))}]
+         [:div.popover-container
+          {:style {:left (str render-x "px")
+                   :top  (str render-y "px")
+                   :position "fixed"
+                   :z-index 12000}}
+          [Target (assoc props :close-fn close-fn)]]]))))
+
+(defn popover-root []
+  (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
+    (when active-popover
+      (let [{:keys [id props]} active-popover
+            ;; Ensure props is a map
+            props    (if (map? props) props (js->clj props :keywordize-keys true))
+            {:keys [x y width height backdrop?]
+             :or {width 320 height 380 backdrop? true}} props
+            close-fn #(re-frame/dispatch [:ui/close-popover])
+            Target   (popover-component id)
+            win-w js/window.innerWidth
+            win-h js/window.innerHeight
+            render-x (max 10 (if (> (+ x width) win-w) (- x width) x))
+            render-y (max 10 (if (> (+ y height) win-h) (- y height) y))]
+        [:<>
+         (when backdrop?
+           [:div.popover-backdrop
+            {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
+             :on-click close-fn
+             :on-context-menu (fn [e] (.preventDefault e) (close-fn))}])
+         [:div.popover-container
+          {:style {:left (str render-x "px")
+                   :top  (str render-y "px")
+                   :position "fixed"
+                   :z-index 12000}}
+          [Target (assoc props :close-fn close-fn)]]]))))
+
+
+#+end_src
+
+
 ***** Component
 
 
