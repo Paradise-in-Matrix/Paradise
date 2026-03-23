@@ -20,7 +20,7 @@ we've made interop with the WASM bindings.
             ["react-virtuoso" :refer [Virtuoso]]
             [reagent.core :as r]
             [reagent.dom.client :as rdom]
-            [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-readers join-names]]
+            [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-readers join-names get-status-string]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
             [container.timeline.item :refer [event-tile wrap-item]]
