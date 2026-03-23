@@ -20,6 +20,7 @@ away.
             [clojure.string :as str]
             [reagent.core :as r]
             ["react" :as react]
+            [utils.svg :as icons]
             ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
 #+end_src
 
