@@ -26,11 +26,13 @@ Not entirely important to read, but certainly interesting.
    [re-frame.db :as db]
    [reagent.core :as r]
    ["react-virtuoso" :refer [Virtuoso]]
-;;   [client.state :as state :refer [sdk-world]]
    [client.diff-handler :refer [apply-matrix-diffs]]
    [navigation.rooms.room-list :refer [parse-room]]
+   [utils.svg :as icons]
+   [overlays.base :refer [modal-component]]
    [utils.global-ui :refer [click-away-wrapper global-context-menu]]
    [utils.helpers :refer [mxc->url]]
+   [taoensso.tempura :as tr]
    [taoensso.timbre :as log]
    [utils.macros :refer [config]]))
 #+end_src
