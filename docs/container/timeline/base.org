@@ -405,33 +405,36 @@ uses the mini-buffer. A nice status indicator.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defn status-indicator [active-room]
-  (let [typing-info @(re-frame/subscribe [:room/typing-users active-room])
-        reader-ids  @(re-frame/subscribe [:timeline/latest-readers])
-        members-map @(re-frame/subscribe [:room/members-map active-room])
-        profile     @(re-frame/subscribe [:sdk/profile])
-        my-id       (:user-id profile)
+  (let [tr            @(re-frame/subscribe [:i18n/tr])
+        typing-info   @(re-frame/subscribe [:room/typing-users active-room])
+        reader-ids    @(re-frame/subscribe [:timeline/latest-readers])
+        members-map   @(re-frame/subscribe [:room/members-map active-room])
+        profile       @(re-frame/subscribe [:sdk/profile])
+        my-id         (:user-id profile)
         typing-ids    (if (map? typing-info) (:users typing-info) typing-info)
         others-typing (filterv #(not= % my-id) (or typing-ids []))
-        has-typists?  (not-empty others-typing)
-        has-readers?  (not-empty reader-ids)
-        is-visible?   (or has-typists? has-readers?)
-        ]
-      [:div.followers-indicator
-       {:class (when is-visible? "is-visible")
-        :key (str active-room "-status-bar")}
-       (cond
-         has-typists?
-         [:div.status-content {:key "typing"}
-          [icons/typing-dots {:style {:color "var(--cp-text-muted)"}}]
-          [:span.text
-           (str (join-names (map #(or (:display-name (get members-map %)) %) others-typing))
-                " is typing...")]]
-         has-readers?
-         [:div.status-content {:key "readers"}
-          [icons/double-check {:width "14px" :height "14px"}]
-          [:span.text (format-readers (map #(or (:display-name (get members-map %)) %) reader-ids))]]
-         :else
-         [:span.text {:key "empty"} "\u00A0"])]))
+        get-name      #(or (:display-name (get members-map %)) %)
+        typing-names  (map get-name others-typing)
+        reader-names  (map get-name reader-ids)
+
+        has-typists?  (not-empty typing-names)
+        has-readers?  (not-empty reader-names)
+        is-visible?   (or has-typists? has-readers?)]
+    [:div.followers-indicator
+     {:class (when is-visible? "is-visible")
+      :key (str active-room "-status-bar")}
+     (cond
+       has-typists?
+       [:div.status-content {:key "typing"}
+        [icons/typing-dots {:style {:color "var(--cp-text-muted)"}}]
+        [:span.text (get-status-string tr :typing typing-names)]]
+       has-readers?
+       [:div.status-content {:key "readers"}
+        [icons/double-check {:width "14px" :height "14px"}]
+        [:span.text (get-status-string tr :reading reader-names)]]
+       :else
+       [:span.text {:key "empty"} "\u00A0"])]))
+
 #+end_src
 
 
