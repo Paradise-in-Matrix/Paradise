@@ -618,6 +618,16 @@ I will segment these another time
     vertical-align: bottom;
 }
 
+
+.reply-indicator {
+    display: inline-block;
+    transform: scale(-1, -1);
+    color: var(--text-muted);
+    opacity: 0.7;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
 .timeline-system-event {
     height: 28px;
     display: flex;
@@ -849,6 +859,16 @@ I will segment these another time
     padding-bottom: 5px;
 }
 
+
+.timeline-row.is-state-event {
+    margin: 12px 0;
+    width: 100%;
+}
+
+.timeline-row.is-message.is-merged {
+    margin-top: -8px;
+}
+
 .timeline-message.is-merged {
     padding-top: 2px;
 }
@@ -909,12 +929,6 @@ I will segment these another time
 .timeline-content-wrapper {
     flex: 1;
     min-width: 0;
-}
-
-.timeline-header {
-    display: flex;
-    align-items: baseline;
-     margin-bottom: 4px;
 }
 
 .timeline-sender-name {
@@ -1180,8 +1194,11 @@ I will segment these another time
 }
 
 
-
-
+.reaction-pill.active {
+    background-color: rgba(0, 136, 204, 0.15);
+    border-color: #0088cc;
+    color: #0088cc;
+}
 
 
 
