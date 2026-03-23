@@ -263,8 +263,8 @@ is an edit)
 (re-frame/reg-sub
  :timeline/current-events
  (fn [db _]
-   (let [active-room (:active-room-id db)
-         raw-events  (get-in db [:timeline active-room] [])
+   (let [active-room   (:active-room-id db)
+         raw-events    (get-in db [:timeline active-room] [])
          sorted-events (->> raw-events
                             (reduce (fn [acc e]
                                       (let [id-key   (or (:internal-id e) (:id e))
