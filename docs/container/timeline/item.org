@@ -199,8 +199,9 @@ help anyone later who wants to make changes to aspects of the timeline.
 
 (re-frame/reg-event-db
  :msg/open-reaction-picker
- (fn [db [_ room-id msg-id x y]]
-   (assoc db :active-reaction-picker {:room-id room-id :msg-id msg-id :x x :y y})))
+ (fn [db [_ room-id event-or-transaction-id  x y]]
+   (assoc db :active-reaction-picker {:room-id room-id :event-or-transaction-id event-or-transaction-id  :x x :y y})))
+
 
 (re-frame/reg-event-db
  :msg/close-reaction-picker
