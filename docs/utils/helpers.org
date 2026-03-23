@@ -16,7 +16,8 @@ So there a couple methods that don't mesh perfectly in any one location that for
    [hickory.core :as h]
    [hickory.render :as hr]
    [clojure.walk :as walk]
-   [taoensso.timbre :as log]))
+   [taoensso.timbre :as log]
+   ))
 #+end_src
 
 
