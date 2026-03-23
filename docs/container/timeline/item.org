@@ -497,7 +497,7 @@ read receipts. This prevents any sort of spamming to the home server.
                       [:context-menu/open
                        {:x mx
                         :y my
-                        :items (build-message-actions item active-room current-user-id mx my)}])))}
+                        :items (build-message-actions tr item active-room current-user-id mx my)}])))}
       [icons/more]]
      ]))
 #+end_src
