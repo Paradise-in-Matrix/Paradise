@@ -290,39 +290,40 @@ Simple verification tab for now
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
 (defn verification-tab []
   (r/with-let [!passphrase (r/atom "")]
-    (let [status        @(re-frame/subscribe [:verification/status])
-          error         @(re-frame/subscribe [:verification/error])
-          is-verifying? (= status :verifying)
-          is-empty?     (empty? @!passphrase)]
+    (let [tr             @(re-frame/subscribe [:i18n/tr])
+          status         @(re-frame/subscribe [:verification/status])
+          error          @(re-frame/subscribe [:verification/error])
+          is-verifying?  (= status :verifying)
+          is-empty?      (empty? @!passphrase)]
       [:div.settings-section
-       [:h2.verification-title "Device Verification"]
+       [:h2.verification-title (tr [:settings.verification/title])]
        (if (= status :verified)
          [:div.success-banner
-          [:div.success-icon "✅"]
+          [:div.success-icon [icons/check-circle-green]]
           [:div
-           [:div.success-title "Session Verified"]
-           [:div.success-subtitle "Your end-to-end encrypted messages are now unlocked."]]]
+           [:div.success-title (tr [:settings.verification.status/success-title])]
+           [:div.success-subtitle (tr [:settings.verification.status/success-subtitle])]]]
          [:<>
           [:p.verification-description
-           "Enter your Security Key or Recovery Passphrase to verify this session and unlock encrypted messages."]
+           (tr [:settings.verification/description])]
           [:div.verification-form
-           [:label.form-label "Security Phrase / Key"]
+           [:label.form-label (tr [:settings.verification.form/label])]
            [:input.form-input
             {:class     (when error "is-invalid")
              :type      "password"
              :value     @!passphrase
              :on-change #(reset! !passphrase (.. % -target -value))
              :disabled  is-verifying?
-             :placeholder "Enter your phrase..."}]
+             :placeholder (tr [:settings.verification.form/placeholder])}]
            (when error
-             [:div.form-error (str "Error: " error)])
+             [:div.form-error (str (tr [:settings.verification.form/error-prefix]) error)])
            [:button.form-button
             {:class    (when is-verifying? "is-verifying")
              :on-click #(re-frame/dispatch [:sdk/submit-verification @!passphrase])
              :disabled (or is-empty? is-verifying?)}
             (if is-verifying?
-              "Verifying..."
-              "Verify Session")]]])])))
+              (tr [:settings.verification.status/is-verifying])
+              (tr [:settings.verification.status/verify-action]))]]])])))
 #+end_src
 
 
