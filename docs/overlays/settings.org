@@ -536,17 +536,18 @@ This needs to be organized a bit better (and documented better).
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
 (defn account-item [{:keys [acc is-active?]}]
-  [:div.account-item {:class (when is-active? "active")}
-   [:div.account-info
-    [:div.account-id (:userId acc)]
-    [:div.account-hs (:hs_url acc)]]
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.account-item {:class (when is-active? "active")}
+     [:div.account-info
+      [:div.account-id (:userId acc)]
+      [:div.account-hs (:hs_url acc)]]
 
-   [:div.account-actions
-    (if is-active?
-      [:div.active-badge "● Active"]
-      [:button.form-button.switch-btn
-       {:on-click #(re-frame/dispatch [:auth/switch-account (:userId acc)])}
-       "Switch"])]])
+     [:div.account-actions
+      (if is-active?
+        [:div.active-badge (tr [:settings.account-item/active-status])]
+        [:button.form-button.switch-btn
+         {:on-click #(re-frame/dispatch [:auth/switch-account (:userId acc)])}
+         (tr [:settings.account-item/switch-button])])]]))
 #+end_src
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
