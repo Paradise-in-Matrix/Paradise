@@ -288,11 +288,7 @@ Mostly for providing meta info about the space lists or space
  :<- [:rooms/all]
  (fn [[rel-map all-rooms] [_ parent-id]]
    (let [child-refs (get rel-map parent-id [])
-         _ (log/debug "Hit?")
-         _ (log/debug all-rooms)
-         rich-lookup (into {} (map (fn [r] [(or (:id r) (.-roomId r)) r]) all-rooms))
-         _ (log/debug rich-lookup)
-         ]
+         rich-lookup (into {} (map (fn [r] [(or (:id r) (.-roomId r)) r]) all-rooms))]
      (mapv (fn [{:keys [id is-space?]}]
              (let [rich-room (get rich-lookup id)]
                (merge {:id id :is-space? is-space? :name "Loading..."}
