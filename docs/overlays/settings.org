@@ -813,24 +813,30 @@ Inside the modal this is our sidebar options.
 
 
 
-    (when is-open?
-      [:div.settings-backdrop
-       {:on-click #(re-frame/dispatch [:settings/close])}
-       [:div.settings-window
-        {:on-click #(.stopPropagation %)}
-        [settings-sidebar active-tab]
-        [:div.settings-content
-         [:div.close-button
-          {:on-click #(re-frame/dispatch [:settings/close])}
-          [:span "✕"]
-          [:span.esc-text "ESC"]]
-         (case active-tab
-           :my-account    [my-account-tab profile]
-           :verification  [verification-tab]
-           :accounts      [accounts-tab]
-           :notifications [notifications-tab]
-           :about         [about-tab]
-           [:div {:style {:color "#fff"}} "Tab not found"])]]])))
+
+#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+(defn settings-content [_props]
+  (let [tr         @(re-frame/subscribe [:i18n/tr])
+        active-tab @(re-frame/subscribe [:settings/active-tab])
+        profile    @(re-frame/subscribe [:sdk/profile])]
+    [:<>
+     [settings-sidebar active-tab]
+     [:div.settings-content
+      [:div.close-button
+       {:on-click #(re-frame/dispatch [:ui/close-modal])}
+       [:span [icons/exit]]
+       [:span.esc-text (tr [:settings.modal/esc])]]
+      (case active-tab
+        :my-account    [my-account-tab profile]
+        :verification  [verification-tab]
+        :accounts      [accounts-tab]
+        :notifications [notifications-tab]
+        :language-time [language-time-tab]
+        :about         [about-tab]
+        [:div {:style {:color "#fff"}} (tr [:settings.modal/not-found])])]]))
+
+#+end_src
+
 
 #+end_src
 
