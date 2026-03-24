@@ -573,7 +573,8 @@ This needs to be organized a bit better (and documented better).
       [:div.tab-footer
        [:button.form-button
         {:on-click #(re-frame/dispatch [:auth/start-login-flow])}
-        "+ Add Account"]]]]))
+        (str "+ " (tr [:settings.accounts/add-account]))]]]]))
+
 #+end_src
 
 
