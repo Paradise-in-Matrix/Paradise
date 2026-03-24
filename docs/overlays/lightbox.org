@@ -23,28 +23,6 @@ Lightbox (or image previewer) is how we intend to provide a nice way to interact
 
 #+end_src
 
-
-**** Reframe Events and Subscriptions
-
-#+begin_src clojurescript :tangle ../../src/overlays/lightbox.cljs
-(re-frame/reg-event-db
- :ui/open-image-preview
- (fn [db [_ url]]
-   (assoc db :image-preview-url url)))
-
-(re-frame/reg-event-db
- :ui/close-image-preview
- (fn [db _]
-   (dissoc db :image-preview-url)))
-
-(re-frame/reg-sub
- :ui/image-preview-url
- (fn [db _]
-   (:image-preview-url db)))
-
-#+end_src
-
-
 **** Lightbox Component + CSS
 
 
