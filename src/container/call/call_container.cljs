@@ -46,6 +46,8 @@
 
 (defn persistent-call-container []
   (let [call-state   @(rf/subscribe [:call/state])
+        tr           @(rf/subscribe [:i18n/tr])
+
         primary?     (get call-state :primary-iframe? true)
         rect         @host-rect
         active-style (if rect
@@ -60,7 +62,7 @@
               :display (if (and (:mobile? call-state) (:chat-open? call-state)) "none" "block")}}
      [:iframe
       {:ref     #(reset! primary-iframe-ref %)
-       :title   "Persistent Element Call Primary"
+       :title   (tr [:container.calls/main-iframe])
        :style   (if primary? active-style hidden-style)
        :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
        :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
@@ -68,7 +70,7 @@
        :src     "about:blank"}]
      [:iframe
       {:ref     #(reset! backup-iframe-ref %)
-       :title   "Persistent Element Call Backup"
+       :title   (tr [:container.calls/backup-iframe])
        :style   (if-not primary? active-style hidden-style)
        :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
        :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
