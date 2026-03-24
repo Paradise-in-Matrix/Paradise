@@ -30,22 +30,26 @@
    (:side-panel db nil)))
 
 (defn room-header [{:keys [display-name compact? active-id]}]
-  (let [main-focus    @(re-frame/subscribe [:container/main-focus])
+  (let [tr            @(re-frame/subscribe [:i18n/tr])
+        main-focus    @(re-frame/subscribe [:container/main-focus])
         side-panel    @(re-frame/subscribe [:container/side-panel])
         call-active?  @(re-frame/subscribe [:call/is-active?])
         in-lobby?     (and (= main-focus :timeline) call-active?)
         show-actions? (or (not compact?) (= main-focus :call))]
-    [:div.timeline-header
+    [:div.room-header
      [:div.header-left
       [:button.mobile-menu-btn {:on-click #(re-frame/dispatch [:ui/toggle-sidebar])}
-       [icons/menu]
+       [icons/arrow-left]
        ]
       (when display-name
         [:h2.timeline-header-title display-name])]
      (when (and show-actions? active-id)
        [:div.header-actions
         [:button.header-icon-btn
-         {:title (if in-lobby? "Join Call" "Start Call")
+         {:title
+          (if in-lobby?
+                   (tr [:container.header/join-call])
+                   (tr [:container.header/start-call]))
           :class (when (or (= main-focus :call) call-active?) "active-green")
           :on-click (fn [_]
                       (re-frame/dispatch [:call/init-widget active-id])
@@ -55,31 +59,31 @@
 
        (when (= main-focus :call)
           [:button.header-icon-btn
-           {:title "Room Chat"
+           {:title (tr [:container.header/room-chat])
             :class (when (= side-panel :timeline) "active")
             :on-click #(re-frame/dispatch [:container/set-side-panel (if (= side-panel :timeline) nil :timeline)])}
            [icons/chat-bubble]])
 
         [:button.header-icon-btn
-         {:title "Search"
+         {:title (tr [:container.header/search])
           :class (when (= side-panel :search) "active")
           :on-click #(re-frame/dispatch [:container/set-side-panel :search])}
          [icons/search]]
 
         [:button.header-icon-btn
-         {:title "Pinned Messages"
+         {:title (tr [:container.header/pinned-messages])
           :class (when (= side-panel :pins) "active")
           :on-click #(re-frame/dispatch [:container/set-side-panel :pins])}
          [icons/pins {:animate :sink}]]
 
         [:button.header-icon-btn
-         {:title "Member List"
+         {:title (tr [:container.header/member-list])
           :class (when (= side-panel :members) "active")
           :on-click #(re-frame/dispatch [:container/set-side-panel :members])}
          [icons/members]]
 
         [:button.header-icon-btn
-         {:title "More Options"
+         {:title (tr [:container.header/more-options])
           :on-click (fn [e]
                       (let [mx (.-clientX e)
                             my (.-clientY e)]
