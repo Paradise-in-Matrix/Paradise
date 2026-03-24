@@ -455,13 +455,14 @@ important.
          [:div.room-hover-actions
           (when is-call?
             [:div.action-icon.chat-action
-             {:title "View Chat & Lobby"
+             {:title
+              (tr [:navigation.room-list/view-chat])
               :on-click (fn [e]
                           (.stopPropagation e)
                           (re-frame/dispatch [:rooms/select id {:force-lobby? true :focus-override :timeline}]))}
              [icons/chat-bubble]])
           [:div.action-icon.settings-action
-           {:title "Room Settings"
+           {:title (tr [:navigation.room-list/room-settings])
             :on-click (fn [e]
                         (.stopPropagation e)
                         (re-frame/dispatch [:rooms/open-settings id]))}
@@ -662,7 +663,7 @@ Now this is actually what we provide to the Virtuoso list for rendering the
 individual elements. Effectively just a fancy destructure to grab the values we
 need out.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
-(defn render-room-item [client rooms active-space active-room closed-drawers active-filter]
+(defn render-room-item [tr client rooms active-space active-room closed-drawers active-filter]
   (fn [_ raw-room]
     (let [{:keys [id roomId name is-space? isSpace depth
                   notification-count unreadNotificationsCount
@@ -683,10 +684,11 @@ need out.
                         (re-frame/dispatch
                          [:context-menu/open
                           {:x mx :y my
-                           :items (build-room-actions id room-name space? #_is-call?)}]))]
+                           :items (build-room-actions tr id room-name space? #_is-call?)}]))]
 ;;      (log/error active-space)
       (r/as-element
-       [room-item {:id id
+       [room-item {:tr tr
+                   :id id
                    :name room-name
                    :indent (* depth 12)
                    :is-space? space?
