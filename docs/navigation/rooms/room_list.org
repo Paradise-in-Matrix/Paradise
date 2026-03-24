@@ -14,7 +14,7 @@
    [navigation.rooms.room-summary :refer [build-room-summary]]
    [navigation.rooms.entry :refer [build-room-actions render-room-item active-call-panel room-type-call?]]
    [client.diff-handler :refer [apply-matrix-diffs]]
-   ["generated-compat" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory]]))
+   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory]]))
 #+end_src
 
 
