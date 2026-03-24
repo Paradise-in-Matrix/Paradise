@@ -5,7 +5,8 @@
             [clojure.string :as str]
             [reagent.core :as r]
             ["react" :as react]
-            ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
+            [utils.svg :as icons]
+            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
 
 (defn reify-attachment [att]
   (let [mime (or (:mime att) "application/octet-stream")
@@ -60,7 +61,7 @@
         [:span.mime-label (last (str/split mime #"/"))]]
        :else
        [:div.preview-file
-        [:span "📄"]
+        [icons/file]
         [:span.file-name filename]]))
    [:button.remove-attachment
     {:on-click #(re-frame/dispatch [:composer/remove-attachment room-id index])}
@@ -89,7 +90,7 @@
          (log/info "Saving reified draft for room:" room-id)
          (.setComposerDraft timeline draft file-info))
        (catch :default e
-         (js/console.error "Draft Reification Failure:" e)))
+         (log/error "Draft Reification Failure:" e)))
      {})))
 
 (re-frame/reg-event-db
