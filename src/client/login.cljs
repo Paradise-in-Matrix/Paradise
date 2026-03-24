@@ -8,7 +8,7 @@
    [client.session-store :refer [SessionStore]]
    [navigation.spaces.bar :refer [init-space-service!]]
    [navigation.rooms.room-list :as rl];;:refer [parse-room apply-diffs! create-room-update-listener setup-room-list-adapter!]]
-   ["generated-compat" :as sdk :refer [RoomListEntriesDynamicFilterKind]]
+   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind]]
    )
   (:require-macros [utils.macros :refer [ocall oget]]))
 
