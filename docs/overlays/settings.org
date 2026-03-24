@@ -327,39 +327,6 @@ Simple verification tab for now
 #+end_src
 
 
-***** Settings Sidebar Component
-
-Inside the modal this is our sidebar options.
-
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
-(defn settings-sidebar [active-tab]
-  [:div.settings-sidebar
-   [:div.settings-group-label "User Settings"]
-   [:div.settings-tab
-    {:class (when (= active-tab :my-account) "is-active")
-     :on-click #(re-frame/dispatch [:settings/set-tab :my-account])}
-    "My Account"]
-   [:div.settings-tab
-    {:class (when (= active-tab :verification) "is-active")
-     :on-click #(re-frame/dispatch [:settings/set-tab :verification])}
-    "Verification"]
-   [:div.settings-tab
-    {:class (when (= active-tab :accounts) "is-active")
-     :on-click #(re-frame/dispatch [:settings/set-tab :accounts])}
-    "Accounts"]
-   [:div.settings-tab
-    {:class (when (= active-tab :notifications) "is-active")
-     :on-click #(re-frame/dispatch [:settings/set-tab :notifications])}
-    "Notifications"]
-   [:div.settings-group-label {:style {:margin-top "1rem"}} "App"]
-   [:div.settings-tab
-    {:class (when (= active-tab :about) "is-active")
-     :on-click #(re-frame/dispatch [:settings/set-tab :about])}
-    "About"]])
-
-
-#+end_src
-
 
 **** Current Account tab
 
