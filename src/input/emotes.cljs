@@ -7,6 +7,7 @@
    [reagent.core :as r]
    [utils.helpers :refer [mxc->url fetch-state-event fetch-room-state]]
    [utils.global-ui :refer [click-away-wrapper]]
+   ["emojibase-data/en/data.json" :as emoji-data]
    ["react" :as react]
    ))
 
@@ -100,51 +101,129 @@
          room-packs (when active-room (get-in db [:emoji/packs :room active-room] {}))]
      (merge account-packs space-packs room-packs))))
 
-(defn emoji-sticker-board [{:keys [on-close on-insert-emoji on-send-sticker]}]
+(defonce categorized-system-packs
+  (let [unwrap (fn [mod] (if (and mod (.-default mod)) (.-default mod) mod))
+        raw-data (js->clj (unwrap emoji-data) :keywordize-keys true)
+        group-meta {0 {:name "Smileys & Emotion" :icon "😀"}
+                    1 {:name "People & Body"     :icon "👋"}
+                    ;; 2 is Component (Skipped)
+                    3 {:name "Animals & Nature"  :icon "🐶"}
+                    4 {:name "Food & Drink"      :icon "🍔"}
+                    5 {:name "Travel & Places"   :icon "✈️"}
+                    6 {:name "Activities"        :icon "⚽"}
+                    7 {:name "Objects"           :icon "💡"}
+                    8 {:name "Symbols"           :icon "💖"}
+                    9 {:name "Flags"             :icon "🚩"}}]
+    (->> raw-data
+         (group-by :group)
+         (reduce-kv (fn [acc group-id emojis]
+                      (if (or (nil? group-id) (= group-id 9))
+                        acc
+                        (let [meta    (get group-meta group-id {:name "Other" :icon "📦"})
+                              pack-id (str "system-" group-id)]
+                          (assoc acc pack-id
+                                 {:name             (:name meta)
+                                  :hero-icon        (:icon meta)
+                                  :is-unicode?      true
+                                  :system-priority  group-id
+                                  :images (into {}
+                                                (for [e emojis
+                                                      :let [char (or (:emoji e) (:unicode e))
+                                                            slug (or (first (:shortcodes e))
+                                                                     (:annotation e)
+                                                                     (:name e)
+                                                                     (:hexcode e))]
+                                                      :when (and char slug)]
+                                                  [(str slug) {:unicode (str char)}]))}))))
+                    {}))))
+
+
+
+
+
+
+
+
+(defn emoji-sticker-board [{:keys [on-close on-insert-emoji on-insert-native on-send-sticker]}]
   (re-frame/dispatch [:sdk/fetch-all-emotes])
   (let [selected-pack-id (r/atom nil)
-        sticker-mode?    (r/atom false)]
-    (fn [{:keys [on-close on-insert-emoji on-send-sticker]}]
-      (let [packs       @(re-frame/subscribe [:emoji/active-set])
-            active-id   (or @selected-pack-id (first (keys packs)))
-            active-pack (get packs active-id)]
-        [click-away-wrapper
-         {:on-close on-close :z-index 998}
-         [:div.emoji-popover
-          (if (empty? packs)
-            [:div.emoji-loading "No emotes found for this space."]
+        sticker-mode?    (r/atom false)
+        tr-sub           (re-frame/subscribe [:i18n/tr])]
+    (fn [{:keys [on-close on-insert-emoji on-insert-native on-send-sticker]}]
+      (let [tr           @tr-sub
+            matrix-packs @(re-frame/subscribe [:emoji/active-set])
+            popover-active @(re-frame/subscribe [:ui/active-popover])
+            packs        (merge categorized-system-packs matrix-packs)
+            sorted-ids   (sort-by #(get-in packs [% :system-priority] 999) (keys packs))
+            active-id    (or @selected-pack-id (first sorted-ids))
+            active-pack  (get packs active-id)
+            content      [:div.emoji-popover
+
+         (if (empty? packs)
+            [:div.emoji-loading (tr [:composer.emotes/no-emotes])]
             [:div.emoji-container
              [:div.emoji-sidebar
-              (for [[pack-id pack-data] packs]
-                (let [pname  (or (:name pack-data) (str pack-id))
-                      avatar (:avatar pack-data)]
+              (for [pack-id sorted-ids]
+                (let [pack-data (get packs pack-id)
+                      pname     (or (:name pack-data) (str pack-id))
+                      avatar    (:avatar pack-data)]
                   [:div.sidebar-pack-item
                    {:key      pack-id
                     :class    (when (= active-id pack-id) "active")
                     :on-click #(reset! selected-pack-id pack-id)
                     :title    pname}
-                   (if avatar
+                   (cond
+                     (:is-unicode? pack-data)
+                     [:span.pack-text-icon (:hero-icon pack-data)]
+                     avatar
                      [:img.pack-icon {:src (mxc->url avatar)}]
-                     [:span.pack-text-icon (subs pname 0 (min 2 (count pname)))])]))]
+                     :else
+                     [:span.pack-text-icon (subs pname 0 (min 2 (count pname)))])
+                   ]))]
              [:div.emoji-grid-area
+
+
               [:div.emoji-pack-header
-               [:div.emoji-pack-title (or (:name active-pack) "Emotes")]
-               [:div.emoji-mode-switch
-                [:button {:class    (when-not @sticker-mode? "active")
-                          :on-click #(reset! sticker-mode? false)} "Inline"]
-                [:button {:class    (when @sticker-mode? "active")
-                          :on-click #(reset! sticker-mode? true)} "Sticker"]]]
+               [:div.emoji-pack-title (or (:name active-pack) (tr [:composer.emotes/default-title]))]
+                              (when-not (:is-unicode? active-pack)
+                 [:div.emoji-mode-switch
+                  [:button {:class    (when-not @sticker-mode? "active")
+                            :on-click #(reset! sticker-mode? false)}
+                   (tr [:composer.emotes/mode-inline])]
+                  [:button {:class    (when @sticker-mode? "active")
+                            :on-click #(reset! sticker-mode? true)}
+                   (tr [:composer.emotes/mode-sticker])]])]
 
               [:div.emoji-grid
                (for [[shortcode item] (get active-pack :images {})]
                  [:div.emoji-cell
                   {:key      shortcode
                    :on-click (fn []
-                               (if (or @sticker-mode? (:is-sticker-pack? active-pack))
+                               (cond
+                                 (:is-unicode? active-pack)
+                                 (on-insert-native (:unicode item))
+                                 (or @sticker-mode? (:is-sticker-pack? active-pack))
                                  (on-send-sticker (:url item) shortcode (:info item))
+                                 :else
                                  (on-insert-emoji shortcode (:url item))))}
-                  [:img.emoji-img
-                   {:src      (mxc->url (:url item))
-                    :title    shortcode
-                    :loading  "lazy"
-                    :alt      shortcode}]])]]])]]))))
+
+                  (if (:is-unicode? active-pack)
+                    [:span.native-emoji {:title shortcode} (:unicode item)]
+                    [:img.emoji-img
+                     {:src      (mxc->url (:url item))
+                      :title    shortcode
+                      :loading  "lazy"
+                      :alt      shortcode}])])]]])]
+            ]
+
+        (if (nil? popover-active)
+          [click-away-wrapper
+           {:on-close on-close :z-index 19}
+           content
+           ]
+          content)
+        ))))
+
+
+
+
