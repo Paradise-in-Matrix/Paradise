@@ -2,7 +2,7 @@
   (:require [client.state :refer [sdk-world]]
             [promesa.core :as p]
             [taoensso.timbre :as log]
-            ["generated-compat" :as sdk])
+            ["ffi-bindings" :as sdk])
   (:require-macros [utils.macros :refer [ocall oget]]))
 
 (declare room-update-handler)
