@@ -10,7 +10,7 @@
             [reagent.core :as r]
             [utils.helpers :refer [mxc->url truncate-name]]
             [utils.svg :as icons]
-            ["generated-compat" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
+            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
             ))
 
 (re-frame/reg-event-fx
@@ -277,6 +277,7 @@
             attachments @(re-frame/subscribe [:composer/attachments active-id])
             loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])
             context     @(re-frame/subscribe [:input/context active-id])
+            tr          @(re-frame/subscribe [:i18n/tr])
             ]
 
         [:div.timeline-input-outer
@@ -291,6 +292,10 @@
              (fn [mxc alt-text info]
                (re-frame/dispatch [:sdk/send-sticker active-id mxc alt-text info])
                (reset! !picker-open? false))
+             :on-insert-native
+             (fn [unicode-char]
+               (when-let [ed @!editor]
+                 (-> ed .chain .focus (.insertContent unicode-char) .run)))
              :on-insert-emoji
              (fn [shortcode url]
                (when-let [ed @!editor]
@@ -302,11 +307,14 @@
                      .run))
                (reset! !picker-open? false))}])
          (when (and context (= (:mode context) :reply))
-           [:div.input-context-banner
-            [:div.context-info
-             [:span (str "Replying to " (truncate-name (-> context :target :sender-name) 32))]]
-            [:button.context-cancel-btn
-             {:on-click #(re-frame/dispatch [:input/clear-context active-id])} [icons/exit]]])
+           (let [
+                 sender-name (truncate-name (-> context :target :sender-name) 32)
+                 ]
+             [:div.input-context-banner
+              [:div.context-info
+               [:span (tr [:composer/replying-to] [sender-name])]]
+              [:button.context-cancel-btn
+               {:on-click #(re-frame/dispatch [:input/clear-context active-id])} [icons/exit]]]))
 
          [:div.timeline-input-wrapper
           (when (seq attachments)
@@ -320,13 +328,13 @@
           (when uploading?
             ^{:key "upload-indicator"}
             [:div.upload-indicator
-             [:span.upload-text "Uploading file..."]
+             [:span.upload-text (tr [:composer/uploading])]
              [:div.upload-progress-bar [:div.upload-progress-fill]]])
 
           ^{:key "composer-input-row"}
           [:div.timeline-input-row
            [:label.timeline-upload-btn
-            {:title "Upload a file"}
+            {:title (tr [:composer/upload-tooltip])}
             [:input {:type "file"
                      :multiple true
                      :style {:display "none"}
@@ -358,6 +366,7 @@
                   :onFiles (fn [files]
                              (let [file-array (js/Array.from files)]
                                (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))
+                  :placeholder (tr [:composer/placeholder]) ;; Not sure if needed since we use loaded-text
                   :onEditorReady #(reset! !editor %)
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
                   :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
