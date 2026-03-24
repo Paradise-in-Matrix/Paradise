@@ -135,6 +135,52 @@
    [:line {:x1 "4" :y1 "6" :x2 "20" :y2 "6"}]
    [:line {:x1 "4" :y1 "18" :x2 "20" :y2 "18"}]])
 
+(defn arrow-left [props]
+  [icon-base props
+   [:line {:x1 "19" :y1 "12" :x2 "5" :y2 "12"}]
+   [:polyline {:points "12 19 5 12 12 5"}]])
+
+(defn check-circle-green [props]
+  [icon-base (merge {:stroke "#22c55e"} props)
+   [:polyline {:points "20 6 9 17 4 12"}]])
+
+(defn chevron-down [props]
+  [icon-base props
+   [:polyline {:points "6 9 12 15 18 9"}]])
+
+(defn home [props]
+  [icon-base props
+   [:path {:d "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"}]
+   [:polyline {:points "9 22 9 12 15 12 15 22"}]])
+
+(defn user [props]
+  [icon-base props
+   [:path {:d "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"}]
+   [:circle {:cx "12" :cy "7" :r "4"}]])
+
+(defn check [props]
+  [icon-base props
+   [:polyline {:points "20 6 9 17 4 12"}]])
+
+(defn leave [props]
+  [icon-base props
+   [:path {:d "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"}]
+   [:polyline {:points "16 17 21 12 16 7"}]
+   [:line {:x1 "21" :y1 "12" :x2 "9" :y2 "12"}]])
+
+(defn download [props]
+  [icon-base props
+   [:path {:d "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"}]
+   [:polyline {:points "7 10 12 15 17 10"}]
+   [:line {:x1 "12" :y1 "15" :x2 "12" :y2 "3"}]])
+
+(defn external-link [props]
+  [icon-base props
+   [:path {:d "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"}]
+   [:polyline {:points "15 3 21 3 21 9"}]
+   [:line {:x1 "10" :y1 "14" :x2 "21" :y2 "3"}]])
+
+
 (defn plus [props]
   [icon-base (merge {:width "20px" :height "20px"} props)
    [:line {:x1 "12" :y1 "5" :x2 "12" :y2 "19"}]
@@ -149,10 +195,15 @@
            :fill "none"
            :stroke-linecap "round"}]])
 
-(defn send-icon [props]
+(defn send [props]
   [icon-base (merge {:width "20px" :height "20px"} props)
    [:path {:d "M22 2L11 13"}]
    [:path {:d "M22 2L15 22L11 13L2 9L22 2Z"}]])
+
+(defn file [props]
+  [icon-base props
+   [:path {:d "M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"}]
+   [:polyline {:points "13 2 13 9 20 9"}]])
 
 (defn reply [props]
   [icon-base props
