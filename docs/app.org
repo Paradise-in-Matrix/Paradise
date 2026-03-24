@@ -571,8 +571,6 @@ when we detatch and reload (basically when you hit control + s to save).
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
   (-> (load-config)
-
-
       (p/then (fn [config]
                 (re-frame/dispatch-sync [:app/config-loaded config])
                 (log/info "Config loaded:" config)
@@ -639,7 +637,7 @@ The final remnants of re-organizing ALL the CSS for our main theme
 .room-item {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
+    padding: 6px 12px;
     cursor: pointer;
     gap: 10px;
 }
