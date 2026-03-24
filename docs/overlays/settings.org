@@ -552,18 +552,19 @@ This needs to be organized a bit better (and documented better).
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
 (defn accounts-tab []
-  (let [accounts @(re-frame/subscribe [:settings/available-accounts])
+  (let [tr           @(re-frame/subscribe [:i18n/tr])
+        accounts     @(re-frame/subscribe [:settings/available-accounts])
         current-user @(re-frame/subscribe [:sdk/profile])]
     [:div.settings-tab-content
-     [:h2.settings-heading "Managed Accounts"]
+     [:h2.settings-heading (tr [:settings.accounts/title])]
 
      [:div.settings-section
       [:p.verification-description
-       "Switch between your active Matrix sessions or add a new one."]
+       (tr [:settings.accounts/description])]
 
       [:div.accounts-list
        (if (empty? accounts)
-         [:div.accounts-empty "No accounts configured."]
+         [:div.accounts-empty (tr [:settings.accounts/empty-state])]
          (for [acc accounts]
            ^{:key (:userId acc)}
            [account-item {:acc acc
