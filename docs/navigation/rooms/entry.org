@@ -28,7 +28,7 @@ So this is where we'll start allowing that logic to live.
    [navigation.rooms.room-summary :refer [build-room-summary]]
    [client.diff-handler :refer [apply-matrix-diffs]]
    [utils.global-ui :refer [avatar long-press-props]]
-   ["generated-compat" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory RoomListLoadingState]])
+   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory RoomListLoadingState]])
   (:require-macros [utils.macros :refer [ocall oget]]))
 #+end_src
 
