@@ -228,17 +228,7 @@
         ]
        [modal-root]
        [popover-root]
-       ;;      [settings-modal]
-       [global-profile-preview]
        [global-context-menu]
-  ;;     [satellite-overlay
-        ;;  (case active-type
-        ;;    :emoji-picker
-;;        emoji-sticker-board
-          ;;  :user-info    user-summary-card
-       ;;     nil)
-    ;;   ]
-;;       [image-lightbox]
        ]
       [:div "Unknown State"])))
 
