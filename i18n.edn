@@ -94,7 +94,13 @@
    :suggestions
    {:no-results "No matches found"}}
   :navigation
-  {:room-list
+  {:actions
+   {:mark-read "Mark as Read"
+    :leave-space "Leave Space"
+    :leave-room   "Leave Room"
+    :copy-link   "Copy Link"
+    :invite      "Invite"}
+   :room-list
    {:room-settings "Room Settings"
     :view-chat "View Chat & Lobby"
     :filters {:all "All"
