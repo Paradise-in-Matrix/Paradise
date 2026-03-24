@@ -17,8 +17,9 @@ Lightbox (or image previewer) is how we intend to provide a nice way to interact
             [clojure.string :as str]
             [re-frame.db :as db]
             [reagent.core :as r]
-            [reagent.dom.client :as rdom]
-                      ))
+            [overlays.base :refer [modal-component]]
+            [utils.svg :as icons]
+            [reagent.dom.client :as rdom]))
 
 #+end_src
 
