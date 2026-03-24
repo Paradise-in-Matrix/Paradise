@@ -1,0 +1,53 @@
+
+  .reaction-details-close-btn {
+      z-index: 10;
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      cursor: pointer;
+  }
+
+  .reaction-details-header {
+      margin-top: 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--cp-border, #333);
+      padding-bottom: 10px;
+  }
+
+  .reaction-detail-row {
+      display: flex;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--cp-border, #333);
+  }
+
+  .reaction-detail-icon {
+      font-size: 28px;
+      margin-right: 16px;
+      min-width: 40px;
+      text-align: center;
+  }
+
+  .reaction-detail-img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+  }
+
+  .reaction-detail-users {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-grow: 1;
+  }
+
+  .reaction-detail-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+  }
+
+  .reaction-detail-user-name {
+      font-weight: 500;
+}
+  
