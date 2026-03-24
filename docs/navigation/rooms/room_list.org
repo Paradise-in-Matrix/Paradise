@@ -562,13 +562,13 @@ above.
  (fn [db _]
    (get db :rooms-unfiltered-cache {})))
 
-(re-frame/reg-sub
+#_(re-frame/reg-sub
  :rooms/active-room-members
  :<- [:rooms/active-id]
  (fn [active-id db]
    (get-in db [:rooms/members active-id] [])))
 
-(re-frame/reg-event-fx
+#_(re-frame/reg-event-fx
  :rooms/fetch-members
  (fn [{:keys [db]} [_ room-id]]
    (let [client (:client db)]
@@ -584,7 +584,7 @@ above.
          (log/warn "Could not find room in client for members fetch:" room-id))))
    {}))
 
-(re-frame/reg-event-db
+#_(re-frame/reg-event-db
  :rooms/save-members
  (fn [db [_ room-id members]]
    (assoc-in db [:rooms/members room-id] members)))
@@ -832,14 +832,18 @@ entire room list to reload. Hopefully not.
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
 (defn filter-toggle-bar []
-  (let [active-filter @(re-frame/subscribe [:room-list/active-filter])]
+  (let [tr            @(re-frame/subscribe [:i18n/tr])
+        active-filter @(re-frame/subscribe [:room-list/active-filter])]
     [:div.filter-bar
-     (for [[id label] [["all" "All"] ["unread" "Unread"] ["people" "People"]]]
+     (for [[id label-key] [["all"    :navigation.room-list.filters/all]
+                           ["unread" :navigation.room-list.filters/unread]
+                           ["people" :navigation.room-list.filters/people]]]
        ^{:key id}
        [:button.filter-btn
         {:class    (when (= active-filter id) "active")
          :on-click #(re-frame/dispatch [:room-list/apply-filter id])}
-        label])]))
+        (tr [label-key])])]))
+
 #+end_src
 
 ***** CSS
