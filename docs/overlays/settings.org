@@ -578,6 +578,133 @@ This needs to be organized a bit better (and documented better).
 #+end_src
 
 
+**** Language/Time Tab
+
+You want to ensure the language options are easy to find for the user.
+
+
+#+begin_src css :tangle ../../css/settings.css
+.language-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.language-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s active;
+  border: 1px solid transparent;
+}
+
+.language-item:hover {
+  background: var(--bg-hover);
+}
+
+.language-item.is-active {
+  background: rgba(var(--success-green-rgb), 0.1);
+  border-color: var(--success-green);
+}
+
+.lang-names {
+  display: flex;
+  flex-direction: column;
+}
+
+.lang-native {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.lang-english {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.language-item [icons/check-circle-green] {
+  animation: scaleIn 0.2s ease-out;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+
+.segmented-control {
+    display: flex;
+    background: var(--bg-tertiary);
+    padding: 4px;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+}
+
+.segmented-control button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.segmented-control button.active {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+#+end_src
+
+
+***** TODO Need to add time format implementation
+
+#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+(defn language-time-tab []
+  (let [tr          @(re-frame/subscribe [:i18n/tr])
+        locale      @(re-frame/subscribe [:i18n/locale])
+        ;; time-format @(re-frame/subscribe [:settings/time-format])
+
+        ]
+    [:div.settings-tab-content
+     [:h2.settings-heading (tr [:settings.language/title])]
+     [:div.settings-section
+      [:p.verification-description (tr [:settings.language/description])]
+      [:h3.settings-subheading (tr [:settings.language/system-label])]
+      [:div.language-list
+       (for [[id label native] [[:en "English" "English"]
+                                [:eo "Esperanto" "Esperanto"]]]
+         ^{:key id}
+         [:div.language-item
+          {:class (when (= locale id) "is-active")
+           :on-click #(re-frame/dispatch [:i18n/set-locale id])}
+          [:div.lang-names
+           [:div.lang-native native]
+           [:div.lang-english label]]
+          (when (= locale id) [icons/check-circle-green])])]
+      #_[:div.settings-spacer]
+      #_[:h3.settings-subheading (tr [:settings.language/time-label])]
+      #_[:div.segmented-control
+       [:button {:class (when (= time-format :h24) "active")
+                 :on-click #(re-frame/dispatch [:settings/set-time-format :h24])}
+        (tr [:settings.language/time-24])]
+       [:button {:class (when (= time-format :h12) "active")
+                 :on-click #(re-frame/dispatch [:settings/set-time-format :h12])}
+        (tr [:settings.language/time-12])]]]]))
+#+end_src
+
+
+
 **** About Tab
 
 
