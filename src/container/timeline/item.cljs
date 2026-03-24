@@ -16,7 +16,7 @@
             [navigation.rooms.room-summary :refer [build-room-summary]]
             [utils.svg :as icons]
             [client.diff-handler :refer [apply-matrix-diffs]]
-            ["generated-compat" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent ReceiptType]]
+            ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent ReceiptType]]
             ))
 
 (defn wrap-item [ffi-item]
@@ -40,15 +40,18 @@
                 real-id        (if (= e-t-tag "EventId")
                                  (.-eventId e-t-inner)
                                  (.-transactionId e-t-inner))
+;;                _ (js/console.error event)
                 content        (.-content event)
                 content-tag    (.-tag content)
                 content-inner  (.-inner content)
                 content-inner-content (when content-inner (.-content content-inner))
+
                 reactions (when-let [reactions-raw (and content-inner-content (.-reactions content-inner-content))]
                             (mapv (fn [r]
-                                    (let [emoji   (get r "key")
-                                          senders (get r "senders")]
-                                      [emoji (count senders)]))
+                                    (let [emoji      (get r "key")
+                                          senders    (get r "senders")
+                                          sender-ids (set (map #(get % "senderId") senders))]
+                                      [emoji (count senders) sender-ids]))
                                   (js->clj reactions-raw)))
 
                 read-by (let [receipts (.-readReceipts event)]
@@ -78,7 +81,6 @@
                           {:tag kind-tag
                            :in-reply-to
                            (when-let [reply-ffi (.-inReplyTo msg-like-content)]
-                         ;; (.eventId ...) calls the function, returning the real string!
                              {:event-id (.eventId reply-ffi)})
                            :inner (case kind-tag
                                     "Message"
@@ -114,10 +116,22 @@
                                                {:w (some-> info .-width js/Number)
                                                 :h (some-> info .-height js/Number)})}
                                     nil)})
+                        "State"
+                        (let [state-content (.-content content-inner)
+                              state-tag     (.-tag state-content)
+                              state-inner   (.-inner state-content)]
+                          {:tag   state-tag
+                           :inner (case state-tag
+                                    "RoomPinnedEvents"
+                                    {:change (some-> state-inner .-change)}
+                                    "RoomAvatar"
+                                    {:url (some-> state-inner .-url)}
+                                    "RoomName"
+                                    {:name (some-> state-inner .-name)}
+                                    {:raw-inner state-inner})})
                         "FailedToParseMessageLike"
                         {:error      (.-error content-inner)
                          :event-type (.-eventType content-inner)}
-
                         "RoomMembership" {:change (some-> content-inner .-change .-name)}
                         "ProfileChange"  {:id real-id}
                         nil)})
@@ -133,23 +147,29 @@
 
 
 (re-frame/reg-event-fx
- :sdk/send-reaction
- (fn [{:keys [db]} [_ room-id msg-id shortcode]]
+ :sdk/toggle-reaction
+ (fn [{:keys [db]} [_ room-id event-or-transaction-id emoji-key]]
    (let [timeline (get-in db [:timeline-subs room-id :timeline])]
      (if-not timeline
        (log/error "No timeline found for reaction in room" room-id)
        (try
-         (-> (.sendReaction timeline msg-id shortcode)
-             (.then #(log/info "Reaction sent:" shortcode))
-             (.catch #(log/error "Failed to send reaction:" %)))
+         (log/error event-or-transaction-id)
+         (-> (.toggleReaction timeline event-or-transaction-id emoji-key)
+             (.then (fn [added?]
+                      (if added?
+                        (log/info "Reaction added:" emoji-key)
+                        (log/info "Reaction removed:" emoji-key))))
+             (.catch #(log/error "Failed to toggle reaction:" %)))
          (catch :default e
-           (log/error "FFI Reaction Panic:" e)))))
+           (log/error "FFI Reaction Toggle Panic:" e)))))
    {}))
+
 
 (re-frame/reg-event-db
  :msg/open-reaction-picker
- (fn [db [_ room-id msg-id x y]]
-   (assoc db :active-reaction-picker {:room-id room-id :msg-id msg-id :x x :y y})))
+ (fn [db [_ room-id event-or-transaction-id  x y]]
+   (assoc db :active-reaction-picker {:room-id room-id :event-or-transaction-id event-or-transaction-id  :x x :y y})))
+
 
 (re-frame/reg-event-db
  :msg/close-reaction-picker
@@ -161,6 +181,42 @@
  (fn [db _]
    (:active-reaction-picker db)))
 
+
+(re-frame/reg-event-db
+ :ui/open-reaction-details
+ (fn [db [_ room-id reactions]]
+   (assoc db :active-reaction-details {:room-id room-id :reactions reactions})))
+
+(re-frame/reg-event-db
+ :ui/close-reaction-details
+ (fn [db _]
+   (dissoc db :active-reaction-details)))
+
+(re-frame/reg-sub
+ :ui/active-reaction-details
+ (fn [db _]
+   (:active-reaction-details db)))
+  
+
+
+
+
+
+(re-frame/reg-event-fx
+ :msg/toggle-pin
+ (fn [{:keys [db]} [_ room-id msg-id]]
+   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
+     (if-not timeline
+       (log/error "No timeline found for pinning")
+       (-> (.pinEvent timeline msg-id)
+           (.then (fn [was-pinned?]
+                    (if was-pinned?
+                      (log/info "Message pinned:" msg-id)
+                      (-> (.unpinEvent timeline msg-id)
+                          (.then #(log/info "Message unpinned:" msg-id))
+                          (.catch #(js/console.error %))))))
+           (.catch #(js/console.error %)))))
+   {}))
 
 (re-frame/reg-event-fx
  :msg/delete
@@ -277,54 +333,71 @@
                (re-frame/dispatch [:msg/mark-visible event-id]))))))
      #js {:threshold 0.5})))
 
-(defn build-message-actions [item active-room current-user-id x y]
+(defn build-message-actions [tr item active-room current-user-id x y]
   (let [msg-id   (:id item)
+        e-t-id   (:event-or-transaction-id item)
         is-mine? (or (:is-own? item)
-                     (= (:sender item) current-user-id))]
+                     (= (:sender item) current-user-id))
+       ]
     (cond-> [{:id "react"
-              :label "Add Reaction"
+              :label (tr [:container.timeline.item/react])
               :icon [icons/smiley]
-              :action #(re-frame/dispatch [:msg/open-reaction-picker active-room msg-id x y])}
+              :action #(re-frame/dispatch [:ui/open-popover :reaction-picker
+                       {:room-id active-room
+                        :msg-id  e-t-id
+                        :x       x
+                        :y       y
+                        }])}
 
-             {:id "reply" :label "Reply" :icon [icons/reply]
+             {:id "reply" :label (tr [:container.timeline.item/reply]) :icon [icons/reply]
               :action #(re-frame/dispatch [:input/set-context active-room :reply item])}
 
              (when (:is-own? item)
-               {:id "edit" :label "Edit Message" :icon [icons/edit]
+               {:id "edit" :label (tr [:container.timeline.item/edit-message]) :icon [icons/edit]
                 :action #(re-frame/dispatch [:input/set-context active-room :edit item])})
-             {:id "thread" :label "Start Thread"  :icon [icons/thread] :action #(re-frame/dispatch [:msg/thread active-room msg-id])}
-             {:id "copy"   :label "Copy Text"     :icon [icons/copy] :action #(js/navigator.clipboard.writeText (or (get-in item [:content :body]) ""))}
-             {:id "link"   :label "Copy Link"     :icon [icons/link] :action #(log/info "Copy permalink for" msg-id)}
-             {:id "pin"    :label "Pin Message"   :icon [icons/pins] :action #(re-frame/dispatch [:msg/pin active-room msg-id])}
-             {:id "source" :label "View Event"    :icon [icons/search] :action #(re-frame/dispatch [:msg/view-source msg-id])}]
-      is-mine? (conj {:id "/
-                delete" :label "Delete"       :icon [icons/trash] :class-name "danger" :action #(re-frame/dispatch [:msg/delete active-room (:event-or-transaction-id item)])}))))
+             {:id "thread" :label  (tr [:container.timeline.item/start-thread]) :icon [icons/thread] :action #(re-frame/dispatch [:msg/thread active-room msg-id])}
+             {:id "copy"   :label (tr [:container.timeline.item/copy-text])      :icon [icons/copy] :action #(js/navigator.clipboard.writeText (or (get-in item [:content :body]) ""))}
+             {:id "link"   :label (tr [:container.timeline.item/copy-link])     :icon [icons/link] :action #(log/info "Copy permalink for" msg-id)}
+             {:id "pin"    :label (tr [:container.timeline.item/pin])     :icon [icons/pins] :action
+              #(re-frame/dispatch [:msg/toggle-pin active-room msg-id])}
+             {:id "source" :label (tr [:container.timeline.item/source])     :icon [icons/search] :action #(re-frame/dispatch [:msg/view-source msg-id])}]
+      is-mine? (conj {:id "delete" :label (tr [:container.timeline.item/delete])  :icon [icons/trash] :class-name "danger" :action #(re-frame/dispatch [:msg/delete active-room e-t-id])}))))
 
-(defn message-hover-toolbar [item active-room current-user-id]
-  (let [msg-id   (:id item)]
+(defn message-hover-toolbar [tr item active-room current-user-id]
+  (let [
+        msg-id   (:id item)
+        e-t-id   (:event-or-transaction-id item)
+        ]
     [:div.message-hover-toolbar
      [:div.toolbar-btn
-      {:title "Add Reaction"
+      {:title    (tr [:container.timeline.item/react])
        :on-click (fn [e]
                    (.preventDefault e)
-              (.stopPropagation e)
-              (let [mouse-x (.-clientX e)
-                    mouse-y (.-clientY e)]
-                (re-frame/dispatch [:msg/open-reaction-picker active-room msg-id mouse-x mouse-y])))}
+                   (.stopPropagation e)
+                   (let [mouse-x (.-clientX e)
+                         mouse-y (.-clientY e)]
+                     (re-frame/dispatch
+                      [:ui/open-popover :reaction-picker
+                       {:room-id active-room
+                        :msg-id  e-t-id
+                        :x       mouse-x
+                        :y       mouse-y
+                        :width   320
+                        :height  380}])))}
       [icons/smiley]]
      [:div.toolbar-btn
-      {:title "Reply"
+      {:title (tr [:container.timeline.item/reply])
        :on-click #(re-frame/dispatch [:input/set-context active-room :reply item])}
       [icons/reply]
       ]
      (when (:is-own? item)
        [:div.toolbar-btn
-        {:title "Edit"
+        {:title (tr [:container.timeline.item/edit-message])
          :on-click #(re-frame/dispatch [:input/set-context active-room :edit item])}
         [icons/edit]
         ])
      [:div.toolbar-btn
-      {:title "More"
+      {:title (tr [:container.timeline.item/more])
        :on-click (fn [e]
                    (.stopPropagation e)
                    (let [mx (.-clientX e)
@@ -333,9 +406,25 @@
                       [:context-menu/open
                        {:x mx
                         :y my
-                        :items (build-message-actions item active-room current-user-id mx my)}])))}
+                        :items (build-message-actions tr item active-room current-user-id mx my)}])))}
       [icons/more]]
      ]))
+
+(defn state-event-view [{:keys [sender-name content]}]
+  (let [{:keys [tag inner]} content]
+    [:div.timeline-state-event
+     {:style {:display "flex"
+              :justify-content "center"
+              :padding "12px"
+              :color "var(--cp-text-muted, #888)"
+              :font-size "0.85rem"
+              :font-style "italic"}}
+     [:span
+      (case tag
+        "RoomPinnedEvents" (str sender-name " updated the pinned messages.")
+        "RoomName"         (str sender-name " changed the room name to: " (:name inner))
+        "RoomAvatar"       (str sender-name " changed the room avatar.")
+        (str sender-name " updated " tag))]]))
 
 (defn message-text [{:keys [body html]}]
   (if (seq html)
@@ -376,7 +465,18 @@
              :alt (:caption content)
              :class class-name
              :loading "lazy"
-             :on-click #(re-frame/dispatch [:ui/open-image-preview url])
+             :on-click #(re-frame/dispatch
+             [:ui/open-modal :image-lightbox
+              {:url url
+               :backdrop-props {:class "lightbox-backdrop"}
+               :window-props   {:style {:background "transparent"
+                                        :box-shadow "none"
+                                        :width "100%"
+                                        :height "100%"
+                                        :max-width "none"
+                                        :max-height "none"
+                                        :padding 0}}}])
+
              :style {:cursor "zoom-in"}}])]
    (when (seq (:caption content))
      [:div.media-caption
@@ -392,50 +492,52 @@
     (fn [url alt class-name]
       [:img {:src url :alt alt :class class-name :loading "lazy"}])))
 
-(defn file-message [{:keys [caption source info]}]
+(defn file-message [{:keys [caption source info]} tr]
   [:div.file-attachment
    [:a {:href (mxc->url source) :target "_blank" :className "file-link"}
-    [:span.file-icon "📁"]
-    [:span.file-name (or caption "Download File")]
+    [:span.file-icon [icons/file]]
+    [:span.file-name (or caption (tr [:container.timeline.status/file-download]))]
     (when-let [size (:size info)]
       [:span.file-size (str "(" (quot size 1024) " KB)")])]])
 
-(defn render-message-content [msg-type-tag content-map in-reply-to reply-msg]
+(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
      (when in-reply-to
        [:div.timeline-reply-banner
-        [:div.reply-indicator "↳"]
+        [:div.reply-indicator [icons/reply]]
         [:div.reply-content
          (if reply-msg
            [:<>
             [:span.reply-sender (:sender-name reply-msg)]
-            [:span.reply-preview (get-in reply-msg [:content :inner :content :body] "Media message")]]
-           [:span.reply-preview "Loading original message..."])]])
-
+            [:span.reply-preview
+             (get-in reply-msg [:content :inner :content :body]
+                     (tr [:container.timeline.status/media-preview]))]]
+           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
      (case msg-type-tag
        "Text"    [message-text content-map]
        "Image"   [image-message content-map]
        "Video"   [video-message content-map]
        "Sticker" [sticker-message content-map]
-       "File"    [file-message content-map]
-       [:span.body (str "Unsupported message type: " msg-type-tag)])
+       "File"    [file-message content-map tr]
+       [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
      (when is-edited?
-       [:span.timeline-edited-label "(edited)"])]))
+       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
 
 (defn system-event-view [icon text]
   [:div.timeline-system-event
    [:span.system-icon icon]
    [:span.system-text text]])
 
-(defn date-divider [ts]
+(defn date-divider [tr ts]
   [:div.timeline-date-separator
    [:div.separator-line]
-   [:span.separator-text (format-divider-date ts)]
+   [:span.separator-text (format-divider-date tr ts)]
    [:div.separator-line]])
 
 (defn event-tile-render [item]
-  (let [{:keys [id sender sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
+  (let [{:keys [id sender sender-id sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
+        tr          @(re-frame/subscribe [:i18n/tr])
         active-room @(re-frame/subscribe [:rooms/active-id])
         my-profile  @(re-frame/subscribe [:sdk/profile])
         my-id       (:user-id my-profile)
@@ -444,36 +546,38 @@
                               (= (-> edit-context :target :id) id))
         custom-tags @(re-frame/subscribe [:room/power-level-tags active-room])
         members-map @(re-frame/subscribe [:room/members-map active-room])
-        member-data (get members-map sender)
-        popover-member {:user-id sender
+        member-data (get members-map sender-id)
+        popover-member {:user-id sender-id
                         :display-name (or (:display-name member-data) sender-name)
-                        :avatar-url (or (:avatar-url member-data) sender-avatar)
+                        :avatar-url (or (:avatar-url member-data) (mxc->url sender-avatar))
                         :power-level (or (:power-level member-data) 0)}
         open-menu-fn (fn [mx my]
                        (re-frame/dispatch
                         [:context-menu/open
                          {:x mx :y my
-                          :items (build-message-actions item active-room my-id mx my)}]))]
+                          :items (build-message-actions tr item active-room my-id mx my)}]))]
     (if (= type :virtual)
       (case (:tag item)
-        "DateDivider" [date-divider (:ts item)]
-        [system-event-view "-" "Timeline Separator"])
+        "DateDivider" [date-divider tr (:ts item)]
+        [system-event-view "-" (tr [:container.timeline.status/timeline-separator])])
       [swipe-to-action-wrapper
+
        {:can-edit? is-own?
         :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
         :wrapper-props (merge (long-press-props open-menu-fn)
                       {:class (str "timeline-message"
+                                   (if (= content-tag "MsgLike") " is-message" " is-system")
                                    (when merge-with-prev? " is-merged"))})}
        [:div.timeline-avatar-wrapper
         (when (and (= content-tag "MsgLike") (not merge-with-prev?))
-          [profile-popover-trigger popover-member custom-tags active-room
+          [profile-popover-trigger popover-member custom-tags active-room nil
            [avatar {:id sender :name sender-name
                     :url (mxc->url sender-avatar)
                     :size 32 :status :online :shape :none}]])]
 
        [:div.timeline-content-wrapper
         (when (= content-tag "MsgLike")
-          [message-hover-toolbar item active-room my-id])
+          [message-hover-toolbar tr item active-room my-id])
 
         (cond
           (= content-tag "MsgLike")
@@ -484,42 +588,77 @@
              (when-not merge-with-prev?
                [:div.timeline-header
                 [profile-popover-trigger popover-member custom-tags active-room
-                 [:span.timeline-sender-name sender-name]]
+                 nil [:span.timeline-sender-name sender-name] ]
                 [:span.timeline-timestamp (format-time ts)]])
              [:div.timeline-body
               (cond
                 is-editing-this? [inline-editor item active-room]
-                (= tag "Sticker") [render-message-content "Sticker" inner in-reply-to reply-msg]
-                (= tag "Redacted") [:span.redacted "This message was deleted."]
-                (= tag "UnableToDecrypt") [:span.decryption-error "Unable to decrypt message."]
+                (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg]
+                (= tag "Redacted")
+                [:span.redacted (tr [:container.timeline.status/redacted])]
+                (= tag "UnableToDecrypt")
+                [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
                 (= tag "Message")
                 (let [{m-tag :tag m-content :content} inner]
-                  [render-message-content m-tag m-content in-reply-to reply-msg])
-                :else [:span.unknown (str "Unknown message kind: " tag)])]])
+                  [render-message-content tr m-tag m-content in-reply-to reply-msg])
+                :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag])
+            (str "Unknown message kind: " tag)])]])
 
           (= content-tag "RoomMembership")
-          [system-event-view "->" (str sender-name " membership changed.")]
+          [system-event-view "->"   (tr [:container.timeline.status/membership] [sender-name])]
 
           (= content-tag "ProfileChange")
-          [system-event-view "@" (str sender-name " changed their profile.")]
+          [system-event-view "@"  (tr [:container.timeline.status/profile] [sender-name])]
+          (= content-tag "State")
+          [state-event-view item]
 
           :else
-          [system-event-view "!" (str "Unknown event type: " content-tag)])
+          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])
 
         (when (or (seq reactions) (seq read-by))
           [:div.timeline-metadata
            (when (seq reactions)
              [:div.reactions-row
-              (for [[emoji count] reactions]
+              (for [[emoji count senders] reactions]
                 ^{:key emoji}
-                [:span.reaction-pill
-                 (if (clojure.string/starts-with? emoji "mxc://")
-                   [:img.reaction-custom {:src (mxc->url emoji {:width 32 :height 32 :method "crop"})}]
-                   [:span.reaction-emoji emoji])
-                 [:span.reaction-count count]])])
+                (let [hover-text (->> senders
+                                      (map (fn [uid]
+                                             (or (:display-name (get members-map uid))
+                                                 uid)))
+                                      (str/join ", "))]
+                  [:span.reaction-pill
+                   {:class (when (contains? senders my-id) "active")
+                    :title hover-text
+                    :on-context-menu (fn [e]
+                                       (.preventDefault e)
+                                       (.stopPropagation e)
+                                       (re-frame/dispatch
+                                        [:ui/open-modal :reaction-details
+                                         {:room-id active-room
+                                          :reactions reactions
+                                          :window-props {:style {:max-width "400px" :min-height "300px"}}}]))
+                    :on-click (fn [e]
+                                (.preventDefault e)
+                                (.stopPropagation e)
+                                (re-frame/dispatch [:sdk/toggle-reaction
+                                                    active-room
+                                                    (:event-or-transaction-id item)
+                                                    emoji]))
+                    :style {:cursor "pointer"
+                            :user-select "none"}}
+                   (if (str/starts-with? emoji "mxc://")
+                     [:img.reaction-custom
+                      {:src (mxc->url emoji {:width 32 :height 32 :method "crop"})
+                       :style {:pointer-events "none"}}]
+                     [:span.reaction-emoji
+                      {:style {:pointer-events "none"}}
+                      emoji])
+                   [:span.reaction-count
+                    {:style {:pointer-events "none"}}
+                    count]]))])
            #_(when (seq read-by)
-             [:div.read-receipts-row
-              [:span.receipt-count (str "✓ " (count read-by))]])])]])))
+               [:div.read-receipts-row
+                [:span.receipt-count (str "✓ " (count read-by))]])])]])))
 
 
 (defn event-tile [item]
@@ -542,5 +681,3 @@
     (finally
       (when-let [node @node-ref]
         (unobserve-node node)))))
-;;
-;;
