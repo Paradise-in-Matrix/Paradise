@@ -995,20 +995,19 @@ component.
         active-filter   @(re-frame/subscribe [:room-list/active-filter])
         client          @(re-frame/subscribe [:sdk/client])
         room-array      (to-array rooms)]
-    (log/warn active-space)
     [:div.sidebar-rooms
-     {:style {:display "flex" :flex-direction "column" :height "100%"}}
-     [:h3.rooms-header {:style {:padding "8px"}}
+     [:div.room-list-header
+
       (if active-space
-        [:<> [:h3 {:style {:margin 0 :font-size "1.1rem"}} (:name active-space)]])]
+        [:h3.room-list-header (:name active-space)]
+        [:h3.room-list-header (tr [:navigation.room-list.headers/home])])]
      (when-not active-space
        [filter-toggle-bar])
      (if (or (nil? room-array) (== (alength room-array) 0))
-       [:div.empty-state "No rooms here..."]
-       [:div.room-collection {:style {:flex 1 :min-height 0}}
-        [virtualized-room-list client room-array active-space active-room closed-drawers active-filter]])
+       [:div.empty-state (tr [:navigation.room-list.empty-state/no-rooms])]
+       [:div.room-collection
+        [virtualized-room-list tr client room-array active-space active-room closed-drawers active-filter]])
      [active-call-panel]]))
-
 #+end_src
 
 
