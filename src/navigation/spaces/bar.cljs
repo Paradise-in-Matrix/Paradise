@@ -8,6 +8,7 @@
             [navigation.rooms.room-list :refer [process-parent-queue!]]
             [client.diff-handler :refer [apply-matrix-diffs apply-generic-diffs!]]
             [overlays.settings :refer [sidebar-profile-mini]]
+            [utils.svg :as icons]
             [utils.helpers :refer [mxc->url]]
             [utils.global-ui :refer [avatar]]
             [taoensso.timbre :as log]))
@@ -105,7 +106,7 @@
                     (p/let [sub-handle (.subscribeToRoomUpdate space-list listener)
                             _ (re-frame/dispatch [:sdk/save-space-sub space-list sub-handle])
                             _ (.paginate space-list)
-
+                            
                             ]
                       ;;(apply-space-rooms-diffs! space-id #js {:tag "Reset" :inner initial-rooms})
                       )
@@ -204,11 +205,7 @@
  :<- [:rooms/all]
  (fn [[rel-map all-rooms] [_ parent-id]]
    (let [child-refs (get rel-map parent-id [])
-         _ (log/debug "Hit?")
-         _ (log/debug all-rooms)
-         rich-lookup (into {} (map (fn [r] [(or (:id r) (.-roomId r)) r]) all-rooms))
-         _ (log/debug rich-lookup)
-         ]
+         rich-lookup (into {} (map (fn [r] [(or (:id r) (.-roomId r)) r]) all-rooms))]
      (mapv (fn [{:keys [id is-space?]}]
              (let [rich-room (get rich-lookup id)]
                (merge {:id id :is-space? is-space? :name "Loading..."}
@@ -291,15 +288,16 @@
 (defn spaces-sidebar []
   (let [spaces        @(re-frame/subscribe [:spaces/all])
         active-id     @(re-frame/subscribe [:spaces/active-id])
-        active-dms    @(re-frame/subscribe [:rooms/active-dm-pops])]
+        active-dms    @(re-frame/subscribe [:rooms/active-dm-pops])
+        tr            @(re-frame/subscribe [:i18n/tr])
+        ]
     [:div.sidebar-spaces
      [:div.home-group
       [:div.space-icon-wrapper
        {:class (when (nil? active-id) "active")
         :on-click #(re-frame/dispatch [:space/select nil])
-        :title "Home"}
-       [:div.home-icon-container "🏠"]]
-
+        :title (tr [:navigation.spaces.bar/home])}
+       [:div.home-icon-container [icons/home]]]
       (for [dm active-dms]
         ^{:key (:id dm)}
         [space-icon-item dm active-id])]
