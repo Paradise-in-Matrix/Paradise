@@ -782,11 +782,37 @@ You want to ensure the language options are easy to find for the user.
 **** Settings Modal component
 
 
+
+***** Settings Sidebar Component
+
+Inside the modal this is our sidebar options.
+
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
-(defn settings-modal []
-  (let [is-open?   @(re-frame/subscribe [:settings/is-open?])
-        active-tab @(re-frame/subscribe [:settings/active-tab])
-        profile    @(re-frame/subscribe [:sdk/profile])]
+(defn settings-sidebar [active-tab]
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.settings-sidebar
+     [:div.settings-group-label (tr [:settings.groups/user-settings])]
+     (for [[id label-key] [[:my-account    :settings.tabs/my-account]
+                           [:verification  :settings.tabs/verification]
+                           [:accounts      :settings.tabs/accounts]
+                           [:notifications :settings.tabs/notifications]
+                           [:language-time :settings.tabs/language-time]
+                           ]]
+       ^{:key id}
+       [:div.settings-tab
+        {:class (when (= active-tab id) "is-active")
+         :on-click #(re-frame/dispatch [:settings/set-tab id])}
+        (tr [label-key])])
+     [:div.settings-group-label {:style {:margin-top "1rem"}}
+      (tr [:settings.groups/app])]
+     [:div.settings-tab
+      {:class (when (= active-tab :about) "is-active")
+       :on-click #(re-frame/dispatch [:settings/set-tab :about])}
+      (tr [:settings.tabs/about])]]))
+#+end_src
+
+
+
     (when is-open?
       [:div.settings-backdrop
        {:on-click #(re-frame/dispatch [:settings/close])}
