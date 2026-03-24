@@ -112,6 +112,13 @@ So we define the component contents and then register in the modal multi-method.
          [:span.btn-icon [icons/external-link]] [:span (@tr [:lightbox/open-original])]]
         [:a.lightbox-btn {:href url :download "image"}
          [:span.btn-icon [icons/download]] [:span (@tr [:lightbox/download])]]]])))
+
+(defmethod modal-component :image-lightbox [_]
+  image-lightbox-content)
+
+
+
+
 #+end_src
 
 
