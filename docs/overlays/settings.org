@@ -466,21 +466,22 @@ This needs to be organized a bit better (and documented better).
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
 (defn notifications-tab []
-  (let [status @(re-frame/subscribe [:push/status])]
+  (let [tr     @(re-frame/subscribe [:i18n/tr])
+        status @(re-frame/subscribe [:push/status])]
     [:div.settings-tab-content
-     [:h2.settings-heading "Push Notifications"]
+     [:h2.settings-heading (tr [:settings.notifications/title])]
      [:div.settings-section
       [:p.verification-description
-       "Enable push notifications to receive alerts for new messages and mentions even when the app is in the background."]
+       (tr [:settings.notifications/description])]
       (if (= status :enabled)
         [:div.success-banner
-         [:div.success-icon "✅"]
+         [:div.success-icon [icons/check-circle-green]]
          [:div.success-text-wrapper
-          [:div.success-title "Notifications Active"]
-          [:div.success-subtitle "You are receiving push alerts on this device."]]]
+          [:div.success-title (tr [:settings.notifications.status/active-title])]
+          [:div.success-subtitle (tr [:settings.notifications.status/active-subtitle])]]]
         [:button.form-button
          {:on-click #(re-frame/dispatch [:push/enable])}
-         "Enable Push Notifications"])]]))
+         (tr [:settings.notifications/enable-btn])])]]))
 #+end_src
 
 
