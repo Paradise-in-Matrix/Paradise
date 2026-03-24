@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY . .
-RUN npm ci
+RUN npm i
 RUN npx shadow-cljs release app
 RUN npx vite build
 
