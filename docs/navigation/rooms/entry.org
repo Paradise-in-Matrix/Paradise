@@ -428,7 +428,7 @@ important.
                 :on-click #(re-frame/dispatch [:rooms/toggle-drawer id])
                 :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
                (long-press-props #(open-menu-fn nil %1 %2)))
-        [:span.drawer-arrow (if is-closed? "▶" "▼")]
+        [:span.drawer-arrow (if is-closed? [icons/chevron-down] [icons/chevron-down])]
         [:span.drawer-name (str/upper-case name)]]
 
        [:div.room-item
