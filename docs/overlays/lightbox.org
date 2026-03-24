@@ -32,7 +32,6 @@ So we define the component contents and then register in the modal multi-method.
 
 ***** Component
 
-****** TODO Swap out the icons with SVGs
 #+begin_src clojurescript :tangle ../../src/overlays/lightbox.cljs
 (defn image-lightbox []
   (r/with-let [!state           (r/atom {:scale 1 :last-scale 1 :x 0 :y 0 :last-x 0 :last-y 0 :start-dist 0})
