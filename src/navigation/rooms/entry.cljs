@@ -13,21 +13,21 @@
    [navigation.rooms.room-summary :refer [build-room-summary]]
    [client.diff-handler :refer [apply-matrix-diffs]]
    [utils.global-ui :refer [avatar long-press-props]]
-   ["generated-compat" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory RoomListLoadingState]])
+   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory RoomListLoadingState]])
   (:require-macros [utils.macros :refer [ocall oget]]))
 
-(defn build-room-actions [room-id room-name is-space?]
+(defn build-room-actions [tr room-id room-name is-space?]
   [{:id "mark-read"
-    :label "Mark as Read"
-    :icon "✓"
+    :label (tr [:navigation.actions/mark-read])
+    :icon [icons/check]
     :action #(re-frame/dispatch [:rooms/mark-read room-id])}
    {:id "copy-link"
-    :label "Copy Link"
-    :icon "🔗"
+    :label (tr [:navigation.actions/copy-link])
+    :icon [icons/link]
     :action #(js/console.log "Copy permalink for" room-id)}
    {:id "leave"
-    :label (if is-space? "Leave Space" "Leave Room")
-    :icon "🚪"
+    :label (if is-space? (tr [:navigation.actions/leave-space]) (tr [:navigation.actions/leave-room]))
+    :icon [icons/leave]
     :class-name "danger"
     :action #(re-frame/dispatch [:rooms/leave room-id])}])
 
@@ -108,7 +108,9 @@
 (defn room-item [{:keys [id name indent is-space? is-closed? is-call? has-call?
                         active-room unread? highlight? notif-count
                         call-participants avatar-url space-id active-filter open-menu-fn]}]
-  (let [active? (= id active-room)]
+  (let [active? (= id active-room)
+        tr      @(re-frame/subscribe [:i18n/tr])
+        ]
     [:div.room-container
      (if is-space?
        [:div.room-drawer-header
@@ -117,7 +119,7 @@
                 :on-click #(re-frame/dispatch [:rooms/toggle-drawer id])
                 :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
                (long-press-props #(open-menu-fn nil %1 %2)))
-        [:span.drawer-arrow (if is-closed? "▶" "▼")]
+        [:span.drawer-arrow (if is-closed? [icons/chevron-down] [icons/chevron-down])]
         [:span.drawer-name (str/upper-case name)]]
 
        [:div.room-item
@@ -144,13 +146,14 @@
          [:div.room-hover-actions
           (when is-call?
             [:div.action-icon.chat-action
-             {:title "View Chat & Lobby"
+             {:title
+              (tr [:navigation.room-list/view-chat])
               :on-click (fn [e]
                           (.stopPropagation e)
                           (re-frame/dispatch [:rooms/select id {:force-lobby? true :focus-override :timeline}]))}
              [icons/chat-bubble]])
           [:div.action-icon.settings-action
-           {:title "Room Settings"
+           {:title (tr [:navigation.room-list/room-settings])
             :on-click (fn [e]
                         (.stopPropagation e)
                         (re-frame/dispatch [:rooms/open-settings id]))}
@@ -182,7 +185,7 @@
              [:span.participant-name p-name]]))])]))
 
 
-(defn render-room-item [client rooms active-space active-room closed-drawers active-filter]
+(defn render-room-item [tr client rooms active-space active-room closed-drawers active-filter]
   (fn [_ raw-room]
     (let [{:keys [id roomId name is-space? isSpace depth
                   notification-count unreadNotificationsCount
@@ -203,10 +206,11 @@
                         (re-frame/dispatch
                          [:context-menu/open
                           {:x mx :y my
-                           :items (build-room-actions id room-name space? #_is-call?)}]))]
+                           :items (build-room-actions tr id room-name space? #_is-call?)}]))]
 ;;      (log/error active-space)
       (r/as-element
-       [room-item {:id id
+       [room-item {:tr tr
+                   :id id
                    :name room-name
                    :indent (* depth 12)
                    :is-space? space?
