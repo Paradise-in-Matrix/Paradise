@@ -3,6 +3,7 @@
             [taoensso.timbre :as log]
             [re-frame.db :as db]
             ["react-virtuoso" :refer [Virtuoso]]
+            [container.timeline.item :refer [event-tile]]
             [promesa.core :as p]
             [reagent.core :as r]
             [reagent.dom.client :as rdom]
@@ -73,7 +74,8 @@
         [:button.header-icon-btn
          {:title (tr [:container.header/pinned-messages])
           :class (when (= side-panel :pins) "active")
-          :on-click #(re-frame/dispatch [:container/set-side-panel :pins])}
+          :on-click #((re-frame/dispatch [:container/set-side-panel :pins])
+                      (re-frame/dispatch [:room/fetch-pinned-events active-id]))}
          [icons/pins {:animate :sink}]]
 
         [:button.header-icon-btn
@@ -89,3 +91,19 @@
                             my (.-clientY e)]
                         (re-frame/dispatch [:context-menu/open {:x mx :y my :items (build-room-actions active-id display-name)}])))}
          [icons/more-vertical]]])]))
+
+(defn make-timeline-item-shim [item event-id]
+  (log/error item)
+  #js {:uniqueId (fn []
+                   #js {:id event-id})
+       :asEvent  (fn []
+                   item)
+       :asVirtual (fn [] nil)})
+
+(defn message-preview-item [room-id event]
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.message-preview-card
+     [event-tile event]
+     [:button.jump-btn
+      {:on-click #(re-frame/dispatch [:room/pretty-jump room-id (:id event)])}
+      (tr [:container.timeline/jump-to-message])]]))
