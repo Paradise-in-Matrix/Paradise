@@ -281,22 +281,10 @@ is an edit)
 
 (re-frame/reg-sub
  :timeline/current-events
- (fn [db _]
-   (let [active-room   (:active-room-id db)
-         raw-events    (get-in db [:timeline active-room] [])
-         sorted-events (->> raw-events
-                            (reduce (fn [acc e]
-                                      (let [id-key   (or (:internal-id e) (:id e))
-                                            existing (get acc id-key)]
-                                        (if (and existing
-                                                 (not (:is-edited? e))
-                                                 (<= (:ts e) (:ts existing)))
-                                          acc
-                                          (assoc acc id-key e))))
-                                    {})
-                            (vals)
-                            (sort-by :ts))]
-     (enrich-timeline-items sorted-events))))
+ (fn [[_ active-room]]
+   (re-frame/subscribe [:timeline/sorted-events active-room]))
+ (fn [sorted-events]
+   (enrich-timeline-items sorted-events)))
 
 (re-frame/reg-sub
  :timeline/latest-readers
