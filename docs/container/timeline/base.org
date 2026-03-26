@@ -155,7 +155,7 @@ export enum DateDividerMode {
                      pag-listener    #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])}
                                  pag-handle      (.subscribeToBackPaginationStatus timeline pag-listener)
                      ]
-               (.paginateBackwards timeline 5 js/undefined)
+               (.paginateBackwards timeline 50 js/undefined)
                (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline timeline-handle nil pag-handle typing-handle]))
              (.catch #(js/console.error "Boot failed:" %))))
        {}))))
