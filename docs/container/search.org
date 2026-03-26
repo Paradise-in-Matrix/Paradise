@@ -29,7 +29,7 @@ https://spec.matrix.org/v1.17/client-server-api/#post_matrixclientv3search
    [reagent.dom.client :as rdom]
    [utils.helpers :refer [mxc->url fetch-state-event]]
    [utils.svg :as icons]
-   [container.reusable :refer [make-timeline-item-shim]]
+   [container.reusable :refer [make-timeline-item-shim message-preview-item]]
    [container.timeline.base :refer [apply-timeline-diffs!]]
    [container.timeline.item :refer [event-tile]]
    [utils.svg :as icons]
@@ -165,24 +165,11 @@ get it ready for rendering using the event tile.
 
 
 
-**** Components
-
-Now for the components themselves. Each one is just a wrapped event tile with
-a convenient click-able jump button.
-It may be reasonable to reuse this for Pins.
-
-#+begin_src clojurescript :tangle ../../src/container/search.cljs
-(defn search-result-item [room-id result]
-  [:div.search-hit-card
-   [event-tile result]
-   [:button.jump-btn
-    {:on-click #(re-frame/dispatch [:room/pretty-jump room-id (:id result)])}
-    "Jump to Message"]])
-#+end_src
+**** Component
 
 
-Now for the main component itself. We want to provide some nice visual
-impact to the user. At some point down the road we'd like to provide
+We want to provide some nice visual impact to the user.
+At some point down the road we'd like to provide
 nice clean filter instructions and provide more complex search options.
 
 For now though, text search will do.
@@ -218,7 +205,7 @@ For now though, text search will do.
           [:div.search-list
            (for [res results]
              ^{:key (:id res)}
-             [search-result-item active-room res])]
+             [message-preview-item active-room res])]
 
           (and (not loading?) (not (str/blank? (:query search-state))) (empty? results))
           [:div.search-status
