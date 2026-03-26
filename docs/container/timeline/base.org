@@ -609,8 +609,14 @@ mentioned above. Should be easily sorted, however.
            :atBottomStateChange #(reset! !at-bottom? %)
            :followOutput (fn [at-bottom] (if (and at-bottom (not focus-mode?)) "auto" false))
            :startReached (fn []
-                           (log/debug "Start reached for" room-id)
-                           (re-frame/dispatch [:sdk/back-paginate room-id]))
+                (let [focus-mode? @(re-frame/subscribe [:room/is-focused? room-id])]
+                  (if focus-mode?
+                    (js/setTimeout #(re-frame/dispatch [:sdk/back-paginate room-id]) 500)
+                    (re-frame/dispatch [:sdk/back-paginate room-id]))))
+
+           :endReached (fn []
+                         (when focus-mode?
+                           (re-frame/dispatch [:sdk/forward-paginate room-id])))
            :computeItemKey (fn [_ item] (:id item))
            :itemContent (fn [_ item]
                           (r/as-element
