@@ -57,7 +57,7 @@
        (or (str/starts-with? mime "audio/")
            (str/starts-with? mime "video/"))
        [:div.preview-media-placeholder
-        [:span "▶"]
+        [:span [icons/chevron-right]]
         [:span.mime-label (last (str/split mime #"/"))]]
        :else
        [:div.preview-file
@@ -65,7 +65,7 @@
         [:span.file-name filename]]))
    [:button.remove-attachment
     {:on-click #(re-frame/dispatch [:composer/remove-attachment room-id index])}
-    "✕"]])
+    [icons/exit]]])
 
   (re-frame/reg-event-fx
  :composer/save-draft
