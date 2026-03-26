@@ -404,10 +404,10 @@ apply it. Then we prompt the app to give us the first page for the controller.
 
 (defn start-room-list-sync! [room-list]
   (log/debug "Starting Dual Room List Sync (UI + Background)")
-  (p/let [ui-result (.entriesWithDynamicAdapters room-list 200
+  (p/let [ui-result (.entriesWithDynamicAdaptersWith room-list 200 true
                                                #js {:onUpdate #(re-frame/dispatch [:room-list/home-rooms-diff %])})
         ui-controller (.controller ui-result)
-        bg-result (.entriesWithDynamicAdapters room-list 200
+        bg-result (.entriesWithDynamicAdaptersWith room-list 200 true
                                                #js {:onUpdate #(re-frame/dispatch [:room-list/bg-rooms-diff %])})
         bg-controller (.controller bg-result)]
 
