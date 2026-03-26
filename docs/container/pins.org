@@ -1,0 +1,265 @@
+
+** Pins (but no needles)
+
+**** Preface
+
+Pins. Should be super straight-forward and simple. Apparently not.
+
+Currently pins can't be easily supported in a way that makes sense. Most
+avenues in the client itself shut down any approach
+- Subscribing to Room Info and trying to listen for changes doesn't even update the pinnedEventIds
+- Creating a timeline with PinnedEvents as the focus does not ever have an initial state
+- Checking the pinned events from the server obviously proves they're populated... but we aren't going to probe for each entry
+- pinnedEventIds is empty on the Room Info itself (so it isn't even initially populated)
+
+These are limitations of the current version of the sdk.
+
+#+begin_src clojurescript
+ pinned-focus (new (.. sdk -TimelineFocus -PinnedEvents)
+                                       #js {:maxEventsToLoad 100
+                                            :maxConcurrentRequests 10
+                                            })
+#+end_src
+
+This is likely the best way to prepare the timelines for the side panel.
+We can also subscribe to the Room Info to actually detect new ones?
+Doesn't matter how, but we need one of those to render the actual entries.
+
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+(ns container.pins
+  (:require
+   [re-frame.core :as re-frame]
+   [taoensso.timbre :as log]
+   [promesa.core :as p]
+   [clojure.string :as str]
+   ["react-virtuoso" :refer [Virtuoso GroupedVirtuoso]]
+   [reagent.core :as r]
+   [reagent.dom.client :as rdom]
+   [utils.helpers :refer [mxc->url fetch-state-event fetch-room-state]]
+   [utils.svg :as icons]
+   [container.reusable :refer [make-timeline-item-shim message-preview-item]]
+   [container.timeline.base :refer [apply-timeline-diffs!]]
+   [container.timeline.item :refer [event-tile wrap-item]]
+   [utils.global-ui :refer [avatar]]
+   ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]
+   )
+  )
+#+end_src
+
+
+**** Current Idea for Implementation
+
+
+The current best rendering idea is to actually boot a new timeline for EACH
+pinned item and render that timeline as a single event tile.
+It'll be immensely overkill, but it'll absolutely work within the constraints
+of the SDK.
+
+
+**** Ephemeral Timelines
+
+
+Now the abomination below is what we've described above.
+The goal for this is to render a single event on a timeline.
+We grab the event and its content and then dispose of the timeline
+then we load the next.
+We expect this to not be the cheapest operation, but given the
+alternatives it isn't exactly the worst. Fetching the event
+content directly from the server would be silly.
+From what I can tell we can't fetch arbitrary events from the server
+so we can manipulate what we are dealt by sync.
+
+#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+(defn fetch-pin-via-ephemeral-timeline [room event-id]
+  (js/Promise.
+   (fn [resolve _]
+     (p/let [focus    (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 1})
+             config   (.create sdk/TimelineConfiguration
+                               #js {:focus             focus
+                                    :dateDividerMode   (.-Daily sdk/DateDividerMode)
+                                    :filter            (new (.. sdk -TimelineFilter -All))
+                                    :trackReadReceipts false})
+             timeline (.timelineWithConfiguration room config)]
+       (let [handle-ref (atom nil)
+             resolved?  (atom false)
+             cleanup!   (fn []
+                          (when-let [h @handle-ref]
+                            (try (.cancel h) (catch :default _)))
+                          (reset! handle-ref nil))]
+
+         (reset! handle-ref
+                 (.addListener timeline
+                   #js {:onUpdate
+                        (fn [_diffs]
+                          (when-not @resolved?
+                            (reset! resolved? true)
+                            (-> (.getEventTimelineItemByEventId timeline event-id)
+                                (p/then (fn [item]
+                                          (cleanup!)
+                                          (if item
+                                            (resolve (wrap-item
+                                                       (make-timeline-item-shim item event-id)))
+
+                                            (resolve nil))))
+                                (p/catch (fn [err]
+                                           (cleanup!)
+                                           (log/error "Shim wrapping failed:" err)
+                                           (resolve nil))))))}))
+
+         (js/setTimeout (fn []
+                          (when-not @resolved?
+                            (reset! resolved? true)
+                            (cleanup!)
+                            (resolve nil)))
+                        5000))))))
+
+#+end_src
+
+
+
+**** Reframe Subscriptions and Events
+
+
+***** Fetching
+
+
+Similar to other instances where the sdk has proven lacking,
+we find ourselves probing the server unfortunately directly.
+Normally we'd just get the pinnedEventIds from the sync,
+but those are always empty in our testing.
+
+I assume in the most recent version this isn't the case.
+Looking at implementations in the most popular client...
+that would appear to be the case. The PinnedEvents focused
+timeline would've been perfect here.
+
+Instead, we'll fetch the event IDs directly. The thought
+here is that the actual request is rather small
+usually; so this shouldn't be too taxing.
+
+#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+(re-frame/reg-fx
+ :fetch-room-pins
+ (fn [{:keys [room room-id homeserver token]}]
+   (p/let [pinned-data (fetch-room-state homeserver token room-id "m.room.pinned_events" "" identity)
+           pinned-ids  (get pinned-data :pinned [])
+           resolved-events
+           (p/all
+            (for [eid pinned-ids]
+              (-> (fetch-pin-via-ephemeral-timeline room eid)
+                  (p/catch (fn [err]
+                             (log/error "Pin resolve failed for" eid err)
+                             nil)))))]
+     (re-frame/dispatch [:room/save-pinned-events room-id (remove nil? resolved-events)]))))
+
+
+(re-frame/reg-event-fx
+ :room/fetch-pinned-events
+ (fn [{:keys [db]} [_ room-id]]
+   (let [client   (:client db)
+         session  (some-> client (.session))
+         room     (some-> client (.getRoom room-id))]
+     (if (and client session room)
+       {:fetch-room-pins {:token      (.-accessToken session)
+                          :homeserver (.-homeserverUrl session)
+                          :room-id    room-id
+                          :room       room}}
+       (log/error "Cannot fetch pins: Missing client, session, or room for:" room-id)))))
+#+end_src
+
+
+***** Saving and Getting
+
+#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+(re-frame/reg-event-db
+ :room/save-pinned-events
+ (fn [db [_ room-id pinned-events]]
+   (assoc-in db [:rooms/data room-id :pinned-events] pinned-events)))
+
+
+(re-frame/reg-sub
+ :room/pinned-events
+ (fn [db [_ room-id]]
+   (get-in db [:rooms/data room-id :pinned-events] [])))
+
+(re-frame/reg-sub
+ :room/pinned-ids
+ (fn [db [_ room-id]]
+   (let [events (get-in db [:rooms/data room-id :pinned-events] [])]
+     (mapv :id events))))
+
+(re-frame/reg-sub
+ :room/pinned-event-by-id
+ (fn [db [_ room-id event-id]]
+   (let [pins (get-in db [:rooms/data room-id :pinned-events] [])]
+     (first (filter #(= (:id %) event-id) pins)))))
+
+#+end_src
+
+
+
+**** Component
+
+
+#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+(defn pins []
+  (let [active-room @(re-frame/subscribe [:rooms/active-id])
+        pins        @(re-frame/subscribe [:room/pinned-events active-room])
+        tr          @(re-frame/subscribe [:i18n/tr])]
+    [:div.sidebar-pins-container
+     {:style {:display "flex" :flex-direction "column" :height "100%" :padding "16px"}}
+     (if (empty? pins)
+       [:div.empty-pins
+        {:style {:text-align "center" :margin-top "40px" :opacity 0.5}}
+        [icons/pins {:width "48px" :height "48px"}]
+        [:p (tr [:container.pins/no-pins] "No pinned messages")]]
+       [:div.pins-list
+        {:style {:flex 1 :overflow-y "auto"}}
+        (for [event pins]
+          [message-preview-item active-room event])])]))
+#+end_src
+
+
+#+begin_src css :tangle ../../css/pins.css
+.sidebar-pins-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 16px;
+}
+
+.pins-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+pins-empty-state {
+    text-align: center;
+    margin-top: 40px;
+    opacity: 0.5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.pins-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--text-primary);
+}
+
+
+#+end_src
+
+
+
+
+
+
+
