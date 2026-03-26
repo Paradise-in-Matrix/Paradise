@@ -74,7 +74,8 @@
         [:button.header-icon-btn
          {:title (tr [:container.header/pinned-messages])
           :class (when (= side-panel :pins) "active")
-          :on-click #((re-frame/dispatch [:container/set-side-panel :pins])
+          :on-click (fn []
+                      (re-frame/dispatch [:container/set-side-panel :pins])
                       (re-frame/dispatch [:room/fetch-pinned-events active-id]))}
          [icons/pins {:animate :sink}]]
 
@@ -106,4 +107,4 @@
      [event-tile event]
      [:button.jump-btn
       {:on-click #(re-frame/dispatch [:room/pretty-jump room-id (:id event)])}
-      (tr [:container.timeline/jump-to-message])]]))
+      (tr [:container/jump-to-message])]]))
