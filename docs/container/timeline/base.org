@@ -193,7 +193,10 @@ export enum DateDividerMode {
  :sdk/back-paginate
  (fn [{:keys [db]} [_ room-id]]
    (let [loading? (get-in db [:timeline/loading-more? room-id])
-         status   (get-in db [:timeline-pagination room-id])]
+         status   (get-in db [:timeline-pagination room-id])
+         status-tag (.-tag status)
+         start-reached? (some-> status (.-inner) (.-hitTimeLineStart))
+         ]
      (if (and room-id
               (not loading?)
               (not= status "Paginating")
