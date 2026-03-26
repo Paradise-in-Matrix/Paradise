@@ -136,8 +136,7 @@ export enum DateDividerMode {
      (do (log/warn "Prevented duplicate timeline boot for:" room-id) {})
      (let [client (:client db)]
        (when-let [room (.getRoom client room-id)]
-         (-> (p/let [
-                     config (.create TimelineConfiguration
+         (-> (p/let [config (.create TimelineConfiguration
                                      #js {:focus             (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false} )
                                           :filter            (new (.. sdk -TimelineFilter -All))
                                           :internalIdPrefix  js/undefined
