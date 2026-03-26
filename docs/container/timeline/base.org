@@ -423,6 +423,117 @@ uses the mini-buffer. A nice status indicator.
 #+end_src
 
 
+**** Jump To? Somewhere.
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+
+(re-frame/reg-event-fx
+ :room/pretty-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-deep-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
+    :dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:room/boot-focused-timeline room-id event-id]]}))
+
+
+
+
+
+(re-frame/reg-sub
+ :timeline/ui-state
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/ui-state room-id] {})))
+
+(re-frame/reg-sub
+ :timeline/jump-target-id
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/jump-target-id room-id])))
+
+(re-frame/reg-sub
+ :room/is-focused?
+ (fn [db [_ room-id]]
+   (some? (get-in db [:timeline/jump-target-id room-id]))))
+
+(re-frame/reg-event-db
+ :timeline/clear-jump-ui
+ (fn [db [_ room-id]]
+   (assoc-in db [:timeline/ui-state room-id :animating-jump?] false)))
+
+
+(re-frame/reg-sub
+ :timeline/loading-forward?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/loading-forward? room-id] false)))
+
+(re-frame/reg-event-fx
+ :sdk/forward-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading? (get-in db [:timeline/loading-forward? room-id])
+         timeline (get-in db [:timeline-subs room-id :timeline])]
+     (if (and timeline (not loading?))
+       (do
+         (-> (.paginateForwards timeline 50 js/undefined)
+             (p/then #(re-frame/dispatch [:sdk/forward-pagination-complete room-id]))
+             (p/catch #(log/error "Forward pagination failed:" %)))
+         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
+       {}))))
+
+(re-frame/reg-event-db
+ :sdk/forward-pagination-complete
+ (fn [db [_ room-id]]
+   (assoc-in db [:timeline/loading-forward? room-id] false)))
+
+
+(re-frame/reg-event-fx
+ :room/boot-focused-timeline
+ (fn [{:keys [db]} [_ room-id event-id]]
+   (let [client (:client db)
+         room   (.getRoom client room-id)]
+     (when room
+       (-> (p/let [focus  (.new (.. sdk -TimelineFocus -Event)
+                                #js {:eventId event-id
+                                     :numEventsToLoad 40})
+                   config (.create sdk/TimelineConfiguration
+                                   #js {:focus             focus
+                                        :filter            (new (.. sdk -TimelineFilter -All))
+                                        :dateDividerMode   (.-Daily sdk/DateDividerMode)
+                                        :trackReadReceipts false})
+                   timeline (.timelineWithConfiguration room config)
+                   listener #js {:onUpdate (fn [diffs]
+                                             (apply-timeline-diffs! room-id diffs)
+                                             )}
+                   tl-handle (.addListener timeline listener)
+                   ]
+             (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline tl-handle nil nil]))
+           (p/catch #(log/error "Focused timeline boot failed:" %))))
+     {})))
+
+
+
+(re-frame/reg-event-fx
+ :room/jump-to-live-bottom
+ (fn [{:keys [db]} [_ room-id]]
+   {:db (-> db
+            (assoc-in [:timeline/ui-state room-id :animating-jump?] true)
+            (update :timeline/jump-target-id dissoc room-id))
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-return-to-live room-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-return-to-live
+ (fn [{:keys [db]} [_ room-id]]
+   {:dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:sdk/boot-timeline room-id]]}))
+
+#+end_src
+
+
 **** Virtuoso Timeline Component
 
 Similar to Spaces and RoomLists we do a Virtuoso component here.
