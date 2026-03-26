@@ -565,7 +565,12 @@ mentioned above. Should be easily sorted, however.
             focus-mode?   @(re-frame/subscribe [:room/is-focused? room-id])]
 
         (when (and (nil? @!initial-idx) (pos? cnt))
-          (reset! !initial-idx (dec (+ @!start-index cnt))))
+          (if-let [target-id jump-target]
+            (let [idx (.findIndex event-array #(= (:id %) target-id))]
+              (if (not= idx -1)
+                (reset! !initial-idx (+ @!start-index idx))
+                (reset! !initial-idx (dec (+ @!start-index cnt)))))
+            (reset! !initial-idx (dec (+ @!start-index cnt)))))
 
         (when (and @!prev-first-id (not= first-id @!prev-first-id) (> cnt @!prev-count))
           (swap! !start-index - (- cnt @!prev-count)))
