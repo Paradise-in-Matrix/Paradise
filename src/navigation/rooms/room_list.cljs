@@ -250,10 +250,10 @@
 
 (defn start-room-list-sync! [room-list]
   (log/debug "Starting Dual Room List Sync (UI + Background)")
-  (p/let [ui-result (.entriesWithDynamicAdapters room-list 200
+  (p/let [ui-result (.entriesWithDynamicAdaptersWith room-list 200 true
                                                #js {:onUpdate #(re-frame/dispatch [:room-list/home-rooms-diff %])})
         ui-controller (.controller ui-result)
-        bg-result (.entriesWithDynamicAdapters room-list 200
+        bg-result (.entriesWithDynamicAdaptersWith room-list 200 true
                                                #js {:onUpdate #(re-frame/dispatch [:room-list/bg-rooms-diff %])})
         bg-controller (.controller bg-result)]
 
@@ -465,10 +465,54 @@
                   :highlight? (pos? mentions)
                   :mentions   msg-count}))))))
 
+
+#_(re-frame/reg-sub
+ :room/pinned-ids
+ (fn [db [_ room-id]]
+   (get-in db [:room-metadata room-id :pinned-ids] #{})))
+
+#_(re-frame/reg-event-db
+ :room/save-info-handle
+ (fn [db [_ room-id handle]]
+   (assoc-in db [:room-info-handles room-id] handle)))
+
+
+#_(re-frame/reg-event-db
+ :room/update-info
+ (fn [db [_ room-id info]]
+   (js/console.error info)
+   (assoc-in db [:room-metadata room-id :pinned-ids] (set (:pinned-event-ids info)))))
+
+
+
+
+#_(re-frame/reg-fx
+ :sdk/subscribe-room-info
+ (fn [{:keys [client room-id]}]
+   (if (and client room-id)
+     (-> (.subscribeToRoomInfo client room-id
+           #js {:call (fn [info]
+                            (re-frame/dispatch [:room/update-info room-id info]))})
+         (.then (fn [handle]
+                  (re-frame/dispatch [:room/save-info-handle room-id handle])))
+         (.catch #(log/error "RoomInfo Sub Error:" %)))
+     (log/error "Cannot subscribe: Missing client or room-id"))))
+
+#_(re-frame/reg-fx
+ :sdk/unsubscribe-room-info
+ (fn [handle]
+
+   (when (and handle (fn? (.-drop handle)))
+     (log/debug "Dropping RoomInfo handle")
+     (.drop handle))))
+
+
 (re-frame/reg-event-fx
  :rooms/select
  (fn [{:keys [db]} [_ room-id opts]]
    (let [current-room-id (:active-room-id db)
+         client          (:client db)
+         old-handle      (get-in db [:room-info-handles current-room-id])
          active-call-id  (get-in db [:call :active-room-id])
          already-loaded? (get-in db [:room-members room-id :data])
          loading?        (get-in db [:room-members room-id :loading?])
@@ -480,7 +524,6 @@
          wipe-call-state? (not is-call-room?)
          swapping-calls? (and active-call-id (not= active-call-id room-id) is-call-room?)
          current-side-panel (get-in db [:ui :side-panel])
-         _ (log/error )
          _ (log/error current-side-panel)
          side-panel-update  (if (and (= current-side-panel :timeline)
                                      (= new-focus :timeline)
@@ -512,7 +555,8 @@
                                    [:container/set-side-panel nil])
                                  (when is-call-room? [:call/init-widget room-id {:join-directly? join-directly?}])])]
          {:db base-db
-          :dispatch-n dispatches})))))
+          :dispatch-n dispatches
+          })))))
 
 
 (re-frame/reg-event-db
