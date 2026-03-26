@@ -1,6 +1,6 @@
 {:en
  {:container
-  {:jump-to "Jump to Message"
+  {:jump-to-message "Jump to Message"
    :search
    {:loading "Searching..."
     :no-results "No messages found."

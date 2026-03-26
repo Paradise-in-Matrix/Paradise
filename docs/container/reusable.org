@@ -295,7 +295,7 @@ as often times these on-off events are useful to be used as a jump-to.
      [event-tile event]
      [:button.jump-btn
       {:on-click #(re-frame/dispatch [:room/pretty-jump room-id (:id event)])}
-      (tr [:container.timeline/jump-to-message])]]))
+      (tr [:container/jump-to-message])]]))
 
 #+end_src
 
