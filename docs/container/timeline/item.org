@@ -730,10 +730,11 @@ individual's display name.
                               :items (build-message-actions tr item active-room my-id mx my)}]))]
 
     (if (= type :virtual)
-      (case (:tag item)
-        "DateDivider" [date-divider tr (:ts item)]
-        [system-event-view "-" (tr [:container.timeline.status/timeline-separator])])
-      [swipe-to-action-wrapper
+      [:div.timeline-item-virtual-wrapper
+       {:style {:display "block" :width "100%" :min-height "40px"}}
+       (case (:tag item)
+         "DateDivider" [date-divider tr (:ts item)]
+         [system-event-view "-" (tr [:container.timeline.status/timeline-separator])])]
 
        {:can-edit? is-own?
         :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
