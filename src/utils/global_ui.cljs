@@ -345,60 +345,62 @@
 
 
 
-(defn swipe-to-action-wrapper [{:keys [can-edit? on-action wrapper-props]} & children]
-  (r/with-let [!drag-state     (r/atom {:start-x nil :current-x 0 :action nil})
-               reply-threshold 50
-               edit-threshold  140]
-    (let [{:keys [start-x current-x action]} @!drag-state
-          is-dragging? (some? start-x)
+(defn swipe-to-action-wrapper [{:keys [can-edit? on-action wrapper-props enabled?]} & children]
+  (if-not enabled?
+    (into [:div.swipe-foreground wrapper-props] children)
+    (r/with-let [!drag-state     (r/atom {:start-x nil :current-x 0 :action nil})
+                 reply-threshold 50
+                 edit-threshold  140]
+      (let [{:keys [start-x current-x action]} @!drag-state
+            is-dragging? (some? start-x)
 
-          handle-ptr-down (fn [e]
-                            (when (= (.-button e) 0)
-                              (.setPointerCapture (.-target e) (.-pointerId e))
-                              (reset! !drag-state {:start-x (.-clientX e) :current-x 0 :action nil})))
+            handle-ptr-down (fn [e]
+                              (when (= (.-button e) 0)
+                                (.setPointerCapture (.-target e) (.-pointerId e))
+                                (reset! !drag-state {:start-x (.-clientX e) :current-x 0 :action nil})))
 
-          handle-ptr-move (fn [e]
+            handle-ptr-move (fn [e]
+                              (when start-x
+                                (let [dx (- start-x (.-clientX e))
+                                      bounded-dx (max 0 (min dx 180))
+                                      new-action (cond
+                                                   (and can-edit? (> bounded-dx edit-threshold)) :edit
+                                                   (> bounded-dx reply-threshold)               :reply
+                                                   :else                                        nil)]
+                                  (swap! !drag-state assoc :current-x bounded-dx :action new-action))))
+
+            handle-ptr-up (fn [e]
                             (when start-x
-                              (let [dx (- start-x (.-clientX e))
-                                    bounded-dx (max 0 (min dx 180))
-                                    new-action (cond
-                                                 (and can-edit? (> bounded-dx edit-threshold)) :edit
-                                                 (> bounded-dx reply-threshold)              :reply
-                                                 :else                                       nil)]
-                                (swap! !drag-state assoc :current-x bounded-dx :action new-action))))
+                              (.releasePointerCapture (.-target e) (.-pointerId e))
+                              (when action
+                                (on-action action))
+                              (reset! !drag-state {:start-x nil :current-x 0 :action nil})))]
 
-          handle-ptr-up (fn [e]
-                          (when start-x
-                            (.releasePointerCapture (.-target e) (.-pointerId e))
-                            (when action
-                              (on-action action))
-                            (reset! !drag-state {:start-x nil :current-x 0 :action nil})))]
+        [:div.timeline-swipe-wrapper
+         {:style {:position "relative" :overflow "hidden"}}
+         [:div.swipe-action-bg
+          {:style {:position "absolute" :right 0 :top 0 :bottom 0 :width "100%"
+                   :display "flex" :align-items "center" :justify-content "flex-end" :padding-right "16px"
+                   :opacity (if (> current-x 20) 1 0)
+                   :transition "opacity 0.2s"
+                   :color (if (= action :edit) "var(--brand-experiment, #5865f2)" "var(--text-muted, #888)")
+                   :font-weight "bold" :font-size "0.85rem" :z-index 0}}
+          (cond
+            (= action :edit)  [:span [icons/edit] " Edit"]
+            (= action :reply) [:span "Reply " [icons/reply]]
+            :else             [:span [icons/reply]])]
 
-      [:div.timeline-swipe-wrapper
-       {:style {:position "relative" :overflow "hidden"}}
-       [:div.swipe-action-bg
-        {:style {:position "absolute" :right 0 :top 0 :bottom 0 :width "100%"
-                 :display "flex" :align-items "center" :justify-content "flex-end" :padding-right "16px"
-                 :opacity (if (> current-x 20) 1 0)
-                 :transition "opacity 0.2s"
-                 :color (if (= action :edit) "var(--brand-experiment, #5865f2)" "var(--text-muted, #888)")
-                 :font-weight "bold" :font-size "0.85rem" :z-index 0}}
-        (cond
-          (= action :edit)  [:span [icons/edit] " Edit"]
-          (= action :reply) [:span "Reply " [icons/reply]]
-          :else             [:span [icons/reply]])]
-
-       [:div.swipe-foreground
-        (merge wrapper-props
-               {:on-pointer-down   handle-ptr-down
-                :on-pointer-move   handle-ptr-move
-                :on-pointer-up     handle-ptr-up
-                :on-pointer-cancel handle-ptr-up
-                :style {:transform    (str "translateX(-" current-x "px)")
-                        :transition   (if is-dragging? "none" "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)")
-                        :touch-action "pan-y"
-                        :position     "relative"
-                        :z-index      1
-                        :background   "var(--background-primary, #313338)"
-                        :user-select  (if is-dragging? "none" "auto")}})
-        (into [:<>] children)]])))
+         (into [:div.swipe-foreground
+                (merge wrapper-props
+                       {:on-pointer-down   handle-ptr-down
+                        :on-pointer-move   handle-ptr-move
+                        :on-pointer-up     handle-ptr-up
+                        :on-pointer-cancel handle-ptr-up
+                        :style {:transform    (str "translateX(-" current-x "px)")
+                                :transition   (if is-dragging? "none" "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)")
+                                :touch-action "pan-y"
+                                :position     "relative"
+                                :z-index      1
+                                :background   "var(--background-primary, #313338)"
+                                :user-select  (if is-dragging? "none" "auto")}})]
+               children)]))))
