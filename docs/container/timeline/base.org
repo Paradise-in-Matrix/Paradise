@@ -394,8 +394,6 @@ uses the mini-buffer. A nice status indicator.
         :dispatch-later [{:ms 7000
                           :dispatch [:sdk/clear-stale-typing room-id]}]}))))
 
-
-
 (re-frame/reg-sub
  :room/typing-users
  (fn [db [_ room-id]]
@@ -572,12 +570,11 @@ size is reached, but the behavior may be impacted by the performant issue
 mentioned above. Should be easily sorted, however.
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defn virtualized-timeline [tr initial-events initial-room-id]
-  (r/with-let [!start-index     (r/atom 1000000)
-               !prev-first-id   (r/atom nil)
-               !prev-count      (r/atom 0)
-               !initial-idx     (r/atom nil)
-               !at-bottom?      (r/atom true)
-               !virtuoso-ref    (r/atom nil)]
+  (let [math-state    (volatile! {:start-index 1000000
+                                  :prev-first-id nil
+                                  :prev-count 0})
+        !at-bottom?   (r/atom true)
+        !virtuoso-ref (r/atom nil)]
     (fn [tr events room-id]
       (let [event-array   (to-array events)
             cnt           (count event-array)
