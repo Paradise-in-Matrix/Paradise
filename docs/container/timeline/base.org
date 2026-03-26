@@ -232,22 +232,32 @@ have two objects with the same unique ID if for example there
 is an edit)
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defn enrich-timeline-items [items]
-  (loop [remaining items
-         processed []
-         last-item nil]
-    (if (empty? remaining)
-      processed
-      (let [curr         (first remaining)
-            curr-is-msg? (= (:content-tag curr) "MsgLike")
-            last-is-msg? (= (:content-tag last-item) "MsgLike")
-            can-merge? (and curr-is-msg?
-                            last-is-msg?
-                            (= (:sender-id curr) (:sender-id last-item))
-                            (< (- (:ts curr) (:ts last-item)) 300000))
-            new-item (assoc curr :merge-with-prev? can-merge?)]
-        (recur (rest remaining)
-               (conj processed new-item)
-               (if curr-is-msg? new-item nil))))))
+  (let [clean-items (remove #(and (= (:type %) :virtual)
+                                  (= (:tag %) "ReadMarker"))
+                            items)]
+    (loop [remaining clean-items
+           processed []
+           last-msg  nil]
+      (if (empty? remaining)
+        processed
+        (let [curr         (first remaining)
+              curr-is-msg? (= (:content-tag curr) "MsgLike")
+              is-virtual?  (= (:type curr) :virtual)
+              stable-id    (or (when is-virtual?
+                                 (str "virtual-" (:tag curr) "-" (:ts curr)))
+                               (:id curr)
+                               (:internal-id curr))
+              can-merge?   (and curr-is-msg?
+                                last-msg
+                                (= (:sender-id curr) (:sender-id last-msg))
+                                (< (- (:ts curr) (:ts last-msg)) 300000))
+
+              new-item     (assoc curr
+                                  :id stable-id
+                                  :merge-with-prev? can-merge?)]
+          (recur (rest remaining)
+                 (conj processed new-item)
+                 (if curr-is-msg? new-item last-msg)))))))
 
 (re-frame/reg-sub
  :timeline/current-events
