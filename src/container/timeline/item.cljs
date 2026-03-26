@@ -10,7 +10,6 @@
             [reagent.dom.client :as rdom]
             [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-time linkify-text]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
-            [container.reusable :refer [room-header]]
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [message-input inline-editor]]
             [navigation.rooms.room-summary :refer [build-room-summary]]
@@ -571,8 +570,9 @@
        [:div.timeline-avatar-wrapper
         (when (and (= content-tag "MsgLike") (not merge-with-prev?))
           [profile-popover-trigger popover-member custom-tags active-room nil
-           [avatar {:id sender :name sender-name
-                    :url (mxc->url sender-avatar)
+           [avatar {:id sender-id :name
+                    (:display-name popover-member)
+                    :url (:avatar-url popover-member)
                     :size 32 :status :online :shape :none}]])]
 
        [:div.timeline-content-wrapper
@@ -588,7 +588,7 @@
              (when-not merge-with-prev?
                [:div.timeline-header
                 [profile-popover-trigger popover-member custom-tags active-room
-                 nil [:span.timeline-sender-name sender-name] ]
+                 nil [:span.timeline-sender-name (:display-name popover-member)] ]
                 [:span.timeline-timestamp (format-time ts)]])
              [:div.timeline-body
               (cond
