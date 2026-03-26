@@ -126,3 +126,66 @@
     flex-direction: row;
 
 }
+
+
+
+
+
+.message-preview-card {
+    padding: 12px;
+    margin-bottom: 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    position: relative;
+    transition: border-color 0.2s ease;
+}
+
+.message-preview-card:hover {
+    border-color: var(--brand-primary-alpha);
+}
+
+.jump-btn {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-3);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s ease;
+}
+
+.jump-btn:hover {
+      background: var(--surface-4);
+      color: var(--brand-primary);
+}
+
+
+
+.jump-btn:active {
+    transform: translateY(1px);
+}
+
+.jump-btn svg {
+    flex-shrink: 0;
+}
+
+.timeline-messages {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
+.timeline-messages.jumping {
+    opacity: 0;
+    transform: translateY(-100px);
+}
+
+.timeline-item.jump-target {
+    animation: highlight-pulse 2s ease-out;
+}
+
+
