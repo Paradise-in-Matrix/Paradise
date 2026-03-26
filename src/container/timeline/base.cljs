@@ -93,7 +93,7 @@
                      pag-listener    #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])}
                                  pag-handle      (.subscribeToBackPaginationStatus timeline pag-listener)
                      ]
-               (.paginateBackwards timeline 5 js/undefined)
+               (.paginateBackwards timeline 50 js/undefined)
                (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline timeline-handle nil pag-handle typing-handle]))
              (.catch #(js/console.error "Boot failed:" %))))
        {}))))
@@ -128,19 +128,24 @@
  :sdk/back-paginate
  (fn [{:keys [db]} [_ room-id]]
    (let [loading? (get-in db [:timeline/loading-more? room-id])
-         status   (get-in db [:timeline-pagination room-id])]
+         status   (get-in db [:timeline-pagination room-id])
+         status-tag (.-tag status)
+         start-reached? (some-> status (.-inner) (.-hitTimeLineStart))
+         ]
      (if (and room-id
               (not loading?)
               (not= status "Paginating")
-              (not= status "TimelineStartReached"))
+              status-tag)
        (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
          (do
-           (-> (.paginateBackwards timeline 50 js/undefined)
+           (log/debug "Paginating backwards")
+           (-> (.paginateBackwards timeline 100 js/undefined)
                (p/then #(re-frame/dispatch [:sdk/pagination-complete room-id]))
                (p/catch #(log/error "Back pagination failed:" %)))
            {:db (assoc-in db [:timeline/loading-more? room-id] true)})
          {})
        {}))))
+
 
 (re-frame/reg-event-db
  :sdk/pagination-complete
@@ -152,41 +157,59 @@
          ))))
 
 (defn enrich-timeline-items [items]
-  (loop [remaining items
-         processed []
-         last-item nil]
-    (if (empty? remaining)
-      processed
-      (let [curr         (first remaining)
-            curr-is-msg? (= (:content-tag curr) "MsgLike")
-            last-is-msg? (= (:content-tag last-item) "MsgLike")
-            can-merge? (and curr-is-msg?
-                            last-is-msg?
-                            (= (:sender-id curr) (:sender-id last-item))
-                            (< (- (:ts curr) (:ts last-item)) 300000))
-            new-item (assoc curr :merge-with-prev? can-merge?)]
-        (recur (rest remaining)
-               (conj processed new-item)
-               (if curr-is-msg? new-item nil))))))
+  (let [clean-items (remove #(and (= (:type %) :virtual)
+                                  (= (:tag %) "ReadMarker"))
+                            items)]
+    (loop [remaining clean-items
+           processed []
+           last-msg  nil]
+      (if (empty? remaining)
+        processed
+        (let [curr         (first remaining)
+              curr-is-msg? (= (:content-tag curr) "MsgLike")
+              is-virtual?  (= (:type curr) :virtual)
+              stable-id    (or (when is-virtual?
+                                 (str "virtual-" (:tag curr) "-" (:ts curr)))
+                               (:id curr)
+                               (:internal-id curr))
+              can-merge?   (and curr-is-msg?
+                                last-msg
+                                (= (:sender-id curr) (:sender-id last-msg))
+                                (< (- (:ts curr) (:ts last-msg)) 300000))
+
+              new-item     (assoc curr
+                                  :id stable-id
+                                  :merge-with-prev? can-merge?)]
+          (recur (rest remaining)
+                 (conj processed new-item)
+                 (if curr-is-msg? new-item last-msg)))))))
+
+(re-frame/reg-sub
+ :timeline/sorted-events
+ (fn [db [_ active-room]]
+   (let [raw-events (get-in db [:timeline active-room] [])]
+     (->> raw-events
+          (reduce (fn [acc e]
+                    (let [id-key   (or (:internal-id e) (:id e))
+                          existing (get acc id-key)]
+                      (if (and existing
+                               (not (:is-edited? e))
+                               (<= (:ts e) (:ts existing)))
+                        acc
+                        (assoc acc id-key e))))
+                  {})
+          (vals)
+          (sort-by (fn [e]
+                     [(:ts e)
+                      (if (= (:type e) :virtual) 0 1)]))))))
+
 
 (re-frame/reg-sub
  :timeline/current-events
- (fn [db _]
-   (let [active-room   (:active-room-id db)
-         raw-events    (get-in db [:timeline active-room] [])
-         sorted-events (->> raw-events
-                            (reduce (fn [acc e]
-                                      (let [id-key   (or (:internal-id e) (:id e))
-                                            existing (get acc id-key)]
-                                        (if (and existing
-                                                 (not (:is-edited? e))
-                                                 (<= (:ts e) (:ts existing)))
-                                          acc
-                                          (assoc acc id-key e))))
-                                    {})
-                            (vals)
-                            (sort-by :ts))]
-     (enrich-timeline-items sorted-events))))
+ (fn [[_ active-room]]
+   (re-frame/subscribe [:timeline/sorted-events active-room]))
+ (fn [sorted-events]
+   (enrich-timeline-items sorted-events)))
 
 (re-frame/reg-sub
  :timeline/latest-readers
@@ -243,8 +266,6 @@
                        :last-update (js/Date.now)})
         :dispatch-later [{:ms 7000
                           :dispatch [:sdk/clear-stale-typing room-id]}]}))))
-
-
 
 (re-frame/reg-sub
  :room/typing-users
@@ -395,96 +416,114 @@
 
 
 (defn virtualized-timeline [tr initial-events initial-room-id]
-  (r/with-let [!start-index     (r/atom 1000000)
-               !prev-first-id   (r/atom nil)
-               !prev-count      (r/atom 0)
-               !initial-idx     (r/atom nil)
-               !at-bottom?      (r/atom true)
-               !virtuoso-ref    (r/atom nil)]
+  (let [math-state    (volatile! {:start-index 1000000
+                                  :prev-first-id nil
+                                  :prev-count 0})
+        !at-bottom?   (r/atom true)
+        !virtuoso-ref (r/atom nil)]
     (fn [tr events room-id]
-      (let [event-array   (to-array events)
-            cnt           (count event-array)
-            first-id      (some-> (aget event-array 0) :id)
-            loading?      @(re-frame/subscribe [:timeline/loading-more? room-id])
-            jump-target   @(re-frame/subscribe [:timeline/jump-target-id room-id])
-            focus-mode?   @(re-frame/subscribe [:room/is-focused? room-id])]
+      (let [event-array (to-array events)
+            cnt         (count event-array)
+            first-id    (some-> (aget event-array 0) :id)
+            loading?    @(re-frame/subscribe [:timeline/loading-more? room-id])
+            jump-target @(re-frame/subscribe [:timeline/jump-target-id room-id])
+            focus-mode? @(re-frame/subscribe [:room/is-focused? room-id])
 
-        (when (and (nil? @!initial-idx) (pos? cnt))
-          (if-let [target-id jump-target]
-            (let [idx (.findIndex event-array #(= (:id %) target-id))]
-              (if (not= idx -1)
-                (reset! !initial-idx (+ @!start-index idx))
-                (reset! !initial-idx (dec (+ @!start-index cnt)))))
-            (reset! !initial-idx (dec (+ @!start-index cnt)))))
+            {:keys [start-index prev-first-id prev-count]} @math-state
 
-        (when (and @!prev-first-id (not= first-id @!prev-first-id) (> cnt @!prev-count))
-          (swap! !start-index - (- cnt @!prev-count)))
+            prepended?    (and prev-first-id
+                               (not= first-id prev-first-id)
+                               (> cnt prev-count))
+            diff          (if prepended? (- cnt prev-count) 0)
+            current-start (if prepended? (- start-index diff) start-index)
 
-        (reset! !prev-first-id first-id)
-        (reset! !prev-count cnt)
+            target-idx    (if jump-target
+                            (let [idx (.findIndex event-array #(= (:id %) jump-target))]
+                              (if (not= idx -1)
+                                (+ current-start idx)
+                                (dec (+ current-start cnt))))
+                            (dec (+ current-start cnt)))]
+
+        (vreset! math-state {:start-index current-start
+                             :prev-first-id first-id
+                             :prev-count cnt})
 
         [:div.timeline-messages
-         {:class (when jumping? "jumping-animation")}
+         {:class (when jump-target "jumping-animation")
+          :style {:display "flex" :flex-direction "column" :flex 1 :height "100%"}}
+
          (when loading?
-           [:div.timeline-loading-overlay
-            [:div.spinner]])
+           [:div.timeline-loading-overlay [:div.spinner]])
 
          (when-not @!at-bottom?
-           (let [focus-mode? @(re-frame/subscribe [:room/is-focused? room-id])]
-             [:button.jump-to-bottom
-              {:on-click (fn []
-                           (if focus-mode?
-                             (re-frame/dispatch [:room/jump-to-live-bottom room-id])
-                             (.scrollToIndex @!virtuoso-ref
-                                             #js {:index (dec (+ @!start-index cnt))
-                                                  :behavior "smooth"})))}
-              [:div {:style {:display "flex" :align-items "center" :gap "8px"}}
-               (tr   [:container.timeline/jump-to-bottom])
-               ]]))
+           [:button.jump-to-bottom
+            {:on-click (fn []
+                         (if focus-mode?
+                           (re-frame/dispatch [:room/jump-to-live-bottom room-id])
+                           (.scrollToIndex @!virtuoso-ref
+                                           #js {:index (dec (+ current-start cnt))
+                                                :behavior "auto"})))}
+            [:div {:style {:display "flex" :align-items "center" :gap "8px"}}
+             (tr [:container.timeline/jump-to-bottom])]])
 
-         [:> Virtuoso
-          {:key (str room-id "-" jump-target)
-           :ref #(reset! !virtuoso-ref %)
-           :data event-array
-           :firstItemIndex @!start-index
-           :initialTopMostItemIndex @!initial-idx
-           :alignToBottom (not focus-mode?)
-           :increaseViewportBy 400
-           :atBottomThreshold 100
-           :atBottomStateChange #(reset! !at-bottom? %)
-           :followOutput (fn [at-bottom] (if (and at-bottom (not focus-mode?)) "auto" false))
-           :startReached (fn []
-                (let [focus-mode? @(re-frame/subscribe [:room/is-focused? room-id])]
-                  (if focus-mode?
-                    (js/setTimeout #(re-frame/dispatch [:sdk/back-paginate room-id]) 500)
-                    (re-frame/dispatch [:sdk/back-paginate room-id]))))
+         (if (zero? cnt)
+           [:div.timeline-empty {:style {:padding "20px" :text-align "center"}} "Loading..."]
 
-           :endReached (fn []
-                         (when focus-mode?
-                           (re-frame/dispatch [:sdk/forward-paginate room-id])))
-           :computeItemKey (fn [_ item] (:id item))
-           :itemContent (fn [_ item]
-                          (r/as-element
-                           [:li.timeline-item
-                            {:key (:id item)
-                             :class (when (= (:id item) jump-target) "is-jump-target")}
-                            [event-tile item]]))}] ]))))
+           [:> Virtuoso
+            {:key (str room-id "-" jump-target)
+             :ref #(reset! !virtuoso-ref %)
+             :style {:height "100%" :flex 1}
+             :data event-array
+             :firstItemIndex current-start
+             :initialTopMostItemIndex target-idx
+             :alignToBottom (not focus-mode?)
+             :increaseViewportBy #js {:top 400 :bottom 400}
+             :atBottomThreshold 100
+             :atBottomStateChange #(reset! !at-bottom? %)
+             :followOutput (fn [is-at-bottom]
+                             (if (and is-at-bottom (not focus-mode?)) "auto" false))
+
+             :startReached (fn []
+                             (when-not loading?
+                               (re-frame/dispatch [:sdk/back-paginate room-id])))
+             :totalListHeightChanged (fn [_]
+                                       (when (and @!at-bottom? (not focus-mode?) @!virtuoso-ref)
+                                         (.scrollToIndex @!virtuoso-ref
+                                                         #js {:index (dec (+ current-start cnt))
+                                                              :align "end"
+                                                              :behavior "auto"})))
+
+             ;; was brute forcing scroll for testing
+            #_ :totalListHeightChanged
+             #_(fn [_]
+               (when (and @!at-bottom? (not focus-mode?) @!virtuoso-ref)
+                 (js/requestAnimationFrame
+                  (fn []
+                    (.scrollTo @!virtuoso-ref
+                               #js {:top 999999999
+                                    :behavior "auto"})))))
+
+             :endReached (fn []
+                           (when focus-mode?
+                             (re-frame/dispatch [:sdk/forward-paginate room-id])))
+             :computeItemKey (fn [_ item] (:id item))
+             :itemContent (fn [_ item]
+                            (r/as-element
+                             ^{:key (:id item)}
+                             [:li.timeline-item
+                              {:class (when (= (:id item) jump-target) "is-jump-target")}
+                              [event-tile item]]))}] )]))))
 
 
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
         room-meta    @(re-frame/subscribe [:rooms/active-metadata])
-        events       @(re-frame/subscribe [:timeline/current-events])
+        events       @(re-frame/subscribe [:timeline/current-events active-id])
         tr           @(re-frame/subscribe [:i18n/tr])
         display-name (when active-id (or (when room-meta (.-name room-meta)) active-id))
        ]
     [:div.timeline-container
-     {:style {:display "flex"
-              :flex-direction "column"
-              :height "100%"
-              :overflow "hidden"}}
-
-     (when-not hide-header?
+       (when-not hide-header?
        [room-header {:display-name display-name
                      :compact?     compact?
                      :active-id    active-id}])
