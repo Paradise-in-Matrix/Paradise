@@ -211,6 +211,7 @@ export enum DateDividerMode {
          {})
        {}))))
 
+
 (re-frame/reg-event-db
  :sdk/pagination-complete
  (fn [db [_ room-id]]
