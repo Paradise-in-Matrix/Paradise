@@ -135,11 +135,11 @@
     (re-frame/subscribe [:room/member-filter-type room-id])])
  (fn [[members query type] _]
    (let [by-type (filter #(= (:membership %) type) members)]
-     (if (clojure.string/blank? query)
+     (if (str/blank? query)
        by-type
-       (let [q (clojure.string/lower-case query)]
-         (filter #(or (clojure.string/includes? (:sort-name %) q)
-                      (clojure.string/includes? (clojure.string/lower-case (:user-id %)) q))
+       (let [q (str/lower-case query)]
+         (filter #(or (str/includes? (:sort-name %) q)
+                      (str/includes? (str/lower-case (:user-id %)) q))
                  by-type))))))
 
 (re-frame/reg-sub
