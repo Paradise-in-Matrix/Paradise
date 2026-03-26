@@ -52,6 +52,7 @@ This is more or less where the layout and control of the container's contents wi
 
 
 
+
 **** Layout
 
 #+begin_src clojurescript :tangle ../../src/container/base.cljs
@@ -59,8 +60,7 @@ This is more or less where the layout and control of the container's contents wi
   (let [main-focus    @(re-frame/subscribe [:container/main-focus])
         side-panel    @(re-frame/subscribe [:container/side-panel])
         active-room   @(re-frame/subscribe [:rooms/active-id])
-        tr            @(re-frame/subscribe [:i18n/tr])
-        ]
+        tr            @(re-frame/subscribe [:i18n/tr])]
     [:div.room-layout
      {:style {:display "grid"
               :flex "1"
@@ -110,6 +110,14 @@ This is more or less where the layout and control of the container's contents wi
                :search   [search]
                :pins     [pins]
                )]])
-           ])
-)
+           ]))
+
+
+#+end_src
+
+
+#+begin_src clojurescript :tangle ../../src/container/base.cljs
+
+
+
 #+end_src
