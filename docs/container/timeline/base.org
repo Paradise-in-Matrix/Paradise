@@ -200,7 +200,7 @@ export enum DateDividerMode {
      (if (and room-id
               (not loading?)
               (not= status "Paginating")
-              (not= status "TimelineStartReached"))
+              status-tag)
        (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
          (do
            (-> (.paginateBackwards timeline 50 js/undefined)
