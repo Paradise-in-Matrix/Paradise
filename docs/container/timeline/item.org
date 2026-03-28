@@ -835,7 +835,40 @@ individual's display name.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn event-tile [item]
+  (let [id (:id item)
+        is-virtual? (= (:type item) :virtual)
+        node-ref (volatile! nil)]
+    (r/create-class
+     {:display-name (str "event-tile-" id)
+
+      :component-did-mount
+      (fn [this]
+        (let [node @node-ref]
+          (when (and node (not is-virtual?) @visibility-observer)
+            (.observe @visibility-observer node))))
+
+      :component-will-unmount
+      (fn [this]
+        (let [node @node-ref]
+          (when (and node (not is-virtual?) @visibility-observer)
+            (.unobserve @visibility-observer node))))
+
+      :reagent-render
+      (fn [item]
+        [:div {:data-event-id id
+               :ref #(vreset! node-ref %)
+               :style {:width "100%"}}
+         [event-tile-render item]])})))
+
+
+(defn connected-event-tile [room-id item-stub]
+  (let [full-items @(re-frame/subscribe [:timeline/events-map room-id])
+        item-data  (get full-items (:id item-stub))]
+    (if item-data
+      [event-tile item-data]
+      [:div.timeline-item-loading])))
 #+end_src
+
 
 
 
