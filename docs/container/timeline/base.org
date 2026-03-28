@@ -410,6 +410,9 @@ uses the mini-buffer. A nice status indicator.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 
+
+
+
 (re-frame/reg-event-fx
  :room/pretty-jump
  (fn [{:keys [db]} [_ room-id event-id]]
@@ -423,10 +426,6 @@ uses the mini-buffer. A nice status indicator.
    {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
     :dispatch-n [[:sdk/cleanup-timeline room-id]
                  [:room/boot-focused-timeline room-id event-id]]}))
-
-
-
-
 
 (re-frame/reg-sub
  :timeline/ui-state
