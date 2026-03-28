@@ -246,6 +246,7 @@ have two objects with the same unique ID if for example there
 is an edit)
 
 
+***** TODO Fix this files organization... The revisions led to me moving stuff.. a bunch
 
 (re-frame/reg-sub
  :timeline/current-events
