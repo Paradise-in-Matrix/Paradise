@@ -235,6 +235,8 @@ export enum DateDividerMode {
 #+end_src
 
 
+***** Timeline Merging?
+
 This is important to do as we must normalize the list coming from the
 Rust SDK. Otherwise sliding sync will provide us duplicate unique
 IDs and cause the Timeline rendering to freak out.
@@ -242,53 +244,7 @@ In addition to normalizing on the id, we need to ensure we
 only render the LATEST version of an id (yes the timeline will
 have two objects with the same unique ID if for example there
 is an edit)
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-(defn enrich-timeline-items [items]
-  (let [clean-items (remove #(and (= (:type %) :virtual)
-                                  (= (:tag %) "ReadMarker"))
-                            items)]
-    (loop [remaining clean-items
-           processed []
-           last-msg  nil]
-      (if (empty? remaining)
-        processed
-        (let [curr         (first remaining)
-              curr-is-msg? (= (:content-tag curr) "MsgLike")
-              is-virtual?  (= (:type curr) :virtual)
-              stable-id    (or (when is-virtual?
-                                 (str "virtual-" (:tag curr) "-" (:ts curr)))
-                               (:id curr)
-                               (:internal-id curr))
-              can-merge?   (and curr-is-msg?
-                                last-msg
-                                (= (:sender-id curr) (:sender-id last-msg))
-                                (< (- (:ts curr) (:ts last-msg)) 300000))
 
-              new-item     (assoc curr
-                                  :id stable-id
-                                  :merge-with-prev? can-merge?)]
-          (recur (rest remaining)
-                 (conj processed new-item)
-                 (if curr-is-msg? new-item last-msg)))))))
-
-(re-frame/reg-sub
- :timeline/sorted-events
- (fn [db [_ active-room]]
-   (let [raw-events (get-in db [:timeline active-room] [])]
-     (->> raw-events
-          (reduce (fn [acc e]
-                    (let [id-key   (or (:internal-id e) (:id e))
-                          existing (get acc id-key)]
-                      (if (and existing
-                               (not (:is-edited? e))
-                               (<= (:ts e) (:ts existing)))
-                        acc
-                        (assoc acc id-key e))))
-                  {})
-          (vals)
-          (sort-by (fn [e]
-                     [(:ts e)
-                      (if (= (:type e) :virtual) 0 1)]))))))
 
 
 (re-frame/reg-sub
