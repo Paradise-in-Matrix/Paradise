@@ -29,10 +29,11 @@
         "react": "^19",
         "react-dom": "^19",
         "react-virtuoso": "^4.18.1",
-        "shadow-cljs":  "^3.3.6",
+        "shadow-cljs": "^3.3.6",
         "typescript": "^5.9.3",
         "unicode-emoji-json": "^0.8.0",
         "uniffi-bindgen-react-native": "git+https://github.com/jhugman/uniffi-bindgen-react-native#5c01f3f7025d069aac1dd1fd51ca72bb76fdb243",
+        "virtua": "^0.48.8",
         "workbox-precaching": "^7.4.0"
     },
     "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
