@@ -69,7 +69,7 @@ so we'll keep them nicely collected here.
        [icons/arrow-left]
        ]
       (when display-name
-        [:h2.timeline-header-title display-name])]
+        [:h2.room-header-name display-name])]
      (when (and show-actions? active-id)
        [:div.header-actions
         [:button.header-icon-btn
@@ -111,6 +111,7 @@ so we'll keep them nicely collected here.
           :on-click #(re-frame/dispatch [:container/set-side-panel :members])}
          [icons/members]]
 
+
         [:button.header-icon-btn
          {:title (tr [:container.header/more-options])
           :on-click (fn [e]
@@ -147,6 +148,15 @@ so we'll keep them nicely collected here.
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 0 1 auto;
+}
+
+.room-header-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    display: flex;
+    text-overflow: ellipsis;
+    flex: 1;
 }
 
 .main-content, .sidebar {
