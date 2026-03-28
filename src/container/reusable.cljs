@@ -43,7 +43,7 @@
        [icons/arrow-left]
        ]
       (when display-name
-        [:h2.timeline-header-title display-name])]
+        [:h2.room-header-name display-name])]
      (when (and show-actions? active-id)
        [:div.header-actions
         [:button.header-icon-btn
@@ -84,6 +84,7 @@
           :class (when (= side-panel :members) "active")
           :on-click #(re-frame/dispatch [:container/set-side-panel :members])}
          [icons/members]]
+
 
         [:button.header-icon-btn
          {:title (tr [:container.header/more-options])
