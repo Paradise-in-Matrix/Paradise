@@ -379,8 +379,6 @@ html, body {
 }
 
 
-/*
-
 [data-virtuoso-scroller="true"]::-webkit-scrollbar-thumb {
     background-clip: padding-box;
     border: 4px solid transparent;
@@ -402,7 +400,6 @@ html, body {
     background-color: rgba(255, 255, 255, 0.6) !important;
 }
 
-*/
 
 .mobile-menu-btn {
     display: none;
