@@ -44,6 +44,7 @@ rooms.
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defonce !timeline-queues (atom {}))
 
+
 (defn apply-timeline-diffs! [room-id updates]
   (swap! !timeline-queues update room-id #(or % (p/resolved [])))
   (swap! !timeline-queues
@@ -72,6 +73,7 @@ This is a functional stub for now. I'll go back and split and describe
 each of these later.
 ****** TODO Describe these
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+
 (re-frame/reg-sub
  :timeline/event-by-id
  (fn [[_ room-id _]]
