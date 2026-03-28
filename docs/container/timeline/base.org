@@ -20,18 +20,18 @@ we've made interop with the WASM bindings.
             [clojure.string :as str]
             [re-frame.db :as db]
             ["react-virtuoso" :refer [Virtuoso]]
+            ["virtua" :refer [VList Virtualizer]]
             [reagent.core :as r]
             [reagent.dom.client :as rdom]
             [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-readers join-names get-status-string]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
-            [container.timeline.item :refer [event-tile wrap-item]]
+            [container.timeline.item :refer [event-tile wrap-item connected-event-tile]]
             [container.reusable :refer [room-header]]
             [input.base :refer [message-input inline-editor]]
             [navigation.rooms.room-summary :refer [build-room-summary]]
             [client.diff-handler :refer [apply-matrix-diffs]]
-            ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]
-            ))
+            ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]))
 #+end_src
 
 
