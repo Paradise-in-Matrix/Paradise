@@ -23,6 +23,15 @@
     flex: 0 1 auto;
 }
 
+.room-header-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    display: flex;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+
 .main-content, .sidebar {
     display: flex;
     flex-direction: column;
@@ -133,7 +142,7 @@
 
 .message-preview-card {
     padding: 12px;
-    margin-bottom: 16px;
+    padding-bottom: 16px;
     background: var(--surface-2);
     border: 1px solid var(--border-color);
     border-radius: 8px;
