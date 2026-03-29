@@ -580,6 +580,13 @@ or "non-space" (both of those filters exist). Then you could easily add a
 button in Hiccup here for a DMs button.
 Keeping with our goal of easily mutated to look how you want!
 
+#+begin_src css :tangle ../../../css/space.css
+  .home-icon-container:hover .animate-sun-pulse {
+      animation: sun-breathe 2s ease-in-out infinite;
+  }
+#+end_src
+
+
 ****** TODO Swap home icon out with SVG
 #+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
 (defn spaces-sidebar []
