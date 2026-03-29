@@ -1,9 +1,8 @@
-
 .global-update-banner {
   position: fixed;
-  top: 0;
   left: 0;
   right: 0;
+  top: env(safe-area-insert-top, 0px);
   z-index: 9999999;
   background: var(--accent-primary);
   color: white;
