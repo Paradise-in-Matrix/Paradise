@@ -22,9 +22,11 @@ org file using it. The scope creep has really started to set in there.
 
 #+begin_src clojurescript :tangle ../../src/utils/svg.cljs
 (ns utils.svg
-  (:require)
+  (:require
+   )
   )
 #+end_src
+
 
 
 **** Icon Base
