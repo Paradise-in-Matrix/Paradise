@@ -13,7 +13,9 @@
         "ubrn:web:build:release": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn build web --config ubrn.config.yaml --release",
         "ubrn:web:build": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn build web --config ubrn.config.yaml",
         "ubrn:checkout": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn checkout --config ubrn.config.yaml",
-        "ubrn:clean": "rm -Rf cpp/ src/generated/ src/index.web.ts*"
+        "ubrn:clean": "rm -Rf cpp/ src/generated/ src/index.web.ts*",
+        "ios:generate": "npx capacitor-assets generate --ios",
+        "ios:sync": "npx cap sync ios"
     },
     "dependencies": {
         "@capacitor-community/electron": "^5.0.1",
@@ -50,6 +52,7 @@
         "@babel/plugin-transform-computed-properties": "^7.28.6",
         "@babel/preset-env": "^7.29.0",
         "@babel/preset-typescript": "^7.28.5",
+        "@capacitor/assets": "^3.0.5",
         "babel-plugin-transform-rename-import": "^2.3.0",
         "concurrently": "^9.2.1",
         "vite": "^7.3.1",
