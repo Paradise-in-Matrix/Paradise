@@ -324,12 +324,15 @@
 (defonce visibility-observer
   (delay
     (js/IntersectionObserver.
-     (fn [entries]
+     (fn [entries observer]
        (doseq [entry entries]
          (when (.-isIntersecting entry)
-           (let [event-id (.getAttribute (.-target entry) "data-event-id")]
+           (let [target   (.-target entry)
+                 event-id (.getAttribute target "data-event-id")]
              (when event-id
-               (re-frame/dispatch [:msg/mark-visible event-id]))))))
+               (.unobserve observer target)
+               (re-frame/dispatch [:msg/mark-visible event-id])
+               )))))
      #js {:threshold 0.5})))
 
 (defn build-message-actions [tr item active-room current-user-id x y]
@@ -435,61 +438,75 @@
   (r/with-let [client       @(re-frame/subscribe [:sdk/client])
                media-source (:source content)
                info         (:info content)
-               w (if (pos? (:w info)) (:w info) 400)
-               h (if (pos? (:h info)) (:h info) 400)
-               style        (if (and w h)
-                              {:aspect-ratio (str w " / " h)}
-                              {:aspect-ratio (str default-ratio)})
+               w            (:w info)
+               h            (:h info)
+               valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
+
+               style        (if valid-dims?
+                              {:aspect-ratio (str w " / " h)
+                               :max-width (str "min(" w "px, 400px)")
+                               :max-height (str "min(" h "px, 350px)")
+                               :background "var(--bg-secondary)"}
+                              {:aspect-ratio (str default-ratio)
+                               :max-width "300px"
+                               :background "var(--bg-secondary)"})
+
                !blob-url    (r/atom nil)
-               _ (when (and client media-source)
-                   (p/let [bytes (.getMediaContent client media-source)
-                           blob  (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
-                           url   (js/URL.createObjectURL blob)]
-                     (reset! !blob-url url)))]
+               _            (when (and client media-source)
+                              (p/let [bytes (.getMediaContent client media-source)
+                                      blob  (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
+                                      url   (js/URL.createObjectURL blob)]
+                                (reset! !blob-url url)))]
     (let [url @!blob-url]
       [:div.media-container {:class class :style style}
        (if url
-         (render-fn url (or (:caption content) (:filename content) "media") "media-content-absolute")
+         (render-fn url (or (:caption content) (:filename content) "media"))
          [:div.message-image-placeholder
+          {:style {:width "100%"
+                   :height "100%"
+                   :display "flex"
+                   :align-items "center"
+                   :justify-content "center"}}
           [:div.spinner]])])
     (finally
       (when-let [url @!blob-url]
         (js/URL.revokeObjectURL url)))))
 
+
 (defn image-message [content]
   [:div.image-attachment-container
    [async-media-wrapper content {:class "media-image" :default-ratio 1.33}
-    (fn [url _ class-name]
+    (fn [url alt-text]
       [:img {:src url
-             :alt (:caption content)
-             :class class-name
-             :loading "lazy"
+             :alt alt-text
+             :loading "eager"
              :on-click #(re-frame/dispatch
-             [:ui/open-modal :image-lightbox
-              {:url url
-               :backdrop-props {:class "lightbox-backdrop"}
-               :window-props   {:style {:background "transparent"
-                                        :box-shadow "none"
-                                        :width "100%"
-                                        :height "100%"
-                                        :max-width "none"
-                                        :max-height "none"
-                                        :padding 0}}}])
+                         [:ui/open-modal :image-lightbox
+                          {:url url
+                           :backdrop-props {:class "lightbox-backdrop"}
+                           :window-props   {:style {:background "transparent"
+                                                    :box-shadow "none"
+                                                    :width "100%"
+                                                    :height "100%"
+                                                    :max-width "none"
+                                                    :max-height "none"
+                                                    :padding 0}}}])
+             :style {:width "100%"
+                     :height "100%"
+                     :display "block"
+                     :object-fit "contain"
+                     :cursor "zoom-in"}}])]])
 
-             :style {:cursor "zoom-in"}}])]
-   (when (seq (:caption content))
-     [:div.media-caption
-      [message-text content]])])
 
 (defn video-message [content]
   (async-media-wrapper content {:class "media-video" :default-ratio 1.77}
-    (fn [url _ class-name]
-      [:video {:src url :controls true :class class-name}])))
+    (fn [url _]
+      [:video {:src url :controls true :style {:width "100%" :height "100%" :display "block"}} ])))
 
 (defn sticker-message [content]
   (async-media-wrapper content {:class "media-sticker" :default-ratio 1.0}
-    (fn [url alt class-name]
-      [:img {:src url :alt alt :class class-name :loading "lazy"}])))
+    (fn [url alt]
+      [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])))
 
 (defn file-message [{:keys [caption source info]} tr]
   [:div.file-attachment
@@ -564,6 +581,9 @@
    [:span.system-icon icon]
    [:span.system-text text]])
 
+
+
+
 (defn date-divider [tr ts]
   [:div.timeline-date-separator
    [:div.separator-line]
@@ -603,7 +623,7 @@
       [swipe-to-action-wrapper
        {:can-edit? is-own?
         :enabled? is-mobile?
-        :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
+         :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
         :wrapper-props (merge (long-press-props open-menu-fn)
                               {:class (str "timeline-message"
                                            (if (= content-tag "MsgLike") " is-message" " is-system")
@@ -623,7 +643,7 @@
           (= content-tag "MsgLike")
           (let [{:keys [tag inner in-reply-to]} content
                 reply-id  (:event-id in-reply-to)
-                reply-msg (when reply-id @(re-frame/subscribe [:timeline/event-by-id active-room reply-id]))]
+                reply-msg (when reply-id @(re-frame/subscribe [:timeline/events-map active-room reply-id]))]
             [:<>
              (when-not merge-with-prev?
                [:div.timeline-header
@@ -647,10 +667,13 @@
           [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
 
           (= content-tag "State")
-          [state-event-view item]
+                    [state-event-view item]
 
-          :else
-          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])
+           :else
+          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])]
+
+          )
+
 
         (when (seq reactions)
           [reaction-row {:reactions reactions
@@ -660,26 +683,45 @@
                          :event-id (:event-or-transaction-id item)}])
         #_(when (seq read-by)
             [:div.read-receipts-row
-             [:span.receipt-count (str "✓ " (count read-by))]])]])))
+             [:span.receipt-count (str "✓ " (count read-by))]])]
+
+       ]
+      )
+
+    )
+  )
 
 
 (defn event-tile [item]
-  (r/with-let [node-ref (r/atom nil)
-               observe-node (fn [node]
-                              (when (and node (not= (:type item) :virtual))
-                                (.observe @visibility-observer node)))
-               unobserve-node (fn [node]
-                                (when (and node (not= (:type item) :virtual))
-                                  (.unobserve @visibility-observer node)))]
-    (let [rendered-item [event-tile-render item]
-          ]
-      [:div {:ref (fn [el]
-                    (when el
-                      (reset! node-ref el)
-                      (observe-node el)))
-             :data-event-id (:id item)
-             }
-       rendered-item])
-    (finally
-      (when-let [node @node-ref]
-        (unobserve-node node)))))
+  (let [id (:id item)
+        is-virtual? (= (:type item) :virtual)
+        node-ref (volatile! nil)]
+    (r/create-class
+     {:display-name (str "event-tile-" id)
+
+      :component-did-mount
+      (fn [this]
+        (let [node @node-ref]
+          (when (and node (not is-virtual?) @visibility-observer)
+            (.observe @visibility-observer node))))
+
+      :component-will-unmount
+      (fn [this]
+        (let [node @node-ref]
+          (when (and node (not is-virtual?) @visibility-observer)
+            (.unobserve @visibility-observer node))))
+
+      :reagent-render
+      (fn [item]
+        [:div {:data-event-id id
+               :ref #(vreset! node-ref %)
+               :style {:width "100%"}}
+         [event-tile-render item]])})))
+
+
+(defn connected-event-tile [room-id item-stub]
+  (let [full-items @(re-frame/subscribe [:timeline/events-map room-id])
+        item-data  (get full-items (:id item-stub))]
+    (if item-data
+      [event-tile item-data]
+      [:div.timeline-item-loading])))
