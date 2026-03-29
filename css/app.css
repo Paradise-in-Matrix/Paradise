@@ -95,7 +95,6 @@ html, body {
 }
 
 
-
 [data-virtuoso-scroller="true"]::-webkit-scrollbar-thumb {
     background-clip: padding-box;
     border: 4px solid transparent;
