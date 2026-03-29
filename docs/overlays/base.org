@@ -2,7 +2,7 @@
 ** Overlays
 
 **** Preface
-
+This is where we define our global reusables. They're using multi-methods for neat registration.
 
 **** Imports
 
