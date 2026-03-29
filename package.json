@@ -14,7 +14,7 @@
         "ubrn:web:build": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn build web --config ubrn.config.yaml",
         "ubrn:checkout": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn checkout --config ubrn.config.yaml",
         "ubrn:clean": "rm -Rf cpp/ src/generated/ src/index.web.ts*",
-        "ios:generate": "npx capacitor-assets generate --ios --splash",
+        "ios:generate": "npx capacitor-assets generate --ios",
         "ios:sync": "npx cap sync ios"
     },
     "dependencies": {
