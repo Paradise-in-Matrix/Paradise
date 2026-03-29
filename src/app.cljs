@@ -16,6 +16,7 @@
    [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay]]
    [utils.macros :refer [i18n-data]]
+   [utils.svg :as icons]
    [client.login :refer [bootstrap!]]
    [navigation.rooms.room-list :refer [room-list]]
    [container.base :refer [container]]
@@ -197,7 +198,8 @@
     [:div.boot-container
      [:div.boot-content
       [:div.boot-logo-wrapper
-       [:div.paradise-logo "P"]]
+       [icons/transition {:size "100px"}]
+       ]
       [:div.boot-loading-text
        [:span (tr [:boot/loading-text])]]]]))
 
