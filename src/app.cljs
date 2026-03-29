@@ -15,7 +15,8 @@
    [client.config :refer [load-config check-remote-version load-i18n]]
    [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay]]
-   [utils.macros :refer [i18n-data]]
+["@capacitor/status-bar" :refer [StatusBar]]
+ [utils.macros :refer [i18n-data]]
    [utils.svg :as icons]
    [client.login :refer [bootstrap!]]
    [navigation.rooms.room-list :refer [room-list]]
@@ -203,7 +204,12 @@
       [:div.boot-loading-text
        [:span (tr [:boot/loading-text])]]]]))
 
-(defn main-layout []
+
+(defn set-status-bar! []
+  (.setBackgroundColor StatusBar #js {:color "#1a1a1a"})
+  (.setStyle StatusBar #js {:style "DARK"}))
+
+  (defn main-layout []
   (let [auth-status   @(re-frame/subscribe [:auth/status])
         sidebar-open? @(re-frame/subscribe [:ui/sidebar-open?])
         update-ready?   @(re-frame/subscribe [:app/update-available?])
