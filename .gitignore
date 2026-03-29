@@ -15,7 +15,6 @@ dist/
 .env.local
 .env.*.local
 rust_modules/
-resources/
 
 .idea/
 .vscode/
@@ -35,6 +34,5 @@ packages/generated/
 
 themes/
 build/
-public/
 
 quick.sh
