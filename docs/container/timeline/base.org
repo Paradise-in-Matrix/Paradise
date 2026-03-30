@@ -409,22 +409,6 @@ We also don't want to list our own name, so we remove that too.
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 
 
-
-
-(re-frame/reg-event-fx
- :room/pretty-jump
- (fn [{:keys [db]} [_ room-id event-id]]
-   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
-    :dispatch-later [{:ms 300
-                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
-
-(re-frame/reg-event-fx
- :room/execute-deep-jump
- (fn [{:keys [db]} [_ room-id event-id]]
-   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
-    :dispatch-n [[:sdk/cleanup-timeline room-id]
-                 [:room/boot-focused-timeline room-id event-id]]}))
-
 (re-frame/reg-sub
  :timeline/ui-state
  (fn [db [_ room-id]]
@@ -558,6 +542,21 @@ We also don't want to list our own name, so we remove that too.
              (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline tl-handle nil nil]))
            (p/catch #(log/error "Focused timeline boot failed:" %))))
      {})))
+
+
+(re-frame/reg-event-fx
+ :room/pretty-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-deep-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
+    :dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:room/boot-focused-timeline room-id event-id]]}))
 
 (re-frame/reg-event-fx
  :room/jump-to-live-bottom
@@ -862,8 +861,6 @@ received an update.
 I will segment these another time
 
 #+begin_src css :tangle ../../../css/timeline.css
-
-
   .timeline-header {
       display: flex;
       align-items: baseline;
@@ -1202,10 +1199,6 @@ I will segment these another time
       margin-top: -8px;
   }
 
-  .timeline-message.is-merged {
-      padding-top: 2px;
-  }
-  
 
 /*
 Testing to see if this solves the final calc issue
@@ -1222,8 +1215,8 @@ Testing to see if this solves the final calc issue
 }
 
   .timeline-item {
-      padding-top: 8px;
-      padding-bottom: 8px;
+      padding-top: 0px;
+      padding-bottom: 0px;
 }
 
   .timeline-item:last-child {
@@ -1263,15 +1256,17 @@ Testing to see if this solves the final calc issue
   }
 
   .timeline-message.is-merged {
-          padding-top: 0px;
-          padding-bottom: 4px;
 
-          padding-top: -4px;
+      padding-top: 0px;
+
+      padding-bottom: 0px;
+
   }
 
   .timeline-message:hover .message-hover-toolbar {
       display: flex;
   }
+
 
   .message-hover-toolbar {
       position: absolute;
