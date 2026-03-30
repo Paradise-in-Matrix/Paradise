@@ -40,12 +40,40 @@ jobs:
           git tag "v${{ env.PKG_VERSION }}"
           git push origin "v${{ env.PKG_VERSION }}"
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+
+      - name: Build Frontend and Electron
+        run: |
+          npm ci
+          npm run release
+          echo '#!/bin/sh' > wrapper.sh
+          echo 'exec /app/main/paradise "$@"' >> wrapper.sh
+          chmod +x wrapper.sh
+          chmod +x scripts/electron.sh
+          ./scripts/electron.sh
+
+      - name: Build Flatpak Bundle
+        run: |
+          flatpak-builder --repo=repo --force-clean build-dir electron/com.gigiaj.paradise.yml
+          flatpak build-bundle repo paradise-${{ env.PKG_VERSION }}.flatpak com.gigiaj.paradise
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ env.PKG_VERSION }}"
           name: "Release v${{ env.PKG_VERSION }}"
           generate_release_notes: true
+          files: |
+            paradise-${{ env.PKG_VERSION }}.flatpak
+            electron/dist/*.AppImage
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
