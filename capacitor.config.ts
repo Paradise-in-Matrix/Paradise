@@ -4,6 +4,12 @@ const config: CapacitorConfig = {
     appId: "com.gigiaj.paradise",
     appName: "Paradise",
     webDir: "dist",
+    server: {
+        //        url: "http://192.168.3.33:8000",
+        cleartext: true,
+        //        allowNavigation: ["192.168.3.33"],
+        androidScheme: "https",
+    },
     plugins: {
         StatusBar: {
             overlaysWebView: true,
