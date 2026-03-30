@@ -322,11 +322,6 @@ Making sure this is dynamic, but abstract is important for now.
 @import "search.css";
 @import "pins.css";
 
-
-/*
-@import "../themes/cordlike.css";
-*/
-
 html, body {
     margin: 0;
     padding: 0;
