@@ -1,0 +1,102 @@
+
+** Platforms
+
+For any app to be appreciated by as many people as possible, we need
+to provide the means for it to be installed on many different platforms.
+
+As such I will detail the bash scripts needed for each platform here.
+For the most part we lean on Capacitor to set-up all but the Web build.
+
+
+**** Electron
+
+For desktop users, they appreciate being able to just have *an app*. It allows
+them to set it to start on log in, minimize to the task tray, and utilize
+more native mechanisms (like encrypted search).
+
+#+begin_src bash :tangle ./scripts/electron.sh
+cd "$(dirname "$0")/.."
+npx cap add @capacitor-community/electron
+jq '.compilerOptions += {"skipLibCheck": true}' electron/tsconfig.json > electron/tsconfig.json.tmp && mv electron/tsconfig.json.tmp electron/tsconfig.json
+echo "
+id: com.gigiaj.paradise
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+command: paradise
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=xdg-documents:ro
+modules:
+  - name: paradise
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: ./electron/dist/linux-unpacked
+      - type: file
+        path: wrapper.sh
+    build-commands:
+      - mkdir -p /app/main
+      - cp -r . /app/main
+      - install -D wrapper.sh /app/bin/paradise
+" >  electron/com.gigiaj.paradise.yml
+npm run electron:make
+#+end_src
+
+
+
+
+
+**** iOS
+
+A key factor in this project's existence. There are clients that exist that
+are AGPL3, which without a CLA can't exist on the app store. (There are
+technically violators of this, but usually those apps at least are
+provided by the main developer). It is one of the reasons VLC worked
+towards changing their licensing for their iOS stuff to MPLv2.
+So instead we needed something new and appropriately compliant with iOS.
+After all, iOS has the largest market share in the United States, so that
+would be a great number of users we would fail to capture with other options.
+
+It is something important to note, as iOS directly influenced our licensing choice.
+AGPL3 with contributors means any contributor can complain to Apple about the
+violated license.
+
+#+begin_src
+
+
+#+end_src
+
+
+
+**** Android
+
+The most used platform on the planet. Very important we go through
+the needed steps to support it. Luckily Google doesn't make it too much
+of a hassle.
+
+
+#+begin_src
+
+
+
+#+end_src
+
+
+**** Web
+
+The original build and the easiest to use. It can even be a PWA, but with the apps
+that'd be less optimal.
+This ensures anyone with a compliant browser can use our client.
+
+#+begin_src
+
+#+end_src
+
+
+
