@@ -30,16 +30,11 @@
 @import "search.css";
 @import "pins.css";
 
-
-/*
-@import "../themes/cordlike.css";
-*/
-
 html, body {
     margin: 0;
     padding: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100dvw;
+    height: 100dvh;
     overflow: hidden;
     box-sizing: border-box;
     background-color: #313338;
@@ -59,12 +54,10 @@ html, body {
 
 .app-root {
     display: flex;
-    height: 100vh;
-    width: 100vw;
+    height: 100dvh;
+    width: 100dvw;
     overflow: hidden;
 }
-
-
 
 
 .body {
@@ -139,14 +132,13 @@ html, body {
     }
 }
 
+
 @media (max-width: 768px) {
     .app-root {
         position: relative;
         overflow: hidden;
         padding-top: env(safe-area-inset-top, 0px);
-/*
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-*/
+        padding-bottom: 0px;
     }
 
     .timeline-container {
@@ -160,11 +152,13 @@ html, body {
         display: flex;
         z-index: 100;
         min-height: 0;
+        overflow-y: auto;
         top: env(safe-area-inset-top, 0px);
         bottom: 0;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
     }
+
 
     .sidebars-open .sidebar-spaces {
         transform: translateX(0);
