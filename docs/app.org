@@ -352,8 +352,6 @@ html, body {
 }
 
 
-
-
 .body {
     color: #dbdee1;
     white-space: pre-wrap;
@@ -452,6 +450,7 @@ html, body {
         transform: translateX(-100%);
         transition: transform 0.3s ease;
     }
+
 
     .sidebars-open .sidebar-spaces {
         transform: translateX(0);
