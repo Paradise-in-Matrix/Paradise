@@ -581,9 +581,6 @@
    [:span.system-icon icon]
    [:span.system-text text]])
 
-
-
-
 (defn date-divider [tr ts]
   [:div.timeline-date-separator
    [:div.separator-line]
@@ -686,11 +683,7 @@
              [:span.receipt-count (str "✓ " (count read-by))]])]
 
        ]
-      )
-
-    )
-  )
-
+      )))
 
 (defn event-tile [item]
   (let [id (:id item)
