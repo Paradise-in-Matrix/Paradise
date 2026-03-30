@@ -426,14 +426,13 @@ html, body {
     }
 }
 
+
 @media (max-width: 768px) {
     .app-root {
         position: relative;
         overflow: hidden;
         padding-top: env(safe-area-inset-top, 0px);
-/*
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-*/
+        padding-bottom: 0px;
     }
 
     .timeline-container {
@@ -447,6 +446,7 @@ html, body {
         display: flex;
         z-index: 100;
         min-height: 0;
+        overflow-y: auto;
         top: env(safe-area-inset-top, 0px);
         bottom: 0;
         transform: translateX(-100%);
