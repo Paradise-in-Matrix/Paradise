@@ -718,9 +718,6 @@ individual's display name.
    [:span.system-icon icon]
    [:span.system-text text]])
 
-
-
-
 (defn date-divider [tr ts]
   [:div.timeline-date-separator
    [:div.separator-line]
@@ -823,11 +820,7 @@ individual's display name.
              [:span.receipt-count (str "✓ " (count read-by))]])]
 
        ]
-      )
-
-    )
-  )
-
+      )))
 #+end_src
 
 
