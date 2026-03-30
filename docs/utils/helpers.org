@@ -293,10 +293,10 @@ We need to be able to convert timestamps to date otherwise people might not be t
                     "container.timeline.status.reading")]
     (case cnt
       0 ""
-      1 (tr [(keyword base-path "one")] [(first names)])
-      2 (tr [(keyword base-path "two")] [(first names) (second names)])
-      3 (tr [(keyword base-path "three")] [(first names) (second names) (nth names 2)])
-      (tr [(keyword base-path "many")] [(first names) (second names) (- cnt 2)]))))
+      1 (tr [(keyword base-path "one")] [(truncate-name (first names) 16)])
+      2 (tr [(keyword base-path "two")] [(truncate-name (first names) 16) (truncate-name (second names) 16)])
+      3 (tr [(keyword base-path "three")] [(truncate-name (first names) 16) (truncate-name (second names) 16) (truncate-name (nth names 2) 16)])
+      (tr [(keyword base-path "many")] [(truncate-name (first names) 16) (truncate-name (second names) 16) (- cnt 2)]))))
 
 #+end_src
 
