@@ -344,6 +344,29 @@ uses the mini-buffer. A nice status indicator.
 #+end_src
 
 
+
+We want to subscribe to a single room's events to have the read indicators for it.
+We then just want to filter out the event objects and get the read-by from inside.
+We also don't want to list our own name, so we remove that too.
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(re-frame/reg-sub
+ :timeline/latest-readers
+ (fn [[_ room-id _]]
+   [(re-frame/subscribe [:timeline/current-events room-id])
+    (re-frame/subscribe [:sdk/profile])])
+ (fn [[events profile] _]
+   (log/error events)
+   (let [my-id        (:user-id profile)
+         actual-events (filter #(= (:type %) :event) events)
+         latest-event  (last actual-events)
+         read-by       (or (:read-by latest-event) [])
+         others        (remove #(= % my-id) read-by)]
+     others)))
+#+end_src
+
+
+
 ***** Component
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
