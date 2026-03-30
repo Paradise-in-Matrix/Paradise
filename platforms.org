@@ -67,6 +67,14 @@ It is something important to note, as iOS directly influenced our licensing choi
 AGPL3 with contributors means any contributor can complain to Apple about the
 violated license.
 
+
+Some helpful notes when debugging iOS, but killing the xcode process regular is
+a good idea. It should probably be the first thing tested on any weird
+boot errors of the app.
+killall Xcode
+
+
+
 #+begin_src
 
 
