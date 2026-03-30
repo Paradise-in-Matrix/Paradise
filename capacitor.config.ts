@@ -5,6 +5,9 @@ const config: CapacitorConfig = {
     appName: "Paradise",
     webDir: "dist",
     plugins: {
+        StatusBar: {
+            overlaysWebView: true,
+        },
         SplashScreen: {
             launchShowDuration: 3000,
             launchAutoHide: false,
