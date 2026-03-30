@@ -78,13 +78,10 @@
         (let [curr         (first remaining)
               curr-is-msg? (= (:content-tag curr) "MsgLike")
               is-virtual?  (= (:type curr) :virtual)
-              stable-id    (or (when is-virtual?
-                                 (let [next-msg (first (rest remaining))]
-                                   (if next-msg
-                                     (str "div-for-" (:id next-msg))
-                                     (str "virtual-" (:tag curr) "-" (:ts curr)))))
-                               (:id curr)
-                               (:internal-id curr))
+              stable-id    (cond
+                             is-virtual? (str "virtual-" (:tag curr) "-" (:ts curr))
+                             (:id curr)  (:id curr)
+                             :else       (:internal-id curr))
               can-merge?   (and curr-is-msg?
                                 last-msg
                                 (= (:sender-id curr) (:sender-id last-msg))
@@ -166,24 +163,6 @@
               :pag-handle    pag-handle
               :typing-handle typing-handle})))
 
-(re-frame/reg-sub
- :timeline/latest-readers
- (fn [_ _]
-   [(re-frame/subscribe [:timeline/current-events])
-    (re-frame/subscribe [:sdk/profile])])
- (fn [[events profile] _]
-   (let [my-id        (:user-id profile)
-         actual-events (filter #(= (:type %) :event) events)
-         latest-event  (last actual-events)
-         read-by       (or (:read-by latest-event) [])
-         others        (remove #(= % my-id) read-by)]
-     others)))
-
-(re-frame/reg-sub
- :timeline/loading-more?
- (fn [db [_ room-id]]
-   (get-in db [:timeline/loading-more? room-id] false)))
-
 (defn followers-indicator [active-room]
   (let [reader-ids  @(re-frame/subscribe [:timeline/latest-readers])
         members-map @(re-frame/subscribe [:room/members-map active-room])
@@ -232,10 +211,24 @@
        []))))
 
 
+(re-frame/reg-sub
+ :timeline/latest-readers
+ (fn [[_ room-id _]]
+   [(re-frame/subscribe [:timeline/current-events room-id])
+    (re-frame/subscribe [:sdk/profile])])
+ (fn [[events profile] _]
+   (log/error events)
+   (let [my-id        (:user-id profile)
+         actual-events (filter #(= (:type %) :event) events)
+         latest-event  (last actual-events)
+         read-by       (or (:read-by latest-event) [])
+         others        (remove #(= % my-id) read-by)]
+     others)))
+
 (defn status-indicator [active-room]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         typing-info   @(re-frame/subscribe [:room/typing-users active-room])
-        reader-ids    @(re-frame/subscribe [:timeline/latest-readers])
+        reader-ids    @(re-frame/subscribe [:timeline/latest-readers active-room])
         members-map   @(re-frame/subscribe [:room/members-map active-room])
         profile       @(re-frame/subscribe [:sdk/profile])
         my-id         (:user-id profile)
@@ -265,22 +258,6 @@
 
 
 
-
-
-
-(re-frame/reg-event-fx
- :room/pretty-jump
- (fn [{:keys [db]} [_ room-id event-id]]
-   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
-    :dispatch-later [{:ms 300
-                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
-
-(re-frame/reg-event-fx
- :room/execute-deep-jump
- (fn [{:keys [db]} [_ room-id event-id]]
-   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
-    :dispatch-n [[:sdk/cleanup-timeline room-id]
-                 [:room/boot-focused-timeline room-id event-id]]}))
 
 (re-frame/reg-sub
  :timeline/ui-state
@@ -415,6 +392,21 @@
              (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline tl-handle nil nil]))
            (p/catch #(log/error "Focused timeline boot failed:" %))))
      {})))
+
+
+(re-frame/reg-event-fx
+ :room/pretty-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-deep-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
+    :dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:room/boot-focused-timeline room-id event-id]]}))
 
 (re-frame/reg-event-fx
  :room/jump-to-live-bottom
