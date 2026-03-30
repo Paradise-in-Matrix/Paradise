@@ -246,31 +246,6 @@ have two objects with the same unique ID if for example there
 is an edit)
 
 
-***** TODO Fix this files organization... The revisions led to me moving stuff.. a bunch
-
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-(re-frame/reg-sub
- :timeline/latest-readers
- (fn [_ _]
-   [(re-frame/subscribe [:timeline/current-events])
-    (re-frame/subscribe [:sdk/profile])])
- (fn [[events profile] _]
-   (let [my-id        (:user-id profile)
-         actual-events (filter #(= (:type %) :event) events)
-         latest-event  (last actual-events)
-         read-by       (or (:read-by latest-event) [])
-         others        (remove #(= % my-id) read-by)]
-     others)))
-#+end_src
-
-
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-(re-frame/reg-sub
- :timeline/loading-more?
- (fn [db [_ room-id]]
-   (get-in db [:timeline/loading-more? room-id] false)))
-#+end_src
-
 
 **** Chat Follower Indicators
 
