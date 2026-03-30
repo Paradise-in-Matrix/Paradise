@@ -50,37 +50,40 @@ or finding Paradise, but the goal for this project is to provide people perhaps 
 
 
 ***** Set-up
-Setup is currently extremely messy. I've included the prebuilt generated-compat JS files.
-
-You need not do this as the generated files are included, but if for some reason you wanted to they were generated
-like so:
+The WASM package is extracted from the repo for cleanliness. So the set-up is rather simple on
+most platforms.
 
 #+NAME: build-scripts
 #+begin_src sh :tangle build-all.sh :tangle-mode (identity #o755)
 npm i
-guix shell -FNC -m manifest.scm -- sh -c "sh irust.sh && sh build-wasm-bindings.sh && sh babel.sh"
 #+end_src
 
 
 Running involves two terminal windows or running both commands together at the moment. No release build for shadow-cljs quite yet.
 
 ** Development Workflow
-To develop Paradise, you need to run the ClojureScript compiler and the Vite 
-asset server simultaneously.
+To develop Paradise, you need to run the ClojureScript compiler and the Vite
+asset server simultaneously. If you're making changes to the repo,
+then it is advised to use the tangler provided too.
+The commands for these are:
 
-*** 1. Start the CLJS Watcher
+
+*** 1. Start ShadowCLJS/Vite
 This handles the compilation of the ~.cljs~ files and provides the REPL.
+#+begin_src sh :async t
+npm run notangle
+#+end_src
+
+*** 2. Start ShadowCLJS/Vite/Tangler
 #+begin_src sh :async t
 npm run dev
 #+end_src
+
 
 This initializes the following commands:
 ShadowCLJS
 npx shadow-cljs watch app
 Vite
 npx vite
-Org Tangler
+Org Tangler (if not notangle)
 npx nbb src/utils/tangler.cljs
-
-
-
