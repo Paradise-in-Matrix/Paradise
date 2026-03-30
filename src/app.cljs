@@ -204,9 +204,9 @@
       [:div.boot-loading-text
        [:span (tr [:boot/loading-text])]]]]))
 
-
 (defn set-status-bar! []
-  (.setBackgroundColor StatusBar #js {:color "#1a1a1a"})
+  (.setBackgroundColor StatusBar #js {:color
+                                      "#1e1f22"})
   (.setStyle StatusBar #js {:style "DARK"}))
 
   (defn main-layout []
