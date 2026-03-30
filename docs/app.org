@@ -269,14 +269,6 @@ We need a boot up screen for those moments where we're not quite ready.
 Making sure this is dynamic, but abstract is important for now.
 #+begin_src clojurescript :tangle ../src/app.cljs
 (defn booting-screen []
-
-
-
-
-
-
-
-
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.boot-container
      [:div.boot-content
