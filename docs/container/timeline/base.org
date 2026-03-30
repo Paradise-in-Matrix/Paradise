@@ -373,7 +373,7 @@ We also don't want to list our own name, so we remove that too.
 (defn status-indicator [active-room]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         typing-info   @(re-frame/subscribe [:room/typing-users active-room])
-        reader-ids    @(re-frame/subscribe [:timeline/latest-readers])
+        reader-ids    @(re-frame/subscribe [:timeline/latest-readers active-room])
         members-map   @(re-frame/subscribe [:room/members-map active-room])
         profile       @(re-frame/subscribe [:sdk/profile])
         my-id         (:user-id profile)
