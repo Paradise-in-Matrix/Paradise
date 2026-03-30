@@ -269,6 +269,14 @@ We need a boot up screen for those moments where we're not quite ready.
 Making sure this is dynamic, but abstract is important for now.
 #+begin_src clojurescript :tangle ../src/app.cljs
 (defn booting-screen []
+
+
+
+
+
+
+
+
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.boot-container
      [:div.boot-content
@@ -294,6 +302,9 @@ Making sure this is dynamic, but abstract is important for now.
 @import "composer.css";
 @import "timeline.css";
 @import "space.css";
+
+
+
 @import "space-icons.css";
 @import "calls.css";
 @import "attachments.css";
@@ -335,6 +346,7 @@ html, body {
 #app {
     height: 100%;
     width: 100%;
+    background: #1e1f22;
 }
 
 .app-root {
@@ -351,6 +363,7 @@ html, body {
     color: #dbdee1;
     white-space: pre-wrap;
     word-wrap: break-word;
+    overflow: hidden;
 }
 
 .body.formatted code {
@@ -418,13 +431,14 @@ html, body {
     }
 }
 
-
 @media (max-width: 768px) {
     .app-root {
         position: relative;
         overflow: hidden;
         padding-top: env(safe-area-inset-top, 0px);
+/*
         padding-bottom: env(safe-area-inset-bottom, 0px);
+*/
     }
 
     .timeline-container {
@@ -435,9 +449,11 @@ html, body {
     .sidebar-spaces,
     .sidebar-rooms {
         position: absolute;
+        display: flex;
         z-index: 100;
+        min-height: 0;
         top: env(safe-area-inset-top, 0px);
-        bottom: env(safe-area-inset-bottom, 0px);
+        bottom: 0;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
     }
@@ -452,8 +468,11 @@ html, body {
 
     .mobile-overlay {
         position: fixed;
-        top: env(safe-area-inset-top, 0px);
+        padding-top: env(safe-area-inset-top, 0px);
+/*
         bottom: env(safe-area-inset-bottom, 0px);
+*/
+        inset: 0;
         background: rgba(0, 0, 0, 0.5);
         z-index: 90;
         animation: fadeIn 0.2s ease;
@@ -505,9 +524,9 @@ providing the encapsulation and parsing for us.
 
 
 #+begin_src clojurescript :tangle ../src/app.cljs
-
 (defn set-status-bar! []
-  (.setBackgroundColor StatusBar #js {:color "#1a1a1a"})
+  (.setBackgroundColor StatusBar #js {:color
+                                      "#1e1f22"})
   (.setStyle StatusBar #js {:style "DARK"}))
 
   (defn main-layout []
