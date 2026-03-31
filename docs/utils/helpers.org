@@ -40,11 +40,11 @@ This works for now though.
    - :method 'crop' or 'scale'"
   ([mxc-url] (mxc->url mxc-url {}))
   ([mxc-url {:keys [homeserver type width height method] :or {type :download}}]
-   (when (and mxc-url (str/starts-with? mxc-url "mxc://"))
+   (when (and (string? mxc-url) (str/starts-with? mxc-url "mxc://"))
      (let [db @re-frame.db/app-db
            server-base (str/replace
-             (or (:homeserver-url db)
-                 (or js/window.MATRIX_HOMESERVER "https://matrix.org")) #"/+$" "")
+                        (or (:homeserver-url db)
+                            (or js/window.MATRIX_HOMESERVER "https://matrix.org")) #"/+$" "")
            resource    (str/replace mxc-url #"^mxc://" "")
            base-path   (str "/_matrix/client/v1/media/" (name type) "/" resource)]
        (if (= type :thumbnail)
@@ -53,6 +53,7 @@ This works for now though.
               "&height=" (or height 48)
               "&method=" (or method "crop"))
          (str server-base base-path))))))
+
 
 (defn url->mxc [url]
   (if (and (string? url) (str/includes? url "/_matrix/"))
