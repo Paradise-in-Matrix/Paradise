@@ -212,7 +212,8 @@ export enum DateDividerMode {
      (let [client (:client db)]
        (when-let [room (.getRoom client room-id)]
          (p/let [latest-event (.latestEvent room)
-                 event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))]
+                 event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))
+                 ]
            (if event-id
              (do
                (log/info "Latest event found. Booting Oreo Concat for:" room-id)
