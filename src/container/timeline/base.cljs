@@ -21,49 +21,26 @@
 (defonce !timeline-queues (atom {}))
 
 
-(defn apply-timeline-diffs! [room-id updates]
-  (swap! !timeline-queues update room-id #(or % (p/resolved [])))
-  (swap! !timeline-queues
-         (fn [queues]
-           (update queues room-id
-                   (fn [prev-promise]
-                     (-> prev-promise
-                         (p/then (fn [current-events]
-                                   (apply-matrix-diffs current-events updates wrap-item)))
-                         (p/then (fn [next-events]
-                                   (log/debug "Timeline diffs finished")
-                                   (re-frame/dispatch [:sdk/update-timeline room-id next-events])
-                                   next-events))
-                         (p/catch (fn [err]
-                                    (js/console.error "Timeline Diff Panic for room" room-id ":" err)
-                                    (get-in @re-frame.db/app-db [:timeline room-id] []))))))))
+(defn apply-timeline-diffs! [room-id source updates]
+  (let [q-key [room-id source]]
+    (swap! !timeline-queues update q-key #(or % (p/resolved [])))
+    (swap! !timeline-queues
+           (fn [queues]
+             (update queues q-key
+                     (fn [prev-promise]
+                       (-> prev-promise
+                           (p/then (fn [current-events]
+                                     (apply-matrix-diffs current-events updates wrap-item)))
+                           (p/then (fn [next-events]
+                                     (let [tagged-events (mapv #(assoc % :timeline-source source) next-events)]
+                                       (re-frame/dispatch [:sdk/update-timeline room-id source tagged-events])
+                                       tagged-events)))
+                           (p/catch (fn [err]
+                                      (js/console.error "Timeline Diff Panic for room" room-id source ":" err)
+                                      (get-in @re-frame.db/app-db [:timeline-data room-id source] [])))))))))
   nil)
 
 
-(re-frame/reg-sub
- :timeline/raw-events
- (fn [db [_ active-room]]
-   (get-in db [:timeline active-room] [])))
-
-(re-frame/reg-sub
- :timeline/sorted-events
- (fn [[_ active-room]]
-   (re-frame/subscribe [:timeline/raw-events active-room]))
- (fn [raw-events _]
-   (->> raw-events
-        (reduce (fn [acc e]
-                  (let [id-key   (or (:internal-id e) (:id e))
-                        existing (get acc id-key)]
-                    (if (and existing
-                             (not (:is-edited? e))
-                             (<= (:ts e) (:ts existing)))
-                      acc
-                      (assoc acc id-key e))))
-                {})
-        (vals)
-        (sort-by (fn [e]
-                   [(:ts e)
-                    (if (= (:type e) :virtual) 0 1)])))))
 
 
 (defn enrich-timeline-items [items]
@@ -93,6 +70,60 @@
                  (conj processed new-item)
                  (if curr-is-msg? new-item last-msg)))))))
 
+(defn process-timeline [raw-events]
+  (if (empty? raw-events)
+    []
+    (->> raw-events
+         (reduce (fn [acc e]
+                   (let [id-key   (cond
+                                    (= (:type e) :virtual) (str "virtual-" (:tag e) "-" (:ts e))
+                                    (not-empty (:id e))    (:id e)
+                                    :else                  (:internal-id e))
+                         existing (get acc id-key)]
+                     (if (and existing (not (:is-edited? e)) (<= (:ts e) (:ts existing)))
+                       acc
+                       (assoc acc id-key e))))
+                 {})
+         vals
+         (sort-by (fn [e] [(:ts e) (if (= (:type e) :virtual) 0 1)]))
+         enrich-timeline-items)))
+
+
+(re-frame/reg-sub
+ :timeline/raw-events
+ (fn [db [_ room-id]]
+   (let [focused-data (get-in db [:timeline-data room-id :focused] [])
+         live-data    (get-in db [:timeline-data room-id :live] [])]
+     (concat focused-data live-data))))
+
+(re-frame/reg-event-db
+ :sdk/update-timeline
+ (fn [db [_ room-id source new-raw-events]]
+   (assoc-in db [:timeline-data room-id source] new-raw-events)))
+
+(re-frame/reg-sub
+ :timeline/sorted-events
+ (fn [[_ active-room]]
+   (re-frame/subscribe [:timeline/raw-events active-room]))
+ (fn [raw-events _]
+   (->> raw-events
+        (reduce (fn [acc e]
+                  (let [id-key   (cond
+                                   (= (:type e) :virtual) (str "virtual-" (:tag e) "-" (:ts e))
+                                   (not-empty (:id e))    (:id e)
+                                   :else                  (:internal-id e))
+                        existing (get acc id-key)]
+                    (if (and existing
+                             (not (:is-edited? e))
+                             (<= (:ts e) (:ts existing)))
+                      acc
+                      (assoc acc id-key e))))
+                {})
+        (vals)
+        (sort-by (fn [e]
+                   [(:ts e)
+                    (if (= (:type e) :virtual) 0 1)])))))
+
 (re-frame/reg-sub
  :timeline/current-events
  (fn [[_ active-room]]
@@ -116,29 +147,105 @@
      (do (log/warn "Prevented duplicate timeline boot for:" room-id) {})
      (let [client (:client db)]
        (when-let [room (.getRoom client room-id)]
-         (-> (p/let [config (.create TimelineConfiguration
-                                     #js {:focus             (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false})
-                                          :filter            (new (.. sdk -TimelineFilter -All))
-                                          :internalIdPrefix  js/undefined
-                                          :dateDividerMode   (.-Daily sdk/DateDividerMode)
-                                          :trackReadReceipts true
-                                          :reportUtds        false})
-                     timeline        (.timelineWithConfiguration room config)
-                     listener        #js {:onUpdate (fn [diffs] (apply-timeline-diffs! room-id diffs))}
-                     typing-listener #js {:call (fn [user-ids]
-                                                  (re-frame/dispatch [:sdk/update-typing-users room-id user-ids]))}
-                     typing-handle   (.subscribeToTypingNotifications room typing-listener)
-                     timeline-handle (.addListener timeline listener)
-                     pag-listener    #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])}
-                     pag-handle      (.subscribeToBackPaginationStatus timeline pag-listener)
-                     _               (-> (.paginateBackwards timeline 50 js/undefined)
-                                         (p/then #(re-frame/dispatch [:sdk/set-timeline-initialized room-id]))
-                                         (p/catch #(log/error "Initial paginate failed" %)))]
-               (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline timeline-handle nil pag-handle typing-handle]))
-             (.catch #(log/error "Boot failed:" %))))
-       {}))))
+         (p/let [latest-event (.latestEvent room)
+                 event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))]
+           (if event-id
+             (do
+               (log/info "Latest event found. Booting Oreo Concat for:" room-id)
+               (re-frame/dispatch [:timeline/set-loading room-id true])
+               (-> (p/let [f-focus  (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 40})
+                           f-config (.create TimelineConfiguration #js {:focus f-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
+                           f-tl     (.timelineWithConfiguration room f-config)]
+                     (let [f-handle (.addListener f-tl #js {:onUpdate #(apply-timeline-diffs! room-id :focused %)})]
+                       (re-frame/dispatch [:sdk/save-focused-timeline room-id f-tl f-handle])
+                       (re-frame/dispatch [:timeline/set-loading room-id false])
+                       (-> (.paginateBackwards f-tl 15) (p/catch #(log/error "Focused bck pag failed:" %)))))
+                   (p/catch #(log/error "Focused boot failed:" %)))
+               (-> (p/let [l-focus  (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false})
+                           l-config (.create TimelineConfiguration #js {:focus l-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
+                           l-tl     (.timelineWithConfiguration room l-config)]
+                     (let [l-handle (.addListener l-tl #js {:onUpdate #(apply-timeline-diffs! room-id :live %)})
+                           t-handle (.subscribeToTypingNotifications room #js {:call #(re-frame/dispatch [:sdk/update-typing-users room-id %])})
+                           p-handle (.subscribeToBackPaginationStatus l-tl #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])})]
+                       (re-frame/dispatch [:sdk/save-live-timeline room-id l-tl l-handle t-handle p-handle])
+                       (-> (.paginateBackwards l-tl 50 js/undefined) (p/catch #(log/error "Live pag failed:" %)))))
+                   (p/catch #(log/error "Live boot failed:" %))))
+             (do
+               (log/info "No latest event found. Booting standard Live timeline:" room-id)
+               (re-frame/dispatch [:timeline/set-loading room-id true])
+               (-> (p/let [l-focus  (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false})
+                           l-config (.create TimelineConfiguration #js {:focus l-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
+                           l-tl     (.timelineWithConfiguration room l-config)]
+                     (let [l-handle (.addListener l-tl #js {:onUpdate #(apply-timeline-diffs! room-id :live %)})
+                           t-handle (.subscribeToTypingNotifications room #js {:call #(re-frame/dispatch [:sdk/update-typing-users room-id %])})
+                           p-handle (.subscribeToBackPaginationStatus l-tl #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])})]
+                       (re-frame/dispatch [:sdk/save-live-timeline room-id l-tl l-handle t-handle p-handle])
+                       (-> (.paginateBackwards l-tl 20 js/undefined)
+                           (p/then #(re-frame/dispatch [:timeline/set-loading room-id false]))
+                           (p/catch #(do (log/error "Live paginate failed" %)
+                                         (re-frame/dispatch [:timeline/set-loading room-id false]))))))
+                   (p/catch #(log/error "Standard Live boot failed:" %))))))
+         {})))))
+
+(re-frame/reg-event-fx
+ :room/boot-focused-timeline
+ (fn [{:keys [db]} [_ room-id event-id]]
+   (let [client (:client db)
+         room   (.getRoom client room-id)]
+     (when room
+       (-> (p/let [focus  (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 40})
+                   config (.create sdk/TimelineConfiguration #js {:focus focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts false})
+                   timeline (.timelineWithConfiguration room config)]
+             (let [listener  #js {:onUpdate #(apply-timeline-diffs! room-id :focused %)}
+                   tl-handle (.addListener timeline listener)]
+               (re-frame/dispatch [:sdk/save-focused-timeline room-id timeline tl-handle])
+               (-> (.paginateForwards timeline 10) (p/catch #(log/error "Jump fwd fail" %)))
+               (-> (.paginateBackwards timeline 5) (p/catch #(log/error "Jump bck fail" %)))))
+           (p/catch #(log/error "Focused timeline boot failed:" %))))
+     {})))
 
 
+
+
+
+
+
+
+(re-frame/reg-event-db
+ :sdk/save-focused-timeline
+ (fn [db [_ room-id timeline handle]]
+   (-> db
+       (assoc-in [:timeline-subs room-id :focused-timeline] timeline)
+       (assoc-in [:timeline-subs room-id :focused-handle] handle))))
+
+(re-frame/reg-event-db
+ :sdk/save-live-timeline
+ (fn [db [_ room-id timeline handle t-handle p-handle]]
+   (-> db
+       (assoc-in [:timeline-subs room-id :timeline] timeline)
+       (assoc-in [:timeline-subs room-id :live-handle] handle)
+       (assoc-in [:timeline-subs room-id :typing-handle] t-handle)
+       (assoc-in [:timeline-subs room-id :pag-handle] p-handle)
+       (assoc-in [:timeline/ui-metadata room-id :initialized?] true))))
+
+(re-frame/reg-event-db
+ :timeline/set-loading
+ (fn [db [_ room-id loading?]]
+   (assoc-in db [:timeline/loading-more? room-id] loading?)))
+
+(re-frame/reg-event-fx
+ :sdk/cleanup-timeline
+ (fn [{:keys [db]} [_ room-id]]
+   (when-let [subs (get-in db [:timeline-subs room-id])]
+     (doseq [handle-key [:tl-handle :focused-handle :live-handle :pag-handle :typing-handle]]
+       (when-let [handle (get subs handle-key)]
+         (try
+           (.cancel handle)
+           (catch :default e
+             (log/warn "Failed to cancel handle:" handle-key e))))))
+   {:db (-> db
+            (update :timeline-subs dissoc room-id)
+            (update :timeline-data dissoc room-id))}))
 
 (re-frame/reg-event-db
  :sdk/set-timeline-initialized
@@ -154,14 +261,135 @@
        {:dispatch-n (map (fn [rid] [:sdk/boot-timeline rid]) rooms-to-boot)}
        {}))))
 
+
 (re-frame/reg-event-db
- :sdk/save-timeline-sub
- (fn [db [_ room-id timeline tl-handle pag-handle typing-handle]]
-   (assoc-in db [:timeline-subs room-id]
-             {:timeline      timeline
-              :tl-handle     tl-handle
-              :pag-handle    pag-handle
-              :typing-handle typing-handle})))
+ :sdk/pagination-complete
+ (fn [db [_ room-id]]
+   (-> db
+       (assoc-in [:timeline/loading-more? room-id] false)
+       (assoc-in [:timeline/ui-metadata room-id :pending-anchor] nil))))
+
+
+(re-frame/reg-event-fx
+ :sdk/back-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
+         loading-forward? (get-in db [:timeline/loading-forward? room-id])
+         timeline         (or (get-in db [:timeline-subs room-id :timeline])
+                              (get-in db [:timeline-subs room-id :focused-timeline]))
+         raw-events       (get-in db [:timeline-data room-id :live] (get-in db [:timeline-data room-id :focused] []))
+         processed        (process-timeline raw-events)
+         anchor-id        (:id (first (filter #(= (:type %) :event) processed)))]
+     (if (and room-id (not loading-back?) (not loading-forward?) timeline)
+       (do
+         (log/info "Triggering SDK Back Paginate for" room-id)
+         (-> (.paginateBackwards timeline 50 js/undefined)
+             (p/then #(re-frame/dispatch [:sdk/pagination-complete room-id]))
+             (p/catch (fn [err]
+                        (log/error "Back Pagination failed:" err)
+                        (re-frame/dispatch [:sdk/pagination-complete room-id]))))
+         {:db (-> db
+                  (assoc-in [:timeline/loading-more? room-id] true)
+                  (assoc-in [:timeline/ui-metadata room-id :pending-anchor] anchor-id))})
+       {}))))
+
+(re-frame/reg-event-fx
+ :sdk/forward-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
+         loading-forward? (get-in db [:timeline/loading-forward? room-id])
+         dead?            (get-in db [:timeline/forward-dead? room-id])
+         timeline         (or (get-in db [:timeline-subs room-id :timeline])
+                              (get-in db [:timeline-subs room-id :focused-timeline]))]
+     (if (and timeline (not loading-back?) (not loading-forward?) (not dead?))
+       (do
+         (log/info "Triggering SDK Forward Paginate for" room-id)
+         (-> (.paginateForwards timeline 50 js/undefined)
+             (p/then #(re-frame/dispatch [:sdk/forward-pagination-complete room-id]))
+             (p/catch (fn [err]
+                        (log/error "Forward Pagination panicked/dead:" err)
+                        (re-frame/dispatch [:sdk/forward-pagination-dead room-id]))))
+         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
+       {}))))
+
+
+(re-frame/reg-event-db
+ :sdk/forward-pagination-complete
+ (fn [db [_ room-id]]
+   (assoc-in db [:timeline/loading-forward? room-id] false)))
+
+(re-frame/reg-event-db
+ :sdk/forward-pagination-dead
+ (fn [db [_ room-id]]
+   (-> db
+       (assoc-in [:timeline/loading-forward? room-id] false)
+       (assoc-in [:timeline/forward-dead? room-id] true))))
+
+(re-frame/reg-event-db
+ :sdk/update-pagination-status
+ (fn [db [_ room-id status]]
+   (assoc-in db [:timeline-pagination room-id] status)))
+
+(re-frame/reg-event-fx
+ :room/pretty-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-deep-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
+    :dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:room/boot-focused-timeline room-id event-id]]}))
+
+(re-frame/reg-event-fx
+ :room/jump-to-live-bottom
+ (fn [{:keys [db]} [_ room-id]]
+   {:db (-> db
+            (assoc-in [:timeline/ui-state room-id :animating-jump?] true)
+            (update :timeline/jump-target-id dissoc room-id))
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-return-to-live room-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-return-to-live
+ (fn [{:keys [db]} [_ room-id]]
+   {:dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:sdk/boot-timeline room-id]]}))
+
+(re-frame/reg-sub
+ :timeline/ui-state
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/ui-state room-id] {})))
+
+(re-frame/reg-sub
+ :timeline/jump-target-id
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/jump-target-id room-id])))
+
+(re-frame/reg-sub
+ :timeline/loading-forward?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/loading-forward? room-id] false)))
+
+(re-frame/reg-sub
+ :timeline/ui-metadata
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/ui-metadata room-id] {})))
+
+(re-frame/reg-sub
+ :timeline/loading-more?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/loading-more? room-id] false)))
+
+(re-frame/reg-sub
+ :room/is-focused?
+ (fn [db [_ room-id]]
+   (some? (get-in db [:timeline/jump-target-id room-id]))))
+
+
 
 (defn followers-indicator [active-room]
   (let [reader-ids  @(re-frame/subscribe [:timeline/latest-readers])
@@ -217,8 +445,7 @@
    [(re-frame/subscribe [:timeline/current-events room-id])
     (re-frame/subscribe [:sdk/profile])])
  (fn [[events profile] _]
-   (log/error events)
-   (let [my-id        (:user-id profile)
+   (let [my-id         (:user-id profile)
          actual-events (filter #(= (:type %) :event) events)
          latest-event  (last actual-events)
          read-by       (or (:read-by latest-event) [])
@@ -259,198 +486,7 @@
 
 
 
-(re-frame/reg-sub
- :timeline/ui-state
- (fn [db [_ room-id]]
-   (get-in db [:timeline/ui-state room-id] {})))
 
-(re-frame/reg-sub
- :timeline/jump-target-id
- (fn [db [_ room-id]]
-   (get-in db [:timeline/jump-target-id room-id])))
-
-(re-frame/reg-sub
- :timeline/loading-forward?
- (fn [db [_ room-id]]
-   (get-in db [:timeline/loading-forward? room-id] false)))
-
-(re-frame/reg-sub
- :timeline/ui-metadata
- (fn [db [_ room-id]]
-   (get-in db [:timeline/ui-metadata room-id] {})))
-
-(re-frame/reg-sub
- :timeline/loading-more?
- (fn [db [_ room-id]]
-   (get-in db [:timeline/loading-more? room-id] false)))
-
-(re-frame/reg-sub
- :room/is-focused?
- (fn [db [_ room-id]]
-   (some? (get-in db [:timeline/jump-target-id room-id]))))
-
-(defn process-timeline [raw-events]
-  (if (empty? raw-events)
-    []
-    (->> raw-events
-         (reduce (fn [acc e]
-                   (let [id-key (or (:internal-id e) (:id e))
-                         existing (get acc id-key)]
-                     (if (and existing (not (:is-edited? e)) (<= (:ts e) (:ts existing)))
-                       acc
-                       (assoc acc id-key e))))
-                 {})
-         vals
-         (sort-by (fn [e] [(:ts e) (if (= (:type e) :virtual) 0 1)]))
-         enrich-timeline-items)))
-
-(re-frame/reg-event-db
- :sdk/pagination-complete
- (fn [db [_ room-id]]
-   (-> db
-       (assoc-in [:timeline/loading-more? room-id] false)
-       (assoc-in [:timeline/ui-metadata room-id :pending-anchor] nil))))
-
-(re-frame/reg-event-fx
- :sdk/back-paginate
- (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])
-         timeline         (get-in db [:timeline-subs room-id :timeline])
-         raw-events       (get-in db [:timeline room-id] [])
-         processed        (process-timeline raw-events)
-         anchor-id        (:id (first (filter #(= (:type %) :event) processed)))]
-     (if (and room-id (not loading-back?) (not loading-forward?) timeline)
-       (do
-         (log/info "Triggering SDK Back Paginate for" room-id)
-         (-> (.paginateBackwards timeline 50 js/undefined)
-             (p/then #(re-frame/dispatch [:sdk/pagination-complete room-id]))
-             (p/catch (fn [err]
-                        (log/error "Back Pagination failed:" err)
-                        (re-frame/dispatch [:sdk/pagination-complete room-id]))))
-         {:db (-> db
-                  (assoc-in [:timeline/loading-more? room-id] true)
-                  (assoc-in [:timeline/ui-metadata room-id :pending-anchor] anchor-id))})
-       {}))))
-
-(re-frame/reg-event-fx
- :sdk/forward-paginate
- (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])
-         dead?            (get-in db [:timeline/forward-dead? room-id])
-         timeline         (get-in db [:timeline-subs room-id :timeline])]
-     (if (and timeline (not loading-back?) (not loading-forward?) (not dead?))
-       (do
-         (log/info "Triggering SDK Forward Paginate for" room-id)
-         (-> (.paginateForwards timeline 50 js/undefined)
-             (p/then #(re-frame/dispatch [:sdk/forward-pagination-complete room-id]))
-             (p/catch (fn [err]
-                        (log/error "Forward Pagination panicked/dead:" err)
-                        (re-frame/dispatch [:sdk/forward-pagination-dead room-id]))))
-         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
-       {}))))
-
-(re-frame/reg-event-db
- :sdk/forward-pagination-complete
- (fn [db [_ room-id]]
-   (assoc-in db [:timeline/loading-forward? room-id] false)))
-
-(re-frame/reg-event-db
- :sdk/forward-pagination-dead
- (fn [db [_ room-id]]
-   (-> db
-       (assoc-in [:timeline/loading-forward? room-id] false)
-       (assoc-in [:timeline/forward-dead? room-id] true))))
-
-(re-frame/reg-event-db
- :sdk/forward-pagination-complete
- (fn [db [_ room-id]]
-   (assoc-in db [:timeline/loading-forward? room-id] false)))
-
-(re-frame/reg-event-fx
- :room/boot-focused-timeline
- (fn [{:keys [db]} [_ room-id event-id]]
-   (let [client (:client db)
-         room   (.getRoom client room-id)]
-     (when room
-       (-> (p/let [focus  (.new (.. sdk -TimelineFocus -Event)
-                                #js {:eventId event-id
-                                     :numEventsToLoad 40})
-                   config (.create sdk/TimelineConfiguration
-                                   #js {:focus             focus
-                                        :filter            (new (.. sdk -TimelineFilter -All))
-                                        :dateDividerMode   (.-Daily sdk/DateDividerMode)
-                                        :trackReadReceipts false})
-                   timeline (.timelineWithConfiguration room config)
-                   listener #js {:onUpdate (fn [diffs]
-                                             (apply-timeline-diffs! room-id diffs))}
-                   tl-handle (.addListener timeline listener)
-                   _ (.paginateForwards timeline 10)
-                   _ (.paginateBackwards timeline 5)
-                   ]
-             (re-frame/dispatch [:sdk/save-timeline-sub room-id timeline tl-handle nil nil]))
-           (p/catch #(log/error "Focused timeline boot failed:" %))))
-     {})))
-
-
-(re-frame/reg-event-fx
- :room/pretty-jump
- (fn [{:keys [db]} [_ room-id event-id]]
-   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
-    :dispatch-later [{:ms 300
-                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
-
-(re-frame/reg-event-fx
- :room/execute-deep-jump
- (fn [{:keys [db]} [_ room-id event-id]]
-   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
-    :dispatch-n [[:sdk/cleanup-timeline room-id]
-                 [:room/boot-focused-timeline room-id event-id]]}))
-
-(re-frame/reg-event-fx
- :room/jump-to-live-bottom
- (fn [{:keys [db]} [_ room-id]]
-   {:db (-> db
-            (assoc-in [:timeline/ui-state room-id :animating-jump?] true)
-            (update :timeline/jump-target-id dissoc room-id))
-    :dispatch-later [{:ms 300
-                      :dispatch [:room/execute-return-to-live room-id]}]}))
-
-(re-frame/reg-event-fx
- :room/execute-return-to-live
- (fn [{:keys [db]} [_ room-id]]
-   {:dispatch-n [[:sdk/cleanup-timeline room-id]
-                 [:sdk/boot-timeline room-id]]}))
-
-
-(re-frame/reg-event-db
- :sdk/update-timeline
- (fn [db [_ room-id new-raw-events]]
-   (let [processed (process-timeline new-raw-events)]
-     (assoc-in db [:timeline room-id] processed))))
-
-(re-frame/reg-event-db
- :sdk/pagination-complete
- (fn [db [_ room-id]]
-   (assoc-in db [:timeline/loading-more? room-id] false)))
-
-(re-frame/reg-event-fx
- :sdk/cleanup-timeline
- (fn [{:keys [db]} [_ room-id]]
-   (when-let [subs (get-in db [:timeline-subs room-id])]
-     (doseq [handle-key [:tl-handle :pag-handle :typing-handle]]
-       (when-let [handle (get subs handle-key)]
-         (try
-           (.cancel handle)
-           (catch :default e
-             (log/warn "Failed to cancel handle:" handle-key e))))))
-   {:db (update db :timeline-subs dissoc room-id)}))
-
-(re-frame/reg-event-db
- :sdk/update-pagination-status
- (fn [db [_ room-id status]]
-   (assoc-in db [:timeline-pagination room-id] status)))
 
 
 
@@ -572,8 +608,7 @@
                                                   (<= dist-from-bottom 500)
                                                   (not loading-forward?))
                                          (re-frame/dispatch [:sdk/forward-paginate room-id])))
-                                     100)))
-                          ))}
+                                     100)))))}
 
           (when loading?
             [timeline-loading-overlay])
@@ -603,6 +638,8 @@
              [:div.spinner]])]
          (when (and @!show-jump? (not @!at-bottom?))
            [timeline-jump-button do-jump! focus-mode?])]))))
+
+
 
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
