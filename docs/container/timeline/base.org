@@ -318,14 +318,135 @@ export enum DateDividerMode {
        {:dispatch-n (map (fn [rid] [:sdk/boot-timeline rid]) rooms-to-boot)}
        {}))))
 
+
 (re-frame/reg-event-db
- :sdk/save-timeline-sub
- (fn [db [_ room-id timeline tl-handle pag-handle typing-handle]]
-   (assoc-in db [:timeline-subs room-id]
-             {:timeline      timeline
-              :tl-handle     tl-handle
-              :pag-handle    pag-handle
-              :typing-handle typing-handle})))
+ :sdk/pagination-complete
+ (fn [db [_ room-id]]
+   (-> db
+       (assoc-in [:timeline/loading-more? room-id] false)
+       (assoc-in [:timeline/ui-metadata room-id :pending-anchor] nil))))
+
+
+(re-frame/reg-event-fx
+ :sdk/back-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
+         loading-forward? (get-in db [:timeline/loading-forward? room-id])
+         timeline         (or (get-in db [:timeline-subs room-id :timeline])
+                              (get-in db [:timeline-subs room-id :focused-timeline]))
+         raw-events       (get-in db [:timeline-data room-id :live] (get-in db [:timeline-data room-id :focused] []))
+         processed        (process-timeline raw-events)
+         anchor-id        (:id (first (filter #(= (:type %) :event) processed)))]
+     (if (and room-id (not loading-back?) (not loading-forward?) timeline)
+       (do
+         (log/info "Triggering SDK Back Paginate for" room-id)
+         (-> (.paginateBackwards timeline 50 js/undefined)
+             (p/then #(re-frame/dispatch [:sdk/pagination-complete room-id]))
+             (p/catch (fn [err]
+                        (log/error "Back Pagination failed:" err)
+                        (re-frame/dispatch [:sdk/pagination-complete room-id]))))
+         {:db (-> db
+                  (assoc-in [:timeline/loading-more? room-id] true)
+                  (assoc-in [:timeline/ui-metadata room-id :pending-anchor] anchor-id))})
+       {}))))
+
+(re-frame/reg-event-fx
+ :sdk/forward-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
+         loading-forward? (get-in db [:timeline/loading-forward? room-id])
+         dead?            (get-in db [:timeline/forward-dead? room-id])
+         timeline         (or (get-in db [:timeline-subs room-id :timeline])
+                              (get-in db [:timeline-subs room-id :focused-timeline]))]
+     (if (and timeline (not loading-back?) (not loading-forward?) (not dead?))
+       (do
+         (log/info "Triggering SDK Forward Paginate for" room-id)
+         (-> (.paginateForwards timeline 50 js/undefined)
+             (p/then #(re-frame/dispatch [:sdk/forward-pagination-complete room-id]))
+             (p/catch (fn [err]
+                        (log/error "Forward Pagination panicked/dead:" err)
+                        (re-frame/dispatch [:sdk/forward-pagination-dead room-id]))))
+         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
+       {}))))
+
+
+(re-frame/reg-event-db
+ :sdk/forward-pagination-complete
+ (fn [db [_ room-id]]
+   (assoc-in db [:timeline/loading-forward? room-id] false)))
+
+(re-frame/reg-event-db
+ :sdk/forward-pagination-dead
+ (fn [db [_ room-id]]
+   (-> db
+       (assoc-in [:timeline/loading-forward? room-id] false)
+       (assoc-in [:timeline/forward-dead? room-id] true))))
+
+(re-frame/reg-event-db
+ :sdk/update-pagination-status
+ (fn [db [_ room-id status]]
+   (assoc-in db [:timeline-pagination room-id] status)))
+
+(re-frame/reg-event-fx
+ :room/pretty-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/ui-state room-id :animating-jump?] true)
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-deep-jump room-id event-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-deep-jump
+ (fn [{:keys [db]} [_ room-id event-id]]
+   {:db (assoc-in db [:timeline/jump-target-id room-id] event-id)
+    :dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:room/boot-focused-timeline room-id event-id]]}))
+
+(re-frame/reg-event-fx
+ :room/jump-to-live-bottom
+ (fn [{:keys [db]} [_ room-id]]
+   {:db (-> db
+            (assoc-in [:timeline/ui-state room-id :animating-jump?] true)
+            (update :timeline/jump-target-id dissoc room-id))
+    :dispatch-later [{:ms 300
+                      :dispatch [:room/execute-return-to-live room-id]}]}))
+
+(re-frame/reg-event-fx
+ :room/execute-return-to-live
+ (fn [{:keys [db]} [_ room-id]]
+   {:dispatch-n [[:sdk/cleanup-timeline room-id]
+                 [:sdk/boot-timeline room-id]]}))
+
+(re-frame/reg-sub
+ :timeline/ui-state
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/ui-state room-id] {})))
+
+(re-frame/reg-sub
+ :timeline/jump-target-id
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/jump-target-id room-id])))
+
+(re-frame/reg-sub
+ :timeline/loading-forward?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/loading-forward? room-id] false)))
+
+(re-frame/reg-sub
+ :timeline/ui-metadata
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/ui-metadata room-id] {})))
+
+(re-frame/reg-sub
+ :timeline/loading-more?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/loading-more? room-id] false)))
+
+(re-frame/reg-sub
+ :room/is-focused?
+ (fn [db [_ room-id]]
+   (some? (get-in db [:timeline/jump-target-id room-id]))))
+
+
 #+end_src
 
 
