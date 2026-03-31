@@ -825,8 +825,7 @@ list for use cases like this either.
                                                   (<= dist-from-bottom 500)
                                                   (not loading-forward?))
                                          (re-frame/dispatch [:sdk/forward-paginate room-id])))
-                                     100)))
-                          ))}
+                                     100)))))}
 
           (when loading?
             [timeline-loading-overlay])
@@ -856,6 +855,7 @@ list for use cases like this either.
              [:div.spinner]])]
          (when (and @!show-jump? (not @!at-bottom?))
            [timeline-jump-button do-jump! focus-mode?])]))))
+
 #+end_src
 
 
