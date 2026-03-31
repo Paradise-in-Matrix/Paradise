@@ -14,7 +14,6 @@
         membership        (oget room-info :membership)
         invited           (= membership "Invited")
         is-marked-unread  (oget room-info :isMarkedUnread)
-        _ (js/console.log room-info)
         notification-state
         #js {:isMention                    (> num-mentions 0)
              :isNotification               (or (> num-notifications 0) is-marked-unread)
