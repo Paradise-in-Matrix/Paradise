@@ -118,11 +118,7 @@ each of these later.
         processed
         (let [curr         (first remaining)
               curr-is-msg? (= (:content-tag curr) "MsgLike")
-              is-virtual?  (= (:type curr) :virtual)
-              stable-id    (cond
-                             is-virtual? (str "virtual-" (:tag curr) "-" (:ts curr))
-                             (:id curr)  (:id curr)
-                             :else       (:internal-id curr))
+              stable-id    (get-event-id curr)
               can-merge?   (and curr-is-msg?
                                 last-msg
                                 (= (:sender-id curr) (:sender-id last-msg))
