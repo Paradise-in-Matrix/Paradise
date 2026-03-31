@@ -320,7 +320,7 @@ export enum DateDividerMode {
  :sdk/preload-timelines
  (fn [{:keys [db]} [_ room-ids]]
    (let [active-subs   (get db :timeline-subs {})
-         rooms-to-boot (remove #(contains? active-subs %) (take 3 room-ids))]
+         rooms-to-boot (remove #(contains? active-subs %) (take 100 room-ids))]
      (if (seq rooms-to-boot)
        {:dispatch-n (map (fn [rid] [:sdk/boot-timeline rid]) rooms-to-boot)}
        {}))))
