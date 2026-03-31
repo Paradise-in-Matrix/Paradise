@@ -17,7 +17,6 @@
   (let [id   (or (.-roomId obj) (.-id obj))
         name (or (.-displayName obj) (.-name obj) "Unknown")
         type-tag (some-> obj .-roomType .-tag)
-        _ (log/warn name)
         ]
     (if-not id
       nil
