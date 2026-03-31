@@ -303,6 +303,41 @@ export enum DateDividerMode {
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+(re-frame/reg-event-db
+ :sdk/save-focused-timeline
+ (fn [db [_ room-id timeline handle]]
+   (-> db
+       (assoc-in [:timeline-subs room-id :focused-timeline] timeline)
+       (assoc-in [:timeline-subs room-id :focused-handle] handle))))
+
+(re-frame/reg-event-db
+ :sdk/save-live-timeline
+ (fn [db [_ room-id timeline handle t-handle p-handle]]
+   (-> db
+       (assoc-in [:timeline-subs room-id :timeline] timeline)
+       (assoc-in [:timeline-subs room-id :live-handle] handle)
+       (assoc-in [:timeline-subs room-id :typing-handle] t-handle)
+       (assoc-in [:timeline-subs room-id :pag-handle] p-handle)
+       (assoc-in [:timeline/ui-metadata room-id :initialized?] true))))
+
+(re-frame/reg-event-db
+ :timeline/set-loading
+ (fn [db [_ room-id loading?]]
+   (assoc-in db [:timeline/loading-more? room-id] loading?)))
+
+(re-frame/reg-event-fx
+ :sdk/cleanup-timeline
+ (fn [{:keys [db]} [_ room-id]]
+   (when-let [subs (get-in db [:timeline-subs room-id])]
+     (doseq [handle-key [:tl-handle :focused-handle :live-handle :pag-handle :typing-handle]]
+       (when-let [handle (get subs handle-key)]
+         (try
+           (.cancel handle)
+           (catch :default e
+             (log/warn "Failed to cancel handle:" handle-key e))))))
+   {:db (-> db
+            (update :timeline-subs dissoc room-id)
+            (update :timeline-data dissoc room-id))}))
 
 (re-frame/reg-event-db
  :sdk/set-timeline-initialized
