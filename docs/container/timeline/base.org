@@ -138,6 +138,7 @@ each of these later.
          enrich-timeline-items)))
 
 
+
 (re-frame/reg-sub
  :timeline/raw-events
  (fn [db [_ room-id]]
@@ -155,23 +156,7 @@ each of these later.
  (fn [[_ active-room]]
    (re-frame/subscribe [:timeline/raw-events active-room]))
  (fn [raw-events _]
-   (->> raw-events
-        (reduce (fn [acc e]
-                  (let [id-key   (cond
-                                   (= (:type e) :virtual) (str "virtual-" (:tag e) "-" (:ts e))
-                                   (not-empty (:id e))    (:id e)
-                                   :else                  (:internal-id e))
-                        existing (get acc id-key)]
-                    (if (and existing
-                             (not (:is-edited? e))
-                             (<= (:ts e) (:ts existing)))
-                      acc
-                      (assoc acc id-key e))))
-                {})
-        (vals)
-        (sort-by (fn [e]
-                   [(:ts e)
-                    (if (= (:type e) :virtual) 0 1)])))))
+   (deduplicate-events raw-events)))
 
 (re-frame/reg-sub
  :timeline/current-events
