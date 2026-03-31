@@ -224,7 +224,7 @@ export enum DateDividerMode {
                      (let [f-handle (.addListener f-tl #js {:onUpdate #(apply-timeline-diffs! room-id :focused %)})]
                        (re-frame/dispatch [:sdk/save-focused-timeline room-id f-tl f-handle])
                        (re-frame/dispatch [:timeline/set-loading room-id false])
-                       (-> (.paginateBackwards f-tl 15) (p/catch #(log/error "Focused bck pag failed:" %)))))
+                       (-> (.paginateBackwards f-tl 20) (p/catch #(log/error "Focused bck pag failed:" %)))))
                    (p/catch #(log/error "Focused boot failed:" %)))
                (-> (p/let [l-focus  (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false})
                            l-config (.create TimelineConfiguration #js {:focus l-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
