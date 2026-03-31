@@ -42,6 +42,36 @@
 
 
 
+(defn get-event-id [e]
+  (cond
+    (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Div"))
+    (str "virtual-divider-" (format-divider-date (:ts e)))
+
+    (= (:type e) :virtual)
+    (str "virtual-" (:tag e) "-" (:ts e))
+
+    (not-empty (:id e))
+    (:id e)
+
+    :else
+    (:internal-id e)))
+
+
+(defn deduplicate-events [raw-events]
+  (->> raw-events
+       (reduce (fn [acc e]
+                 (let [id-key   (get-event-id e)
+                       existing (get acc id-key)]
+                   (if (and existing
+                            (not (:is-edited? e))
+                            (<= (:ts e) (:ts existing))
+                            (not (and (= (:timeline-source e) :live)
+                                      (= (:timeline-source existing) :focused))))
+                     acc
+                     (assoc acc id-key e))))
+               {})
+       (vals)
+       (sort-by (fn [e] [(:ts e) (if (= (:type e) :virtual) 0 1)]))))
 
 (defn enrich-timeline-items [items]
   (let [clean-items (remove #(and (= (:type %) :virtual)
@@ -54,11 +84,7 @@
         processed
         (let [curr         (first remaining)
               curr-is-msg? (= (:content-tag curr) "MsgLike")
-              is-virtual?  (= (:type curr) :virtual)
-              stable-id    (cond
-                             is-virtual? (str "virtual-" (:tag curr) "-" (:ts curr))
-                             (:id curr)  (:id curr)
-                             :else       (:internal-id curr))
+              stable-id    (get-event-id curr)
               can-merge?   (and curr-is-msg?
                                 last-msg
                                 (= (:sender-id curr) (:sender-id last-msg))
@@ -74,19 +100,9 @@
   (if (empty? raw-events)
     []
     (->> raw-events
-         (reduce (fn [acc e]
-                   (let [id-key   (cond
-                                    (= (:type e) :virtual) (str "virtual-" (:tag e) "-" (:ts e))
-                                    (not-empty (:id e))    (:id e)
-                                    :else                  (:internal-id e))
-                         existing (get acc id-key)]
-                     (if (and existing (not (:is-edited? e)) (<= (:ts e) (:ts existing)))
-                       acc
-                       (assoc acc id-key e))))
-                 {})
-         vals
-         (sort-by (fn [e] [(:ts e) (if (= (:type e) :virtual) 0 1)]))
+         deduplicate-events
          enrich-timeline-items)))
+
 
 
 (re-frame/reg-sub
@@ -106,23 +122,7 @@
  (fn [[_ active-room]]
    (re-frame/subscribe [:timeline/raw-events active-room]))
  (fn [raw-events _]
-   (->> raw-events
-        (reduce (fn [acc e]
-                  (let [id-key   (cond
-                                   (= (:type e) :virtual) (str "virtual-" (:tag e) "-" (:ts e))
-                                   (not-empty (:id e))    (:id e)
-                                   :else                  (:internal-id e))
-                        existing (get acc id-key)]
-                    (if (and existing
-                             (not (:is-edited? e))
-                             (<= (:ts e) (:ts existing)))
-                      acc
-                      (assoc acc id-key e))))
-                {})
-        (vals)
-        (sort-by (fn [e]
-                   [(:ts e)
-                    (if (= (:type e) :virtual) 0 1)])))))
+   (deduplicate-events raw-events)))
 
 (re-frame/reg-sub
  :timeline/current-events
@@ -148,7 +148,8 @@
      (let [client (:client db)]
        (when-let [room (.getRoom client room-id)]
          (p/let [latest-event (.latestEvent room)
-                 event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))]
+                 event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))
+                 ]
            (if event-id
              (do
                (log/info "Latest event found. Booting Oreo Concat for:" room-id)
@@ -159,7 +160,7 @@
                      (let [f-handle (.addListener f-tl #js {:onUpdate #(apply-timeline-diffs! room-id :focused %)})]
                        (re-frame/dispatch [:sdk/save-focused-timeline room-id f-tl f-handle])
                        (re-frame/dispatch [:timeline/set-loading room-id false])
-                       (-> (.paginateBackwards f-tl 15) (p/catch #(log/error "Focused bck pag failed:" %)))))
+                       (-> (.paginateBackwards f-tl 20) (p/catch #(log/error "Focused bck pag failed:" %)))))
                    (p/catch #(log/error "Focused boot failed:" %)))
                (-> (p/let [l-focus  (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false})
                            l-config (.create TimelineConfiguration #js {:focus l-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
@@ -206,11 +207,6 @@
 
 
 
-
-
-
-
-
 (re-frame/reg-event-db
  :sdk/save-focused-timeline
  (fn [db [_ room-id timeline handle]]
@@ -243,6 +239,7 @@
            (.cancel handle)
            (catch :default e
              (log/warn "Failed to cancel handle:" handle-key e))))))
+   (swap! !timeline-queues dissoc [room-id :focused] [room-id :live])
    {:db (-> db
             (update :timeline-subs dissoc room-id)
             (update :timeline-data dissoc room-id))}))
@@ -256,7 +253,7 @@
  :sdk/preload-timelines
  (fn [{:keys [db]} [_ room-ids]]
    (let [active-subs   (get db :timeline-subs {})
-         rooms-to-boot (remove #(contains? active-subs %) (take 3 room-ids))]
+         rooms-to-boot (remove #(contains? active-subs %) (take 100 room-ids))]
      (if (seq rooms-to-boot)
        {:dispatch-n (map (fn [rid] [:sdk/boot-timeline rid]) rooms-to-boot)}
        {}))))
@@ -640,7 +637,6 @@
            [timeline-jump-button do-jump! focus-mode?])]))))
 
 
-
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
         room-meta    @(re-frame/subscribe [:rooms/active-metadata])
@@ -654,6 +650,7 @@
      (if-not active-id
        [:div.timeline-empty "Select a room to start chatting."]
        [:<>
+        ^{:key active-id}
         [virtualized-timeline active-id]
         [message-input]
         [status-indicator active-id]])]))
