@@ -76,31 +76,6 @@ each of these later.
 ****** TODO Describe these
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 
-(re-frame/reg-sub
- :timeline/raw-events
- (fn [db [_ active-room]]
-   (get-in db [:timeline active-room] [])))
-
-(re-frame/reg-sub
- :timeline/sorted-events
- (fn [[_ active-room]]
-   (re-frame/subscribe [:timeline/raw-events active-room]))
- (fn [raw-events _]
-   (->> raw-events
-        (reduce (fn [acc e]
-                  (let [id-key   (or (:internal-id e) (:id e))
-                        existing (get acc id-key)]
-                    (if (and existing
-                             (not (:is-edited? e))
-                             (<= (:ts e) (:ts existing)))
-                      acc
-                      (assoc acc id-key e))))
-                {})
-        (vals)
-        (sort-by (fn [e]
-                   [(:ts e)
-                    (if (= (:type e) :virtual) 0 1)])))))
-
 
 (defn enrich-timeline-items [items]
   (let [clean-items (remove #(and (= (:type %) :virtual)
