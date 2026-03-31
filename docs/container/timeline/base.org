@@ -129,6 +129,60 @@ each of these later.
                  (conj processed new-item)
                  (if curr-is-msg? new-item last-msg)))))))
 
+(defn process-timeline [raw-events]
+  (if (empty? raw-events)
+    []
+    (->> raw-events
+         (reduce (fn [acc e]
+                   (let [id-key   (cond
+                                    (= (:type e) :virtual) (str "virtual-" (:tag e) "-" (:ts e))
+                                    (not-empty (:id e))    (:id e)
+                                    :else                  (:internal-id e))
+                         existing (get acc id-key)]
+                     (if (and existing (not (:is-edited? e)) (<= (:ts e) (:ts existing)))
+                       acc
+                       (assoc acc id-key e))))
+                 {})
+         vals
+         (sort-by (fn [e] [(:ts e) (if (= (:type e) :virtual) 0 1)]))
+         enrich-timeline-items)))
+
+
+(re-frame/reg-sub
+ :timeline/raw-events
+ (fn [db [_ room-id]]
+   (let [focused-data (get-in db [:timeline-data room-id :focused] [])
+         live-data    (get-in db [:timeline-data room-id :live] [])]
+     (concat focused-data live-data))))
+
+(re-frame/reg-event-db
+ :sdk/update-timeline
+ (fn [db [_ room-id source new-raw-events]]
+   (assoc-in db [:timeline-data room-id source] new-raw-events)))
+
+(re-frame/reg-sub
+ :timeline/sorted-events
+ (fn [[_ active-room]]
+   (re-frame/subscribe [:timeline/raw-events active-room]))
+ (fn [raw-events _]
+   (->> raw-events
+        (reduce (fn [acc e]
+                  (let [id-key   (cond
+                                   (= (:type e) :virtual) (str "virtual-" (:tag e) "-" (:ts e))
+                                   (not-empty (:id e))    (:id e)
+                                   :else                  (:internal-id e))
+                        existing (get acc id-key)]
+                    (if (and existing
+                             (not (:is-edited? e))
+                             (<= (:ts e) (:ts existing)))
+                      acc
+                      (assoc acc id-key e))))
+                {})
+        (vals)
+        (sort-by (fn [e]
+                   [(:ts e)
+                    (if (= (:type e) :virtual) 0 1)])))))
+
 (re-frame/reg-sub
  :timeline/current-events
  (fn [[_ active-room]]
