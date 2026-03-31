@@ -19,7 +19,7 @@
       line-height: 1;
 }
 
-.timeline-header {
+  .timeline-header {
       display: flex;
       align-items: baseline;
       gap: 8px;
@@ -284,7 +284,7 @@
   .timeline-body p + p {
      /*
       margin-top: 8px;
-  */
+  ,*/
   }
 
   .message-list {
@@ -357,10 +357,6 @@
       margin-top: -8px;
   }
 
-  .timeline-message.is-merged {
-      padding-top: 2px;
-  }
-  
 
 /*
 Testing to see if this solves the final calc issue
@@ -377,8 +373,8 @@ Testing to see if this solves the final calc issue
 }
 
   .timeline-item {
-      padding-top: 8px;
-      padding-bottom: 8px;
+      padding-top: 0px;
+      padding-bottom: 0px;
 }
 
   .timeline-item:last-child {
@@ -418,21 +414,23 @@ Testing to see if this solves the final calc issue
   }
 
   .timeline-message.is-merged {
-          padding-top: 0px;
-          padding-bottom: 4px;
 
-          padding-top: -4px;
+      padding-top: 0px;
+
+      padding-bottom: 0px;
+
   }
 
   .timeline-message:hover .message-hover-toolbar {
       display: flex;
   }
 
+
   .message-hover-toolbar {
       position: absolute;
   /*
       top: -4px;
-  */
+  ,*/
       right: 16px;
       display: none;
       background: #2b2d31;
@@ -734,3 +732,7 @@ Testing to see if this solves the final calc issue
       border-color: #0088cc;
       color: #0088cc;
   }
+
+
+
+
