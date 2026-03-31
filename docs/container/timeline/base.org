@@ -76,6 +76,36 @@ each of these later.
 ****** TODO Describe these
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 
+(defn get-event-id [e]
+  (cond
+    (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Div"))
+    (str "virtual-divider-" (format-divider-date (:ts e)))
+
+    (= (:type e) :virtual)
+    (str "virtual-" (:tag e) "-" (:ts e))
+
+    (not-empty (:id e))
+    (:id e)
+
+    :else
+    (:internal-id e)))
+
+
+(defn deduplicate-events [raw-events]
+  (->> raw-events
+       (reduce (fn [acc e]
+                 (let [id-key   (get-event-id e)
+                       existing (get acc id-key)]
+                   (if (and existing
+                            (not (:is-edited? e))
+                            (<= (:ts e) (:ts existing))
+                            (not (and (= (:timeline-source e) :live)
+                                      (= (:timeline-source existing) :focused))))
+                     acc
+                     (assoc acc id-key e))))
+               {})
+       (vals)
+       (sort-by (fn [e] [(:ts e) (if (= (:type e) :virtual) 0 1)]))))
 
 (defn enrich-timeline-items [items]
   (let [clean-items (remove #(and (= (:type %) :virtual)
