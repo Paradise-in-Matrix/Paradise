@@ -581,8 +581,7 @@ We also don't want to list our own name, so we remove that too.
    [(re-frame/subscribe [:timeline/current-events room-id])
     (re-frame/subscribe [:sdk/profile])])
  (fn [[events profile] _]
-   (log/error events)
-   (let [my-id        (:user-id profile)
+   (let [my-id         (:user-id profile)
          actual-events (filter #(= (:type %) :event) events)
          latest-event  (last actual-events)
          read-by       (or (:read-by latest-event) [])
