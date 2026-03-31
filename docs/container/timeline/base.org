@@ -306,6 +306,7 @@ export enum DateDividerMode {
            (.cancel handle)
            (catch :default e
              (log/warn "Failed to cancel handle:" handle-key e))))))
+   (swap! !timeline-queues dissoc [room-id :focused] [room-id :live])
    {:db (-> db
             (update :timeline-subs dissoc room-id)
             (update :timeline-data dissoc room-id))}))
