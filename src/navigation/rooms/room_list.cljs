@@ -156,7 +156,7 @@
                        (-> (apply-matrix-diffs current-rooms updates #(parse-room client space-service %))
                            (p/then (fn [next-rooms]
                                      (re-frame/dispatch-sync [:room-list/set-home-rooms-sync next-rooms])
-                                     (re-frame/dispatch [:room-list/set-home-rooms next-rooms])))
+                                     #_(re-frame/dispatch [:room-list/set-home-rooms next-rooms])))
                            (p/catch (fn [err]
                                       (log/error "Global Diff Panic:" err)
                                       nil)))))))))
@@ -173,10 +173,10 @@
  (fn [db [_ rooms]]
    (assoc db :rooms rooms)))
 
-(re-frame/reg-event-fx
+#_(re-frame/reg-event-fx
  :room-list/set-home-rooms
  (fn [_ [_ rooms]]
-   (let [top-room-ids (take 5 (map #(.-id %) rooms))]
+   (let [top-room-ids (take 25 (map #(.-id %) rooms))]
      {:dispatch [:sdk/preload-timelines top-room-ids]})))
 
 (re-frame/reg-event-db
@@ -208,6 +208,7 @@
                                              (aset r "parents" (aget old-room "parents"))
                                              (aset r "first-parent-id" pid)))))
                                      (re-frame/dispatch-sync [:room-list/set-bg-rooms-sync next-rooms])
+                                     (re-frame/dispatch [:room-list/set-bg-rooms next-rooms])
                                      (doseq [r next-rooms]
                                        (when-not (aget r "first-parent-id")
                                          (let [id (or (.-id r) (.-roomId r) (aget r "roomId"))]
@@ -230,6 +231,14 @@
      (assoc db
             :bg-rooms-array rooms-list
             :rooms-unfiltered-cache rooms-map))))
+
+
+(re-frame/reg-event-fx
+ :room-list/set-bg-rooms
+ (fn [_ [_ rooms]]
+   (let [top-room-ids (take 50 (map #(.-id %) rooms))
+         ]
+     {:dispatch [:sdk/preload-timelines top-room-ids]})))
 
 (re-frame/reg-event-db
  :room-list/save-bg-list-handle
