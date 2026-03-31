@@ -271,7 +271,7 @@ and notify reframe properly.
                        (-> (apply-matrix-diffs current-rooms updates #(parse-room client space-service %))
                            (p/then (fn [next-rooms]
                                      (re-frame/dispatch-sync [:room-list/set-home-rooms-sync next-rooms])
-                                     (re-frame/dispatch [:room-list/set-home-rooms next-rooms])))
+                                     #_(re-frame/dispatch [:room-list/set-home-rooms next-rooms])))
                            (p/catch (fn [err]
                                       (log/error "Global Diff Panic:" err)
                                       nil)))))))))
@@ -288,10 +288,10 @@ and notify reframe properly.
  (fn [db [_ rooms]]
    (assoc db :rooms rooms)))
 
-(re-frame/reg-event-fx
+#_(re-frame/reg-event-fx
  :room-list/set-home-rooms
  (fn [_ [_ rooms]]
-   (let [top-room-ids (take 5 (map #(.-id %) rooms))]
+   (let [top-room-ids (take 25 (map #(.-id %) rooms))]
      {:dispatch [:sdk/preload-timelines top-room-ids]})))
 
 (re-frame/reg-event-db
