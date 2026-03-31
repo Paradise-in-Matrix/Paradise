@@ -142,7 +142,7 @@
 
 .message-preview-card {
     padding: 12px;
-    padding-bottom: 16px;
+    margin-bottom: 16px;
     background: var(--surface-2);
     border: 1px solid var(--border-color);
     border-radius: 8px;
