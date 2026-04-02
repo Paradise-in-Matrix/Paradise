@@ -101,3 +101,124 @@ behaviors against the Rust sdk.
 This is a good spot to explore what the Rust FFI exposes to use in the client as well.
 Such as the space_service is useful to avoid manaul calculation of the spaces vs rooms.
 Well. So we thought anyway. It appears to not be as innately useful as initially thought.
+
+
+***** Building a Client object
+
+This actually was relatively quick to figure out, but the client builder merely takes
+a few options. It is fairly dynamically configurable as is. Still, more time was spent
+ensuring this could be used for both login and restore session.
+So we allow nullish options in passphrase and store-id and if they're null
+we generate them. If they are not null then we read from the value passed.
+At the end of the process once the client object is 'built' we try to run the
+login or restoreSession method depending on what is passed through to restore-or-login!
+
+
+Now later we need some helper functions to determine which session we are currently in.
+This is a functionality useful to supporting multiple accounts at once.
+
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(defn maybe-local-session []
+  (p/let [store (SessionStore.)
+          sessions (.loadSessions store)
+          user-id (first (js/Object.keys sessions))]
+    (when user-id (aget sessions user-id))))
+
+(defn get-specific-session [target-user-id]
+  (p/let [store (SessionStore.)
+          sessions (.loadSessions store)]
+    (aget sessions target-user-id)))
+
+#+end_src
+
+
+Now this is actually the method that builds our client object.
+Some important little notes I can add here, but the sliding sync
+version really just determines whether it is enabled or not.
+If the version is anything but 0 then it'll use Sliding Sync.
+
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(defn build-client [hs passphrase? store-id? restore-or-login!]
+  (p/let [sdk-root (if (.-ClientBuilder sdk) sdk (.-default sdk))
+          ClientBuilder (.-ClientBuilder sdk-root)
+          SSVBuilder    (.-SlidingSyncVersionBuilder sdk-root)
+          IDBBuilder    (.-IndexedDbStoreBuilder sdk-root)
+          store (SessionStore.)
+          store-id   (or store-id? (.generateStoreId store))
+          passphrase (or passphrase? (.generatePassphrase store))
+          store-name (.getStoreName store store-id)
+          store-config (-> (new IDBBuilder store-name)
+                           (.passphrase passphrase))
+          builder (-> (new ClientBuilder)
+                      (.serverNameOrHomeserverUrl hs)
+                      (.indexeddbStore store-config)
+                      (.autoEnableCrossSigning true)
+                      (cond-> (nil? passphrase?)
+                        (.slidingSyncVersionBuilder (.-DiscoverNative SSVBuilder))))
+          client  (.build builder)
+          _ (restore-or-login! client)
+          session (.session client)
+          _ (or passphrase? (.save store session passphrase store-id))]
+    client))
+#+end_src
+
+
+
+Now we can provide our application initialization and attempt to restore the previous login session.
+If the previous login session is found, then we start-syncing and kick off the client's run.
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :bootstrap
+  (fn [{:keys [target-user-id]}]
+    (go
+      (try
+        (<p! (p/let [data? (if target-user-id
+                             (get-specific-session target-user-id)
+                             (maybe-local-session))]
+               (if data?
+                 (p/let [session (.-session data?)
+                         hs-url  (.-homeserverUrl session)
+                         uid     (.-userId session)
+                         token   (.-accessToken session)
+                         dev-id  (.-deviceId session)
+                         client  (build-client hs-url
+                                               (.-passphrase data?)
+                                               (.-storeId data?)
+                                               #(.restoreSession % session))]
+                   (reset! state/!media-cache nil)
+                   (reset! state/!client client)
+                   {:status :success
+                    :user-id uid
+                    :hs-url hs-url
+                    :session-data {:accessToken token
+                                   :homeserverUrl hs-url
+                                   :userId uid
+                                   :deviceId dev-id}})
+                 {:status :empty})))
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+
+(worker/register :login
+                 (fn [{:keys [hs user pass]}]
+                   (go
+                     (try
+                       (<p! (p/let [client  (build-client hs nil nil #(.login % user pass))
+                                    session (.session client)
+                                    uid     (.-userId session)
+                                    hs-url  (.-homeserverUrl session)
+                                    token   (.-accessToken session)
+                                    dev-id  (.-deviceId session)]
+                              (reset! state/!client client)
+                              (reset! state/!media-cache nil)
+
+                              {:status :success
+                               :user-id uid
+                               :hs-url hs-url
+                               :session-data {:accessToken token
+                                              :homeserverUrl hs-url
+                                              :userId uid
+                                              :deviceId dev-id}}))
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+
+#+end_src
