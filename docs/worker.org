@@ -222,3 +222,34 @@ If the previous login session is found, then we start-syncing and kick off the c
                          {:status :error :msg (str e)})))))
 
 #+end_src
+
+
+This initializes many of the client services. They are somewhat better described
+in their respective files, but in short the room list service handles
+informing the sdk on what to sync. We just choose allRooms for ease now. I'm sure
+that isn't exactly the most effective solution, but it'll do for now.
+
+The space service would be more useful if the Space Room children worked properly,
+but I'll probably have complaints about that throughout the project.
+Either way, it is still useful for creating the parent-child relationships for
+spaces and their rooms.
+
+The sync service is the actual service that tries to sync with the home server.
+
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :start-sync
+                 (fn [_]
+                   (go
+                     (try
+                       (<p! (p/let [client       @state/!client
+                                    sync-service (-> (.syncService client) (.withOfflineMode) (.finish))
+                                    rls-instance (.roomListService sync-service)
+                                    room-list    (.allRooms rls-instance)
+                                    space-service (.spaceService client)]
+                              (rooms/start-room-list-sync! client room-list space-service)
+                              (.start sync-service)
+                              (spaces/init-space-service! client)))
+                       {:status :success}
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+#+end_src
