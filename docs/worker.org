@@ -33,3 +33,29 @@ if applicable.
 #+end_src
 
 
+
+**** Web Worker Examples
+
+The mechanisms we use for the web worker are relatively straightforward
+once you see how they are used. It's effectively a bunch of RPCs between
+the main thread and the web worker. The web worker we want to handle
+all rust-sdk interaction. This creates a nice segmented design between
+the Rust SDK operations and the actual UI. It also provides a guide
+for creating future multi-threaded operations for the client.
+
+At some point I would like to revise the cljs-workers library, but
+for now it is plenty sufficient for what we need. That said, it isn't
+actually super complex as it is just a wrapper for common web worker
+operations.
+
+#+begin_src clojurescript
+
+#+end_src
+
+
+#+begin_src clojurescript
+
+#+end_src
+
+
+
