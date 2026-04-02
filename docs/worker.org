@@ -253,3 +253,51 @@ The sync service is the actual service that tries to sync with the home server.
                        (catch :default e
                          {:status :error :msg (str e)})))))
 #+end_src
+
+
+
+
+
+
+
+
+
+Fetching the profile is a promise, so it is reasonable for now
+to separate it into its own sort of call instead of just
+bundling in the client context. I may revisit though.
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :fetch-profile
+                 (fn [_]
+                   (go
+                     (try
+                       (let [client  @state/!client
+                             user-id (.-userId (.session client))
+                             profile (<p! (.getProfile client user-id))]
+                         {:status :success
+                          :profile {:user-id user-id
+                                    :display-name (.-displayName profile)
+                                    :avatar-url   (.-avatarUrl profile)}})
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+#+end_src
+
+This is more or less the same info we store in a session object, so we just neatly
+want to provide the UI a way to request this info. It'll use it in a great number
+of locations.
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :get-client-context
+                 (fn [_]
+                   (go
+                     (try
+                       (if-let [client @state/!client]
+                         (let [session (.session client)]
+                           {:status :success
+                            :session {:userId        (.-userId session)
+                                      :deviceId      (.-deviceId session)
+                                      :accessToken   (.-accessToken session)
+                                      :homeserverUrl (.-homeserverUrl session)}})
+                         {:status :error :msg "No active client"})
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+#+end_src
+
