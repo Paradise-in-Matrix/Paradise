@@ -7,6 +7,8 @@ As we've built this out it becomes apparent there would be a tangible gain to se
 the behavior that is ONLY rust-sdk operations from the UI code.
 This would allow our start-up to feel much more instantaneous and incredibly more responsive.
 
+As far as documentation goes, some of it will be ported from the prior implementations location
+if applicable.
 
 **** Imports
 
