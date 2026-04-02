@@ -79,3 +79,25 @@ WASM.
                          {:status :error :msg (str e)})))))
 #+end_src
 
+
+
+
+
+**** Starting the Client
+
+This is more or less where we start our journey of actually interfacing with the
+matrix-rust-sdk WASM bindings. Since the client initialization is relatively 'easy'
+compared to actually making use of the information and state internally.
+
+It seems that WASM needs camelCase after it is converted from Rust.
+So entries_handle becomes entriesStream
+
+We started with view models but eventually moved towards more Clojure native
+implementations that align better with reframe to make writing more idiomatic.
+As such it becomes much simpler to initialize and manage the state.
+Though this does mean we'll retroactively need to add methods to do certain
+behaviors against the Rust sdk.
+
+This is a good spot to explore what the Rust FFI exposes to use in the client as well.
+Such as the space_service is useful to avoid manaul calculation of the spaces vs rooms.
+Well. So we thought anyway. It appears to not be as innately useful as initially thought.
