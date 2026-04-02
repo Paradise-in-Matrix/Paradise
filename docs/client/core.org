@@ -1,5 +1,5 @@
 
-** Core Namespace
+** Core
 
 The initial namespace in which we start the application.
 We'll aim to keep everything neatly segmented, but as we start scaffolding
