@@ -59,3 +59,23 @@ operations.
 
 
 
+
+
+**** Initialize the Wasm
+
+
+So the first thing we need to do is actually initialize the
+WASM.
+
+
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :init-wasm
+                 (fn [_]
+                   (go
+                     (try
+                       (<p! (sdk/uniffiInitAsync))
+                       {:status :success}
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+#+end_src
+
