@@ -301,3 +301,110 @@ of locations.
                          {:status :error :msg (str e)})))))
 #+end_src
 
+
+
+**** Settings related (will likely be moved)
+
+
+***** Pushers
+
+Having written the service worker and notifications for another client before
+these aren't exactly too different. I'll come back to these and document them
+a bit better though. The service worker itself is decently covered though.
+
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :register-pusher
+  (fn [{:keys [p256dh auth endpoint app-id push-url app-name lang]}]
+    (go
+      (try
+        (let [client     @state/!client
+              hs-url     (.homeserver client)
+              token      (.-accessToken (.session client))
+              clean-base (str/replace hs-url #"/+$" "")
+              url        (str clean-base "/_matrix/client/v3/pushers/set")
+              payload    {:kind "http"
+                          :app_id app-id
+                          :pushkey p256dh
+                          :app_display_name app-name
+                          :device_display_name "Web Browser"
+                          :lang lang
+                          :append false
+                          :data {:url push-url
+                                 :events_only true
+                                 :endpoint endpoint
+                                 :p256dh p256dh
+                                 :auth auth}}
+              resp       (<p! (js/fetch url #js {:method "POST"
+                                                 :headers #js {"Authorization" (str "Bearer " token)
+                                                               "Content-Type" "application/json"}
+                                                 :body (js/JSON.stringify (clj->js payload))}))]
+          (if (.-ok resp)
+            {:status :success}
+            (let [err-body (<p! (.json resp))]
+              {:status :error :msg err-body})))
+        (catch :default e
+          {:status :error :msg (str e)})))))
+#+end_src
+
+
+
+***** Session Recovery (Verification)
+
+The Rust-SDK actually neatly handles recovery keys. So we just pass it the module
+it expects and then the recovery key... and that actually is it. It'll handle
+Everything else from there.
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :recover-session
+                 (fn [{:keys [recovery-key]}]
+                   (go
+                     (try
+                       (if-let [client @state/!client]
+                         (let [encryption-module (.encryption client)]
+                           (log/info "Attempting session recovery with key length:" (count recovery-key))
+                           (<p! (.recover encryption-module recovery-key))
+                           (log/info "Session recovery successful!")
+                           {:status :success})
+                         {:status :error :msg "No active client"})
+                       (catch :default e
+                         (let [err-str (or (.-message e) (str e))]
+                           (log/error "Recovery FFI Panic:" err-str)
+                           {:status :error :msg err-str}))))))
+#+end_src
+
+
+***** Account Aggregation
+
+For multi-account we need to neatly be able to aggregate the accounts we're signed
+into.
+
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :get-available-accounts
+                 (fn [_]
+                   (go
+                     (try
+                       (<p! (p/let [store (SessionStore.)
+                                    sessions (.loadSessions store)]
+                              (let [accs (for [uid (js/Object.keys sessions)
+                                               :let [data (aget sessions uid)
+                                                     session (.-session data)]]
+                                           {:userId uid
+                                            :hs_url (.-homeserverUrl session)})]
+                                {:status :success :accounts (vec accs)})))
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+#+end_src
+
+
+And of course we need to be able to grab the account data for an account as well.
+#+begin_src clojurescript :tangle ../src/worker.cljs
+(worker/register :get-account-data
+                 (fn [{:keys [event-type]}]
+                   (go
+                     (try
+                       (if-let [client @state/!client]
+                         (let [data (<p! (.accountData client event-type))]
+                           {:status :success :data data})
+                         {:status :error :msg "No active client"})
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+#+end_src
