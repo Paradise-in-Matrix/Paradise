@@ -21,8 +21,49 @@ pieces.
 #+end_src
 
 
+**** The Web Worker
 
-**** Reframe event and subscriptions 
+So we need to initialize the web worker more or less immediately
+
+Now we want these to behave as a stream, so we register them and what
+reframe event they should trigger here.
+#+begin_src clojurescript :tangle ../../src/client/core.cljs
+(defn handle-worker-stream! [data]
+  (let [msg-type (:type data)]
+    (case msg-type
+      "home-rooms-diff"      (re-frame/dispatch [:room-list/set-home-rooms-sync (:rooms data)])
+      "bg-rooms-diff"        (re-frame/dispatch [:room-list/set-bg-rooms-sync (:rooms data)])
+      "global-spaces-diff"   (re-frame/dispatch [:sdk/set-spaces-list-sync (:spaces data)])
+      "space-rooms-diff"     (re-frame/dispatch [:sdk/update-space-view (:space-id data) (:rooms data)])
+      "room-parent-resolved" (re-frame/dispatch [:rooms/apply-parent-resolution (:room-id data) (:first-parent-id data)])
+      "room-preview-resolved"  (re-frame/dispatch [:rooms/set-preview (:room-id data) (:preview data)])
+      "timeline-diff"
+      (let [source (keyword (:source data))
+            events (mapv (fn [e]
+                           (-> e
+                               (assoc :timeline-source source)
+                               (update :type keyword)))
+                         (:events data))]
+        (re-frame/dispatch [:sdk/update-timeline (:room-id data) source events]))
+
+      "widget-message"    (re-frame/dispatch [:call/recv-widget-message (:data data)])
+      "timeline-loading"  (re-frame/dispatch [:timeline/set-loading (:room-id data) (:loading? data)])
+      "typing-update"     (re-frame/dispatch [:sdk/update-typing-users (:room-id data) (:users data)])
+      "pagination-status" (re-frame/dispatch [:sdk/update-pagination-status (:room-id data) (:status data)])
+      nil)))
+#+end_src
+
+Now we want to just create a pool of one for the rust-sdk to execute on.
+#+begin_src clojurescript :tangle ../../src/client/core.cljs
+(defn init-worker! []
+  (when-not @state/!engine-pool
+    (reset! state/!engine-pool
+            (main/create-pool 1 "engine.js"
+                              {:worker-opts #js {:type "module"}
+                               :on-stream handle-worker-stream!}))))
+#+end_src
+
+
 
 We intend to this to be passed as a callback where needed and handle any client
 operations here up until the point in which the client is 'started'.
