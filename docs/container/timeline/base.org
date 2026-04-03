@@ -699,7 +699,13 @@ list for use cases like this either.
                           (reset! !prev-last-id current-last-id)) 0)
 
         [:div.virtua-timeline-wrapper
-         {:style {:flex 1 :position "relative" :display "flex" :flex-direction "column" :min-height 0}}
+         {:style {:flex 1
+                  :position "relative"
+                  :display "flex"
+                  :flex-direction "column"
+                  :min-height 0
+                  :opacity (if @!initialized? 1 0)
+                  :transition "opacity 0.15s ease-in-out"}}
 
          [:div.timeline-messages
           {:class (when jump-target "jumping-animation")
