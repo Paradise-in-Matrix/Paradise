@@ -462,12 +462,12 @@ The major functionality we need is to register the service worker itself.
 We do so while passing off the session token so that the service worker
 may immediately begin to render our images.
 #+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
-(defn register-sw! [session]
+(defn register-sw! []
   (when (exists? js/navigator.serviceWorker)
     (let [sw-container js/navigator.serviceWorker
           try-sync!    (fn []
-                         (when (and (.-controller sw-container) session)
-                           (re-frame/dispatch [:auth/sync-sw-only session])))]
+                         (when (.-controller sw-container)
+                           (re-frame/dispatch [:auth/sync-sw-with-worker])))]
 
       (-> (.register sw-container "/sw.js" #js {:type "module"})
           (.then (fn [reg]
