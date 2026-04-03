@@ -39,22 +39,26 @@ We'll need a way to generically upload to Matrix for anything from updating avat
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
 (re-frame/reg-event-fx
  :sdk/upload-media
- (fn [{:keys [db]} [_ file on-success-event]]
-   (let [client (:client db)
-         reader (js/FileReader.)]
-     (if (and client file)
+ (fn [_ [_ file on-success-event]]
+   (let [reader (js/FileReader.)]
+     (if file
        (do
          (set! (.-onload reader)
                (fn [e]
                  (let [buffer (.. e -target -result)
-                       mime (.-type file)]
-                   (-> (.uploadMedia client mime buffer js/undefined)
-                       (p/then (fn [mxc-url]
-                                 (re-frame/dispatch (conj on-success-event mxc-url))))
-                       (p/catch #(log/error "Generic Upload Failed:" %))))))
+                       mime   (.-type file)]
+                   (if-let [pool @login/!engine-pool]
+                     (go
+                       (let [res (<! (main/do-with-pool! pool {:handler :upload-media
+                                                               :arguments {:mime mime :buffer buffer}}))]
+                         (if (= (:status res) "success")
+                           (re-frame/dispatch (conj on-success-event (:url res)))
+                           (log/error "Upload failed:" (:msg res)))))
+                     (log/error "No engine pool for upload")))))
          (.readAsArrayBuffer reader file)
-         {:db (assoc db :uploading-files? true)})
-       (do (js/console.warn "Missing client or file for generic upload") {})))))
+         {:db (assoc (re-frame/db) :uploading-files? true)})
+       (do (log/warn "Missing file for upload") {})))))
+
 #+end_src
 
 
