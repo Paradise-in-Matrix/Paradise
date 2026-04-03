@@ -32,45 +32,6 @@ https://spec.matrix.org/v1.17/client-server-api/#post_matrixclientv3search
 #+end_src
 
 
-**** Helper Functions
-
-So Search results obviously don't come back in the event form
-we use for Timelines, so we need to coerce them into the right
-shape.
-Below are some helper functions we use to do just that.
-
-#+begin_src clojurescript :tangle ../../src/container/search.cljs
-(defn msgtype->rust-tag [msgtype]
-  (case msgtype
-    "m.text"   "Text"
-    "m.emote"  "Emote"
-    "m.notice" "Notice"
-    "m.image"  "Image"
-    "m.video"  "Video"
-    "m.audio"  "Audio"
-    "m.file"   "File"
-    "Text"))
-
-(defn normalize-search-result [hit]
-  (let [evt          (:result hit)
-        raw-content  (:content evt)
-        edited?      (some? (:m.new_content raw-content))
-        real-content (if edited? (:m.new_content raw-content) raw-content)
-        msgtype      (:msgtype real-content)]
-    {:id          (:event_id evt)
-     :internal-id (:event_id evt)
-     :sender-id   (:sender evt)
-     :ts          (:origin_server_ts evt)
-     :is-edited?  edited?
-     :content-tag "MsgLike"
-     :content     {:tag "Message"
-                   :inner {:tag     (msgtype->rust-tag msgtype)
-                           :content real-content}}
-     :type        :timeline}))
-#+end_src
-
-
-
 **** Reframe Subscriptions and Events
 
 
