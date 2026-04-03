@@ -16,20 +16,10 @@ So this is where we'll start allowing that logic to live.
 (ns navigation.rooms.entry
   (:require
    [clojure.string :as str]
-   [promesa.core :as p]
    [re-frame.core :as re-frame]
-   [taoensso.timbre :as log]
-   [re-frame.db :as db]
-   ["react-virtuoso" :refer [Virtuoso]]
-   [promesa.core :as p]
    [reagent.core :as r]
    [utils.svg :as icons]
-   [reagent.dom.client :as rdom]
-   [navigation.rooms.room-summary :refer [build-room-summary]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [utils.global-ui :refer [avatar long-press-props]]
-   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory RoomListLoadingState]])
-  (:require-macros [utils.macros :refer [ocall oget]]))
+   [utils.global-ui :refer [avatar long-press-props]]))
 #+end_src
 
 
