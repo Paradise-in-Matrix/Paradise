@@ -401,8 +401,19 @@ facilitates the iframe and the widget in the rust-sdk.
 
 
 #+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+(defonce window-listener-attached? (atom false))
 
 
+(rf/reg-event-fx
+ :call/finalize-init
+ (fn [{:keys [db]} [_ room-id new-primary? is-encrypted? final-url]]
+   {:db (-> db
+            (assoc-in [:call :active-room-id] room-id)
+            (assoc-in [:call :widget-url] final-url)
+            (assoc-in [:call :primary-iframe?] new-primary?)
+            (assoc-in [:call :encrypted?] is-encrypted?)
+            (assoc-in [:call :loading?] false))
+    :dispatch [:call/attach-window-listener]}))
 
 From this point we can start staging the actual ElementCallWidget inside the
 rust-sdk and coercing it to communicate with the Element call iframe over
