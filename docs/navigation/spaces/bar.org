@@ -1,8 +1,7 @@
 
 ** Spaces
 
-Spaces rendering. Now Aurora doesn't actually have a way to render spaces on the side bar currently, so we'll now be starting to cook up
-our own solutions for things.
+Spaces rendering.
 
 The logical starting point is ensuring that there isn't any internal structure for the Rust sdk that trivializes this further.
 I am aware, however, that as spaces are just rooms the room object contains a flag that outlines whether an item is a space or
