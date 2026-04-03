@@ -7,10 +7,10 @@
 
 *** Constants and Utilities
 
-First, we define the key used in localStorage.
-This is the "root" key under which all user sessions will be serialized.
+First, we define the file used in OPFS.
+This is the "root" file under which all user sessions will be serialized.
 #+begin_src clojurescript :tangle ../../src/client/session_store.cljs
-(def ^:private storage-key "mx_session_v3")
+(def ^:private file-name "mx_session_v3.json")
 #+end_src
 
 
