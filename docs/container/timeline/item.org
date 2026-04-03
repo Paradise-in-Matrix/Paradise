@@ -629,19 +629,16 @@ individual's display name.
         node-ref (volatile! nil)]
     (r/create-class
      {:display-name (str "event-tile-" id)
-
       :component-did-mount
       (fn [this]
         (let [node @node-ref]
           (when (and node (not is-virtual?) @visibility-observer)
             (.observe @visibility-observer node))))
-
       :component-will-unmount
       (fn [this]
         (let [node @node-ref]
           (when (and node (not is-virtual?) @visibility-observer)
             (.unobserve @visibility-observer node))))
-
       :reagent-render
       (fn [item]
         [:div {:data-event-id id
