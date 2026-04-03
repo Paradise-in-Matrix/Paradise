@@ -131,43 +131,6 @@ not (among many other indicators).
                (merge {:id id :is-space? is-space? :name "Loading..."}
                       rich-room)))
            child-refs))))
-
-(re-frame/reg-event-db
- :sdk/update-space-view
- (fn [db [_ space-id space-items]]
-   (let [children-refs (mapv (fn [item]
-                               {:id        (or (:id item) (.-roomId item) (.-id item))
-                                :is-space? (:is-space? item)})
-                             space-items)
-         _ (log/debug children-refs)
-         ]
-     (assoc-in db [:space-children space-id] children-refs))))
-
-(re-frame/reg-event-db
- :sdk/set-space-service
- (fn [db [_ service]]
-   (assoc db :space-service service)))
-#+end_src
-
-
-**** Selection
-
-#+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
-(re-frame/reg-event-fx
- :space/select
- (fn [{:keys [db]} [_ space-id]]
-   (let [current-space (:active-space-id db)]
-     (if (= current-space space-id)
-       (do (process-parent-queue!)
-       {})
-       {:db (-> db
-                (assoc :active-space-id space-id)
-                (assoc :active-room-id nil))
-        :dispatch-n (if space-id
-                      [[:sdk/paginate-space space-id]
-                       [:sdk/fetch-room-emotes :space space-id]
-                       [:sdk/fetch-space-hierarchy space-id]]
-                      [[:room-list/apply-filter "people"]])}))))
 #+end_src
 
 
