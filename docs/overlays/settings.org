@@ -463,6 +463,10 @@ This needs to be organized a bit better (and documented better).
 ***** Reframe event, effects, and subscriptions
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+
+
+
+
 (re-frame/reg-fx
  :idb/fetch-sessions
  (fn [on-success-event]
@@ -488,10 +492,18 @@ This needs to be organized a bit better (and documented better).
                    (.close db)
                    (re-frame/dispatch (conj on-success-event []))))))))))
 
+
 (re-frame/reg-event-fx
  :settings/load-accounts
- (fn [{:keys [db]} _]
-   {:idb/fetch-sessions [:settings/set-accounts]}))
+ (fn [_ _]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :get-available-accounts}))]
+         (if (= (:status res) "success")
+           (re-frame/dispatch [:settings/set-accounts (:accounts res)])
+           (log/error "Failed to fetch accounts from worker:" (:msg res)))))
+     (log/warn "Cannot load accounts: No engine pool"))
+   {}))
 
 (re-frame/reg-event-db
  :settings/set-accounts
@@ -546,7 +558,6 @@ This needs to be organized a bit better (and documented better).
        [:button.form-button
         {:on-click #(re-frame/dispatch [:auth/start-login-flow])}
         (str "+ " (tr [:settings.accounts/add-account]))]]]]))
-
 #+end_src
 
 
