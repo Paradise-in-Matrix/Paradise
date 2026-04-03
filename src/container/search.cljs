@@ -2,108 +2,38 @@
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
-   [promesa.core :as p]
    [clojure.string :as str]
-   ["react-virtuoso" :refer [Virtuoso GroupedVirtuoso]]
+   [cljs-workers.core :as main]
+   [client.state :as state]
+   [cljs.core.async :refer [go <!]]
    [reagent.core :as r]
-   [reagent.dom.client :as rdom]
-   [utils.helpers :refer [mxc->url fetch-state-event]]
    [utils.svg :as icons]
-   [container.reusable :refer [make-timeline-item-shim message-preview-item]]
-   [container.timeline.base :refer [apply-timeline-diffs!]]
-   [container.timeline.item :refer [event-tile]]
-   [utils.svg :as icons]
-   [utils.global-ui :refer [avatar]]
-   ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]
-   )
-  )
-
-(defn msgtype->rust-tag [msgtype]
-  (case msgtype
-    "m.text"   "Text"
-    "m.emote"  "Emote"
-    "m.notice" "Notice"
-    "m.image"  "Image"
-    "m.video"  "Video"
-    "m.audio"  "Audio"
-    "m.file"   "File"
-    "Text"))
-
-(defn normalize-search-result [hit]
-  (let [evt          (:result hit)
-        raw-content  (:content evt)
-        edited?      (some? (:m.new_content raw-content))
-        real-content (if edited? (:m.new_content raw-content) raw-content)
-        msgtype      (:msgtype real-content)]
-    {:id          (:event_id evt)
-     :internal-id (:event_id evt)
-     :sender-id   (:sender evt)
-     :ts          (:origin_server_ts evt)
-     :is-edited?  edited?
-     :content-tag "MsgLike"
-     :content     {:tag "Message"
-                   :inner {:tag     (msgtype->rust-tag msgtype)
-                           :content real-content}}
-     :type        :timeline}))
-
-
-(re-frame/reg-fx
- :room/matrix-search
- (fn [{:keys [homeserver token room-id query]}]
-   (let [base-server  (if (str/starts-with? homeserver "http")
-                        homeserver
-                        (str "https://" homeserver))
-         clean-server (str/replace base-server #"/+$" "")
-         url          (str clean-server "/_matrix/client/v3/search")
-         body (clj->js {:search_categories
-                        {:room_events
-                         {:search_term query
-                          :order_by    "recent"
-                          :filter      {:rooms [room-id]}
-                          :event_context {:before_limit 1 :after_limit 1}}}})]
-     (-> (js/fetch url
-                   #js {:method "POST"
-                        :headers #js {"Authorization" (str "Bearer " token)
-                                      "Content-Type"  "application/json"}
-                        :body (js/JSON.stringify body)})
-         (p/then (fn [res]
-                   (if (.-ok res)
-                     (.json res)
-                     (throw (js/Error. (str "Search failed with status: " (.-status res)))))))
-         (p/then #(re-frame/dispatch [:room/search-success room-id %]))
-         (p/catch #(re-frame/dispatch [:room/search-error room-id %]))))))
-
+   [container.reusable :refer [message-preview-item]]))
 
 (re-frame/reg-event-fx
  :room/execute-search
  (fn [{:keys [db]} [_ room-id query]]
-   (let [client     (:client db)
-          session    (some-> client (.session))
-         homeserver (some-> session (.-homeserverUrl))
-         token      (some-> session (.-accessToken))]
-     (if (and homeserver token (not (str/blank? query)))
+   (if (str/blank? query)
+     (log/warn "Search aborted: Empty query")
+     (do
+       (go
+         (let [pool @state/!engine-pool
+               res  (<! (main/do-with-pool! pool {:handler :search-room
+                                                  :arguments {:room-id room-id :query query}}))]
+           (if (= (:status res) "success")
+             (re-frame/dispatch [:room/search-success room-id (:results res)])
+             (re-frame/dispatch [:room/search-error room-id (:msg res)]))))
        {:db (-> db
                 (assoc-in [:search-data room-id :loading?] true)
                 (assoc-in [:search-data room-id :query] query)
-                (assoc-in [:search-data room-id :results] []))
-        :room/matrix-search {:homeserver homeserver
-                             :token      token
-                             :room-id    room-id
-                             :query      query}}
-       (log/warn "Search aborted: Missing session or empty query")))))
+                (assoc-in [:search-data room-id :results] []))}))))
 
 (re-frame/reg-event-db
  :room/search-success
- (fn [db [_ room-id response]]
-   (log/error response)
-   (let [hits       (some-> response
-        (.-search_categories)
-        (.-room_events)
-        (.-results))
-         normalized (map #(normalize-search-result  (js->clj % :keywordize-keys true)) hits)]
-     (-> db
-         (assoc-in [:search-data room-id :results] normalized)
-         (assoc-in [:search-data room-id :loading?] false)))))
+ (fn [db [_ room-id normalized-hits]]
+   (-> db
+       (assoc-in [:search-data room-id :results] normalized-hits)
+       (assoc-in [:search-data room-id :loading?] false))))
 
 (re-frame/reg-event-db
  :room/search-error
