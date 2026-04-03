@@ -60,6 +60,12 @@ It is convenient to define the actual items that make up a timeline.
  :ui/active-reaction-details
  (fn [db _]
    (:active-reaction-details db)))
+
+(re-frame/reg-sub
+ :sdk/homeserver-url
+ (fn [db _]
+   (:homeserver-url db)))
+
 #+end_src
 
 
