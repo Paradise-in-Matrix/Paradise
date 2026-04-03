@@ -401,20 +401,6 @@ facilitates the iframe and the widget in the rust-sdk.
 
 
 #+begin_src clojurescript :tangle ../../src/container/call/core.cljs
-(def capabilities-provider
-  #js {:acquireCapabilities
-       (fn [requested-caps]
-         (try
-           (let [db @rf-db/app-db
-                 client (:client db)
-                 user-id (.userId client)
-                 device-id (or (some-> client .session .-deviceId) "paradise-web")]
-             (log/debug "UniFFI is calling synchronously for permissions...")
-             (sdk/getElementCallRequiredPermissions user-id device-id))
-           (catch :default e
-             (log/error "Capabilities provider crashed!" e)
-             #js {:read #js [] :send #js []})))})
-#+end_src
 
 
 
