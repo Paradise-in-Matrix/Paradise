@@ -79,31 +79,6 @@ these map with decently descriptive documentation surrounding.
 https://matrix-org.github.io/matrix-rust-sdk/
 
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
-(re-frame/reg-event-fx
- :sdk/upload-and-send-file
- (fn [{:keys [db]} [_ room-id buffer mime filename]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (if-not timeline
-       (log/error "No timeline found for" room-id)
-       (try
-         (let [file-info #js {:mimetype        (or mime "application/octet-stream")
-                              :size            (js/BigInt (.-byteLength buffer))
-                              :thumbnailInfo   js/undefined
-                              :thumbnailSource js/undefined}
-
-               upload-source (.new (.. UploadSource -Data)
-                                   #js {:bytes    buffer
-                                        :filename filename})
-               params (.. UploadParameters
-                          (create #js {:source  upload-source
-                                       :caption filename}))]
-           (.sendFile timeline params file-info)
-           (re-frame/dispatch [:sdk/upload-complete]))
-         (catch :default e
-           (js/console.error "FFI Sync Call Panic:" e)
-           (re-frame/dispatch [:sdk/upload-complete]))))
-     {})))
-#+end_src
 
 
 
