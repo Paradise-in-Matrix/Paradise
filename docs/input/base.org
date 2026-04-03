@@ -136,65 +136,11 @@ buffer of data so we can actually check the data associated and pass it on.
 
 
 
-**** Sending Messages
 
+**** Message Submit
 
-***** Sending Attachments
 
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
-(defn send-attachments! [sdk timeline room attachments text html]
-  (let [total (count attachments)]
-    (p/let [_ (p/loop [idx 0]
-                (when (< idx total)
-                  (let [att       (nth attachments idx)
-                        is-last?  (= idx (dec total))
-                        {:keys [source info type]} (prepare-attachment sdk att)
-                        caption   (if is-last? (or text js/undefined) (:filename att))
-                        formatted (if (and is-last? (not (str/blank? html)))
-                                    #js {:format (.new (.-Html (.-MessageFormat sdk)))
-                                         :body html}
-                                    js/undefined)
-                        params    (.. sdk -UploadParameters
-                                      (create #js {:source source
-                                                   :caption (or caption js/undefined)
-                                                   :formattedCaption (or formatted js/undefined)}))]
-                    (log/info "Sending attachment" (inc idx) "of" total "as" type)
-                    (.sendFile timeline params info)
-                    (p/do! (p/delay 100)
-                           (p/recur (inc idx))))))]
-      (.clearComposerDraft room js/undefined)
-      (doseq [att attachments]
-        (js/URL.revokeObjectURL (:preview-url att)))
-      true)))
-
-  (defn send-all! [timeline attachments text html]
-  (let [total (count attachments)
-        send-one (fn send-one [remaining-atts idx]
-                   (if (empty? remaining-atts)
-                     (js/Promise.resolve true)
-                     (let [att (first remaining-atts)
-                           is-last? (= idx (dec total))
-                           caption   (if is-last? text (:filename att))
-                           formatted (if (and is-last? (not (str/blank? html)))
-                                       #js {:format (.new (.-Html (.-MessageFormat sdk)))
-                                            :body html}
-                                       js/undefined)
-
-                           ffi-att (reify-attachment att)
-                           inner   (.-inner ffi-att)
-                           info    (condp = (.-tag ffi-att)
-                                     "Image" (.-imageInfo inner)
-                                     "Video" (.-videoInfo inner)
-                                     (.-fileInfo inner))
-                           params (.. (.-UploadParameters sdk)
-                                      (create #js {:source (.-source inner)
-                                                   :caption (or caption js/undefined)
-                                                   :formattedCaption (or formatted js/undefined)}))]
-                       (log/info "Sending file" (inc idx) "of" total)
-                       (-> (.sendFile timeline params info)
-                           (.then (fn [] (send-one (rest remaining-atts) (inc idx))))))))]
-    (send-one (vec attachments) 0)))
-#+end_src
 
 
 
