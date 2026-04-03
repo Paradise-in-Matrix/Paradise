@@ -47,36 +47,6 @@
 #+end_src
 
 
-**** Initializing Room List Syncing
-
-We can simplify (and diverge) from Aurora's implementation as View models are very rigid
-and lock us into a certain pattern. Instead we'll just let reframe know the diff and let
-it handle re-rendering directly.
-This can be broken part a bit more for labeling purpose. For now though, it is easily
-described as creating a set of entries (initializing the sliding sync frame size) and
-then attaching an onUpdate to easily refresh those entries without much effort.
-We apply a filter to ensure we don't end up with any duplication on the resulting room list and
-apply it. Then we prompt the app to give us the first page for the controller.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-
-(defn start-room-list-sync! [room-list]
-  (log/debug "Starting Dual Room List Sync (UI + Background)")
-  (p/let [ui-result (.entriesWithDynamicAdaptersWith room-list 200 true
-                                               #js {:onUpdate #(re-frame/dispatch [:room-list/home-rooms-diff %])})
-        ui-controller (.controller ui-result)
-        bg-result (.entriesWithDynamicAdaptersWith room-list 200 true
-                                               #js {:onUpdate #(re-frame/dispatch [:room-list/bg-rooms-diff %])})
-        bg-controller (.controller bg-result)]
-
-    (re-frame/dispatch [:room-list/set-filter "people"])
-    (.setFilter ui-controller (get-rust-filter "people"))
-    (.addOnePage ui-controller)
-    (re-frame/dispatch [:room-list/save-home-list-handle ui-result])
-    (.setFilter bg-controller (get-rust-filter "all"))
-    (.addOnePage bg-controller)
-    (re-frame/dispatch [:room-list/save-bg-list-handle bg-result])))
-#+end_src
-
 
 **** Space Tree Flattening
 
