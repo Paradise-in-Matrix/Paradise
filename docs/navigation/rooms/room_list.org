@@ -395,14 +395,6 @@ and file structures.
 
 
 
-
-
-#+begin_src css :tangle ../../../css/room-list.css
-
-
-#+end_src
-
-
 **** Filter Selection
 
 While setting filters isn't the most resource friendly implementation
