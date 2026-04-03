@@ -531,6 +531,7 @@ individual's display name.
         tr               @(re-frame/subscribe [:i18n/tr])
         active-room      @(re-frame/subscribe [:rooms/active-id])
         my-profile       @(re-frame/subscribe [:sdk/profile])
+        hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
         is-mobile?       @(re-frame/subscribe [:ui/mobile?])
         my-id            (:user-id my-profile)
         edit-context     @(re-frame/subscribe [:input/context active-room])
@@ -541,7 +542,7 @@ individual's display name.
         member-data      (get members-map sender-id)
         popover-member   {:user-id sender-id
                           :display-name (or (:display-name member-data) sender-name)
-                          :avatar-url (or (:avatar-url member-data) (mxc->url sender-avatar))
+                          :avatar-url (or (:avatar-url member-data) (mxc->url sender-avatar {:homeserver hs-url :type :thumbnail :width 48 :height 48}))
                           :power-level (or (:power-level member-data) 0)}
         open-menu-fn     (fn [mx my]
                            (re-frame/dispatch
@@ -559,7 +560,7 @@ individual's display name.
       [swipe-to-action-wrapper
        {:can-edit? is-own?
         :enabled? is-mobile?
-         :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
+        :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
         :wrapper-props (merge (long-press-props open-menu-fn)
                               {:class (str "timeline-message"
                                            (if (= content-tag "MsgLike") " is-message" " is-system")
@@ -579,7 +580,9 @@ individual's display name.
           (= content-tag "MsgLike")
           (let [{:keys [tag inner in-reply-to]} content
                 reply-id  (:event-id in-reply-to)
-                reply-msg (when reply-id @(re-frame/subscribe [:timeline/events-map active-room reply-id]))]
+                events-map  @(re-frame/subscribe [:timeline/events-map active-room])
+                reply-msg (get events-map reply-id)
+                ]
             [:<>
              (when-not merge-with-prev?
                [:div.timeline-header
@@ -589,11 +592,11 @@ individual's display name.
              [:div.timeline-body
               (cond
                 is-editing-this? [inline-editor item active-room]
-                (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg]
+                (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
                 (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
                 (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
                 (= tag "Message") (let [{m-tag :tag m-content :content} inner]
-                                    [render-message-content tr m-tag m-content in-reply-to reply-msg])
+                                    [render-message-content tr m-tag m-content in-reply-to reply-msg item])
                 :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]])
 
           (= content-tag "RoomMembership")
@@ -603,26 +606,17 @@ individual's display name.
           [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
 
           (= content-tag "State")
-                    [state-event-view item]
+          [state-event-view item]
 
-           :else
-          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])]
-
-          )
-
+          :else
+          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])
 
         (when (seq reactions)
           [reaction-row {:reactions reactions
                          :my-id my-id
                          :members-map members-map
                          :active-room active-room
-                         :event-id (:event-or-transaction-id item)}])
-        #_(when (seq read-by)
-            [:div.read-receipts-row
-             [:span.receipt-count (str "✓ " (count read-by))]])]
-
-       ]
-      )))
+                         :event-id (:event-or-transaction-id item)}])]])))
 #+end_src
 
 
