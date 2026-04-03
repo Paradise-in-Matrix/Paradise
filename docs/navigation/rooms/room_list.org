@@ -125,29 +125,37 @@ I add the call room previewing.
 There are our reframe pieces. I'll go into detail on each of them later on. For now this
 is effectively a functioning *stub*.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-(re-frame/reg-sub
- :rooms/active-id
- (fn [db _]
-   (:active-room-id db)))
+(re-frame/reg-sub :rooms/active-id (fn [db _] (:active-room-id db)))
+(re-frame/reg-sub :space-rooms (fn [db _] (vec (or (:space-rooms db) []))))
+(re-frame/reg-sub :rooms/all (fn [db _] (let [rooms (:rooms db)] (if (map? rooms) (vec (vals rooms)) (vec (or rooms []))))))
 
-(re-frame/reg-sub
- :space-rooms
- (fn [db _]
-   (vec (or (:space-rooms db) []))))
 
 (re-frame/reg-sub
  :rooms/active-metadata
  :<- [:rooms/active-id]
  :<- [:rooms/unfiltered-indexed-map]
  (fn [[active-id rooms-map] _]
-   (when active-id
-     (get rooms-map active-id))))
+   (when active-id (get rooms-map active-id))))
+
+
+(re-frame/reg-event-fx
+ :room-list/paginate-global
+ (fn [_ _]
+   (main/do-with-pool! @state/!engine-pool {:handler :paginate-room-list})
+   {}))
+
+(re-frame/reg-event-db
+ :rooms/set-preview
+ (fn [db [_ room-id preview-data]]
+   (assoc-in db [:room-previews room-id] preview-data)))
 
 (re-frame/reg-sub
- :rooms/all
- (fn [db _]
-   (let [rooms (:rooms db)]
-     (if (map? rooms) (vec (vals rooms)) (vec (or rooms []))))))
+ :rooms/preview
+ (fn [db [_ room-id]]
+   (get-in db [:room-previews room-id])))
+
+
+
 #+end_src
 
 
