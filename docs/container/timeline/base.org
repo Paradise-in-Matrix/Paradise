@@ -41,7 +41,6 @@ This is a functional stub for now. I'll go back and split and describe
 each of these later.
 ****** TODO Describe these
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-
 (defn get-event-id [e]
   (cond
     (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Div"))
@@ -55,7 +54,6 @@ each of these later.
 
     :else
     (:internal-id e)))
-
 
 (defn deduplicate-events [raw-events]
   (->> raw-events
@@ -142,32 +140,6 @@ each of these later.
 #+end_src
 
 
-
-Something important to note is that for arbitrarily large rooms we should instead
-not load the read receipts. It will cause non-negligible performance issues.
-****** TODO Check room size before loading timeline and flip read receipts based on member count
-
-#+begin_src javascript
-export enum TimelineFilter_Tags {
-    All = "All",
-    OnlyMessage = "OnlyMessage",
-    EventTypeFilter = "EventTypeFilter"
-}
-
-
-export enum TimelineFocus_Tags {
-    Live = "Live",
-    Event = "Event",
-    Thread = "Thread",
-    PinnedEvents = "PinnedEvents"
-}
-
-export enum DateDividerMode {
-    Daily,
-    Monthly
-}
-
-#+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (re-frame/reg-event-fx
