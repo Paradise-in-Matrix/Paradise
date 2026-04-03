@@ -467,57 +467,41 @@ facilitates the iframe and the widget in the rust-sdk.
 
 #+begin_src clojurescript :tangle ../../src/container/call/core.cljs
 (rf/reg-event-fx
- :call/start-native-message-pump
- (fn [{:keys [db]} [_ room-id is-primary?]]
-   (let [handle (get-in db [:call :widget-handle])]
-     (if-not handle
-       (do (log/error "No widget handle found!") {})
-       (do
-         (letfn [(recv-loop []
-                   (-> (.recv handle)
-                       (.then (fn [msg-string]
-                                (if (and msg-string (not= msg-string "null"))
-                                  (do
-                                    (when-let [iframe (if is-primary? @primary-iframe-ref @backup-iframe-ref)]
-                                      (.postMessage (.-contentWindow iframe)
-                                                    (js/JSON.parse msg-string)
-                                                    "*"))
-                                    (js/setTimeout recv-loop 0))
-                                  (js/setTimeout recv-loop 50))))
-                       (.catch #(log/error "Recv loop crashed:" %))))]
-           (recv-loop))
-         (.addEventListener js/window "message"
-                            (fn [event]
-                              (when (= (.-origin event) (.. js/window -location -origin))
-                                (let [raw-data   (.-data event)
-                                      action     (str (.-action raw-data))
-                                      req-id     (.-requestId raw-data)
-                                      widget-id  (.-widgetId raw-data)
-                                      msg-string (js/JSON.stringify raw-data)]
-                                  (cond
-                                    (= action "io.element.device_mute")
-                                    (let [d (.-data raw-data)]
-                                      (rf/dispatch [:call/update-media-state
-                                                    {:audio (.-audio_enabled d)
-                                                     :video (.-video_enabled d)}]))
+ :call/attach-window-listener
+ (fn [_ _]
+   (when-not @window-listener-attached?
+     (reset! window-listener-attached? true)
+     (.addEventListener js/window "message"
+       (fn [event]
+         (when (= (.-origin event) (.. js/window -location -origin))
+           (let [raw-data   (.-data event)
+                 action     (str (.-action raw-data))
+                 req-id     (.-requestId raw-data)
+                 widget-id  (.-widgetId raw-data)
+                 msg-string (js/JSON.stringify raw-data)]
 
-                                    (str/starts-with? action "io.element.")
-                                    (do
-                                      (log/debug "Manually ACKing custom action:" action)
-                                      (when-let [iframe (if is-primary? @primary-iframe-ref @backup-iframe-ref)]
-                                        (let [ack #js {:api       "toWidget"
-                                                       :action    action
-                                                       :requestId req-id
-                                                       :widgetId  widget-id
-                                                       :response  #js {}
-                                                       :data      #js {}}]
-                                          (.postMessage (.-contentWindow iframe) ack "*")))
-                                      (-> (.send handle msg-string)
-                                          (.catch #(log/error "Rust rejected custom action:" %))))
+             (when (= action "io.element.device_mute")
+               (let [d (.-data raw-data)]
+                 (rf/dispatch [:call/update-media-state
+                               {:audio (.-audio_enabled d)
+                                :video (.-video_enabled d)}])))
 
-                                    :else
-                                    (-> (.send handle msg-string)
-                                        (.catch #(log/error "Rust rejected standard message:" %))))))))
-         {})))))
+             (when (str/starts-with? action "io.element.")
+               (let [is-primary? (get-in @rf-db/app-db [:call :primary-iframe?] true)
+                     iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
+                 (when-let [iframe @iframe-ref]
+                   (let [ack #js {:api       "toWidget"
+                                  :action    action
+                                  :requestId req-id
+                                  :widgetId  widget-id
+                                  :response  #js {}
+                                  :data      #js {}}]
+                     (.postMessage (.-contentWindow iframe) ack "*")))))
+
+             (if-let [pool @state/!engine-pool]
+               (main/do-with-pool! pool {:handler :send-widget-message
+                                         :arguments {:msg-string msg-string}})
+               (log/error "No worker pool to route iframe message!")))))))
+   {}))
 #+end_src
 
