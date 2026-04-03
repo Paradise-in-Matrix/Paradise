@@ -392,10 +392,11 @@ facilitates the iframe and the widget in the rust-sdk.
    [re-frame.db :as rf-db]
    [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref]]
    [container.call.call-view :as call-view]
-   ["ffi-bindings" :as sdk]
    [taoensso.timbre :as log]
-   [clojure.string :as str]))
-
+   [clojure.string :as str]
+   [cljs.core.async :refer [go <!]]
+   [cljs-workers.core :as main]
+   [client.state :as state]))
 #+end_src
 
 
