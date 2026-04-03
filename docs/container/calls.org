@@ -33,8 +33,6 @@ magnitudes simpler.
         (.click btn)
         (log/error "Could not find button with test-id:" test-id)))))
 
-
-
 (defn send-widget-action! [db action data]
   (let [is-primary? (get-in db [:call :primary-iframe?] true)
         iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
@@ -51,6 +49,17 @@ magnitudes simpler.
           (catch :default e
             (log/error "Failed to send action" action "to iframe:" e)))))))
 
+(rf/reg-event-fx
+ :call/recv-widget-message
+ (fn [{:keys [db]} [_ msg-string]]
+   (let [is-primary? (get-in db [:call :primary-iframe?] true)
+         iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
+     (when-let [iframe @iframe-ref]
+       (try
+         (.postMessage (.-contentWindow iframe) (js/JSON.parse msg-string) "*")
+         (catch :default e
+           (log/error "Failed to pipe worker message to iframe:" e)))))
+   {}))
 
 (rf/reg-event-fx
  :call/hangup
