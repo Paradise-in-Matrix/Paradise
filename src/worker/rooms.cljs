@@ -1,0 +1,243 @@
+(ns worker.rooms
+  (:require
+   [cljs-workers.worker :as worker]
+   [clojure.string :as str]
+   [promesa.core :as p]
+   [taoensso.timbre :as log]
+   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory]]
+   [cljs.core.async.interop :refer-macros [<p!]]
+   [client.diff-handler :refer [apply-matrix-diffs]]
+   [navigation.rooms.room-summary :refer [build-room-summary]]
+   [worker.state :as state])
+  (:require-macros
+   [cljs.core.async.macros :refer [go]]))
+
+(defonce !ui-controller (atom nil))
+(defonce !bg-controller (atom nil))
+
+(defonce !ui-list-result (atom nil))
+(defonce !bg-list-result (atom nil))
+
+(defonce !home-rooms (atom #js []))
+(defonce !home-mutex (atom (p/resolved nil)))
+
+(defonce !bg-rooms-array (atom #js []))
+(defonce !bg-room-mutex (atom (p/resolved nil)))
+
+(defonce !parent-queue (atom {}))
+(defonce !parent-cache (atom {}))
+
+(defonce !preview-promises (atom {}))
+
+(defn enqueue-parent-check! [room-id]
+  (swap! !parent-queue update room-id #(if % % 0)))
+
+
+(defn process-parent-queue! [client space-service]
+  (let [queue @!parent-queue]
+    (when (and space-service (seq queue))
+      (-> (p/all
+           (map (fn [[id attempts]]
+                  (if-let [room (some #(when (= (:id %) id) %) @!bg-rooms-array)]
+                    (-> (.joinedParentsOfChild space-service id)
+                        (p/then (fn [parents]
+                                  (if (pos? (alength parents))
+                                    {:id id :status :success :parents parents :room room}
+                                    {:id id :status :retry :attempts (inc attempts)})))
+                        (p/catch (fn [e]
+                                   (js/console.error "Queue FFI fail for" id e)
+                                   {:id id :status :retry :attempts (inc attempts)})))
+                    (p/resolved {:id id :status :drop})))
+                queue))
+          (p/then (fn [results]
+                    (doseq [res results]
+                      (when (= (:status res) :success)
+                        (let [parents (:parents res)
+                              first-parent-id (.-roomId (aget parents 0))]
+
+                          (swap! !parent-cache assoc (:id res)
+                                 {:parents parents
+                                  :first-parent-id first-parent-id})
+
+                          (swap! !bg-rooms-array
+                                 (fn [rooms]
+                                   (mapv (fn [r]
+                                           (if (= (:id r) (:id res))
+                                             (assoc r :first-parent-id first-parent-id)
+                                             r))
+                                         rooms)))
+
+                          (worker/stream! {:type "room-parent-resolved"
+                                           :room-id (:id res)
+                                           :first-parent-id first-parent-id}))))
+
+                    (let [to-keep (reduce (fn [acc res]
+                                            (if (and (= (:status res) :retry) (< (:attempts res) 3))
+                                              (assoc acc (:id res) (:attempts res))
+                                              acc))
+                                          {} results)]
+                      (reset! !parent-queue to-keep)
+                      (when (seq to-keep)
+                        (js/setTimeout #(process-parent-queue! client space-service) 2000)))))))))
+
+(defn- extract-preview [preview-ffi]
+  (when preview-ffi
+    (let [is-call? (try
+                     (let [info (.info preview-ffi)
+                           type (some-> info .-roomType)]
+                       (boolean
+                        (and (= "Custom" (some-> type .-tag))
+                             (= "org.matrix.msc3417.call" (some-> type .-inner .-value)))))
+                     (catch :default _ false))]
+      {:is-call? is-call?})))
+
+
+(worker/register :get-room-preview
+                 (fn [{:keys [room-id]}]
+                   (go
+                     (try
+                       (if-let [preview-p (get @!preview-promises room-id)]
+                         (let [preview-ffi (<p! preview-p)]
+                           (if preview-ffi
+                             {:status :success :preview (extract-preview preview-ffi)}
+                             {:status :error :msg "Preview resolved to nil"}))
+                         {:status :error :msg "No preview promise retained for this room"})
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
+
+(defn parse-room [client space-service room-interface]
+  (p/let [room-info     (if (fn? (.-roomInfo room-interface)) (.roomInfo room-interface) nil)
+          latest-event  (.latestEvent room-interface)
+          room-id       (if room-info (.-id room-info) "unknown-room")]
+    (try
+      (let [_ (when (and client (exists? (.-getRoomPreviewFromRoomId client)) (not= room-id "unknown-room"))
+                (when-not (contains? @!preview-promises room-id)
+                  (let [preview-p (try
+                                    (p/promise (.getRoomPreviewFromRoomId client room-id #js []))
+                                    (catch :default e
+                                      (p/resolved nil)))]
+                    (swap! !preview-promises assoc room-id preview-p)
+                    (-> preview-p
+                        (p/then (fn [ffi]
+                                  (when-let [clean-preview (extract-preview ffi)]
+                                    (worker/stream! {:type "room-preview-resolved"
+                                                     :room-id room-id
+                                                     :preview clean-preview}))))
+                        (p/catch #(log/error "Background preview fetch failed:" %))))))
+            summary       (build-room-summary room-interface room-info latest-event)
+            cached-parent (get @!parent-cache room-id)
+            first-parent  (:first-parent-id cached-parent)]
+        (-> (js->clj summary :keywordize-keys true)
+            (assoc :id room-id)
+            (cond-> first-parent (assoc :first-parent-id first-parent))))
+      (catch :default e
+        (log/error "Failed to parse room:" room-id e)
+        {:id room-id :name "Error parsing room"}))))
+
+
+(defn get-rust-filter [filter-id]
+  (case filter-id
+    "unread"
+    (RoomListEntriesDynamicFilterKind.All.
+      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Unread.)
+                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+    "people"
+    (RoomListEntriesDynamicFilterKind.All.
+      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.People})
+                         (RoomListEntriesDynamicFilterKind.Joined.)
+                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+    "favourite"
+    (RoomListEntriesDynamicFilterKind.All.
+      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Favourite.)
+                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+
+    (RoomListEntriesDynamicFilterKind.All.
+      #js {:filters #js [(RoomListEntriesDynamicFilterKind.NonLeft.)
+                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})))
+
+(worker/register :set-room-filter
+  (fn [{:keys [filter-id]}]
+    (if-let [ctrl @!ui-controller]
+      (do
+        (.setFilter ctrl (get-rust-filter filter-id))
+        (.addOnePage ctrl)
+        {:status :success})
+      {:status :error :msg "Controller not initialized"})))
+
+(defn apply-home-diffs-async! [client space-service updates]
+  (swap! !home-mutex
+         (fn [prev-promise]
+           (p/then prev-promise
+                   (fn []
+                     (-> (apply-matrix-diffs @!home-rooms updates #(parse-room client space-service %))
+                         (p/then (fn [next-rooms]
+                                   (reset! !home-rooms next-rooms)
+                                   (worker/stream! {:type "home-rooms-diff" :rooms next-rooms})))
+                         (p/catch (fn [err] (log/error "Global Diff Panic:" err)))))))))
+
+
+(defn apply-bg-rooms-diffs! [client space-service updates]
+  (swap! !bg-room-mutex
+         (fn [prev-promise]
+           (p/then prev-promise
+                   (fn []
+                     (-> (apply-matrix-diffs @!bg-rooms-array updates #(parse-room client space-service %))
+                         (p/then (fn [next-rooms]
+                                   (reset! !bg-rooms-array next-rooms)
+                                   (worker/stream! {:type "bg-rooms-diff" :rooms next-rooms})
+
+                                   (doseq [r next-rooms]
+                                     (when-not (:first-parent-id r)
+                                       (enqueue-parent-check! (:id r))))
+                                   (process-parent-queue! client space-service)))
+                         (p/catch (fn [err] (log/error "Global Diff Panic:" err)))))))))
+
+
+(defn start-room-list-sync! [client room-list space-service]
+  (p/let [ui-result (.entriesWithDynamicAdaptersWith room-list 200 true
+                                                     #js {:onUpdate #(apply-home-diffs-async! client space-service %)})
+          ui-controller (.controller ui-result)
+          bg-result (.entriesWithDynamicAdaptersWith room-list 200 true
+                                                     #js {:onUpdate #(apply-bg-rooms-diffs! client space-service %)})
+          bg-controller (.controller bg-result)]
+    (reset! !ui-controller ui-controller)
+    (reset! !bg-controller bg-controller)
+
+    (reset! !ui-list-result ui-result)
+    (reset! !bg-list-result bg-result)
+
+    (.setFilter ui-controller (get-rust-filter "people"))
+    (.addOnePage ui-controller)
+
+    (.setFilter bg-controller (get-rust-filter "all"))
+    (.addOnePage bg-controller)))
+
+
+
+(worker/register :paginate-room-list
+  (fn [_]
+    (if-let [ctrl @!ui-controller]
+      (do (.addOnePage ctrl) {:status :success})
+      {:status :error :msg "Controller not initialized"})))
+
+
+
+
+
+(worker/register :fetch-space-hierarchy
+                 (fn [{:keys [space-id]}]
+                   (go
+                     (try
+                       (let [client     @state/!client
+                             base-url   (.homeserver client)
+                             session    (.session client)
+                             token      (.-accessToken session)
+                             clean-base (str/replace base-url #"/+$" "")
+                             url        (str clean-base "/_matrix/client/v1/rooms/" space-id "/hierarchy")
+                             resp       (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))
+                             json       (<p! (.json resp))]
+                         (if (.-ok resp)
+                           {:status :success :rooms (:rooms (js->clj json :keywordize-keys true))}
+                           {:status :error :msg (str "Hierarchy fetch failed: " (.-status resp))}))
+                       (catch :default e
+                         {:status :error :msg (str e)})))))

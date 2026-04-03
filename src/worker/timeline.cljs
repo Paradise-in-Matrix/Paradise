@@ -1,0 +1,464 @@
+(ns worker.timeline
+  (:require
+   [cljs-workers.worker :as worker]
+   [promesa.core :as p]
+   [taoensso.timbre :as log]
+   [clojure.string :as str]
+   ["ffi-bindings" :as sdk :refer [TimelineConfiguration MessageType ReceiptType]]
+   [cljs.core.async.interop :refer-macros [<p!]]
+   [client.diff-handler :refer [apply-matrix-diffs]]
+   [worker.state :as state])
+  (:require-macros
+   [cljs.core.async.macros :refer [go]]))
+
+(defonce !active-timelines (atom {}))
+(defonce !timeline-arrays (atom {}))
+(defonce !timeline-mutexes (atom {}))
+
+(defn apply-timeline-diffs-async! [room-id source updates]
+  (let [q-key [room-id source]]
+    (swap! !timeline-mutexes update q-key #(or % (p/resolved [])))
+    (swap! !timeline-mutexes
+           (fn [mutexes]
+             (update mutexes q-key
+                     (fn [prev-promise]
+                       (-> prev-promise
+                           (p/then (fn []
+                                     (let [current-events (get @!timeline-arrays q-key #js [])]
+                                       (apply-matrix-diffs current-events updates wrap-item))))
+                           (p/then (fn [next-events]
+                                     (swap! !timeline-arrays assoc q-key next-events)
+                                     (worker/stream! {:type "timeline-diff"
+                                                      :room-id room-id
+                                                      :source source
+                                                      :events next-events})))
+                           (p/catch (fn [err] (log/error "Timeline Diff Panic:" err))))))))))
+
+(defmulti focus (fn [{:keys [type]}] type))
+(defmethod focus :event [{:keys [id count]}] (new (.. sdk -TimelineFocus -Event) #js {:eventId id :numEventsToLoad count}))
+(defmethod focus :live [{:keys [threaded?]}] (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents threaded?}))
+
+(defn create-timeline-config [focus-obj track-receipts]
+  (.create TimelineConfiguration
+           #js {:focus focus-obj
+                :filter (new (.. sdk -TimelineFilter -All))
+                :dateDividerMode (.-Daily sdk/DateDividerMode)
+                :trackReadReceipts track-receipts
+                :reportUtds false
+                :internalIdPrefix js/undefined}))
+
+(defn boot-timeline! [{:keys [source room room-id focus-obj track-receipts paginate-amount]}]
+  (worker/stream! {:type "timeline-loading" :room-id room-id :loading? true})
+  (-> (p/let [config (create-timeline-config focus-obj track-receipts)
+              tl     (.timelineWithConfiguration room config)]
+        (let [is-live? (= source :live)
+              handle   (.addListener tl #js {:onUpdate #(apply-timeline-diffs-async! room-id source %)})
+              t-handle (when is-live?
+                         (.subscribeToTypingNotifications room #js {:call #(worker/stream! {:type "typing-update" :room-id room-id :users (js->clj %)})}))
+              p-handle (when is-live?
+                         (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))]
+          (swap! !active-timelines assoc-in [room-id source]
+                 {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
+          (when (:forward paginate-amount) (.paginateForwards tl (:forward paginate-amount)))
+          (-> (.paginateBackwards tl (:back paginate-amount))
+              (p/then #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))
+              (p/catch #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false})))))
+      (p/catch #(log/error source "boot failed:" %))))
+
+(worker/register :boot-timeline
+  (fn [{:keys [room-id]}]
+    (go
+      (if-let [room (.getRoom @state/!client room-id)]
+        (try
+          (let [latest-event (<p! (.latestEvent room))
+                event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))]
+            (if event-id
+              (do
+                (boot-timeline! {:source :focused :room room :room-id room-id
+                                 :focus-obj (focus {:type :event :id event-id :count 40})
+                                 :track-receipts false :paginate-amount {:back 25}})
+                (boot-timeline! {:source :live :room room :room-id room-id
+                                 :focus-obj (focus {:type :live :threaded? false})
+                                 :track-receipts true :paginate-amount {:back 50}})
+                {:status :success})
+              (do
+                (boot-timeline! {:source :live :room room :room-id room-id
+                                 :focus-obj (focus {:type :live :threaded? false})
+                                 :track-receipts true :paginate-amount {:back 25}})
+                {:status :success})))
+          (catch :default e
+            {:status :error :msg (str e)}))
+        {:status :error :msg "Room not found"}))))
+
+(worker/register :cleanup-timeline
+  (fn [{:keys [room-id]}]
+    (when-let [room-subs (get @!active-timelines room-id)]
+      (doseq [source (keys room-subs)]
+        (let [{:keys [handle t-handle p-handle]} (get room-subs source)]
+          (some-> handle .cancel)
+          (some-> t-handle .cancel)
+          (some-> p-handle .cancel))))
+    (swap! !active-timelines dissoc room-id)
+    (swap! !timeline-arrays dissoc [room-id :live] [room-id :focused])
+    {:status :success}))
+
+(worker/register :paginate-timeline
+                 (fn [{:keys [room-id direction amount]}]
+                   (go
+                     (if-let [tl (or (get-in @!active-timelines [room-id :live :timeline])
+                                     (get-in @!active-timelines [room-id :focused :timeline]))]
+                       (try
+                         (if (= direction "back")
+                           (<p! (.paginateBackwards tl amount js/undefined))
+                           (<p! (.paginateForwards tl amount js/undefined)))
+                         {:status :success}
+                         (catch :default e
+                           {:status :error :msg (str e)}))
+                       {:status :error :msg "Timeline not found"}))))
+
+(defn- extract-mxc-url [ffi-source]
+  (when ffi-source
+    (try
+      (.url ffi-source)
+      (catch :default _ nil))))
+
+(defn wrap-item [ffi-item]
+  (let [raw-id (.uniqueId ffi-item)
+        id-str (if raw-id (or (.-id raw-id) raw-id) (str "virt-" (hash ffi-item)))
+        event (.asEvent ffi-item)
+        virtual (.asVirtual ffi-item)]
+    (cond event
+          (let [sender-profile (.-senderProfile event)
+                 inner-profile  (when sender-profile (.-inner sender-profile))
+                sender-avatar  (or (when inner-profile (.-avatarUrl inner-profile))
+                                   (.-sender event))
+                sender-name    (or (when inner-profile (.-displayName inner-profile))
+                                   (.-sender event))
+                sender-id      (.-sender event)
+                is-editable?   (.-isEditable event)
+                is-own?        (.-isOwn event)
+                e-t-id         (.-eventOrTransactionId event)
+                e-t-tag        (.-tag e-t-id)
+                e-t-inner      (.-inner e-t-id)
+                real-id        (if (= e-t-tag "EventId")
+                                 (.-eventId e-t-inner)
+                                 (.-transactionId e-t-inner))
+                content        (.-content event)
+                content-tag    (.-tag content)
+                content-inner  (.-inner content)
+                content-inner-content (when content-inner (.-content content-inner))
+                reactions (when-let [reactions-raw (and content-inner-content (.-reactions content-inner-content))]
+                            (mapv (fn [r]
+                                    (let [emoji      (get r "key")
+                                          senders    (get r "senders")
+                                          sender-ids (set (map #(get % "senderId") senders))]
+                                      [emoji (count senders) sender-ids]))
+                                  (js->clj reactions-raw)))
+                read-by (let [receipts (.-readReceipts event)]
+                          (if (and receipts (> (.-size receipts) 0))
+                            (vec (js/Array.from (.keys receipts)))))
+                ]
+            {:id                      real-id
+             :internal-id             id-str
+             :event-or-transaction-id e-t-id
+             :type                    :event
+             :sender-name             sender-name
+             :sender-id               sender-id
+             :sender-avatar           sender-avatar
+             :ts                      (js/Number (.-timestamp event))
+             :reactions               reactions
+             :read-by                 read-by
+             :is-own?                 is-own?
+             :is-editable?            is-editable?
+             :content-tag             content-tag
+             :content (case content-tag
+                        "MsgLike"
+                        (let [msg-like-content (.-content content-inner)
+                              kind             (.-kind msg-like-content)
+                              kind-tag         (.-tag kind)
+                              kind-inner       (.-inner kind)]
+                          {:tag kind-tag
+                           :in-reply-to
+                           (when-let [reply-ffi (.-inReplyTo msg-like-content)]
+                             {:event-id (.eventId reply-ffi)})
+                           :inner (case kind-tag
+                                    "Message"
+                                    (let [actual        (.-content kind-inner)
+                                          m-type        (.-msgType actual)
+                                          m-tag         (.-tag m-type)
+                                          m-inner       (.-inner m-type)
+                                          m-content-obj (.-content m-inner)]
+                                      {:tag m-tag
+                                       :content (case m-tag
+                                                  ("Text" "Emote" "Notice")
+                                                  {:body (.-body m-content-obj)
+                                                   :is-edited? (.-isEdited actual)
+                                                   :html (some-> m-content-obj .-formatted .-body)}
+
+                                                  ("Image" "Video" "Audio" "File" "Sticker")
+                                                  (let [formatted  (.-formattedCaption m-content-obj)
+                                                        info       (.-info m-content-obj)
+                                                        ffi-source (.-source m-content-obj)
+                                                        raw-mxc    (extract-mxc-url ffi-source)
+                                                        res        {:mimetype (some-> info .-mimetype)
+                                                                    :size     (some-> info .-size js/Number)}]
+                                                    (when ffi-source
+                                                      (swap! state/!media-cache assoc real-id ffi-source))
+
+                                                    {:tag         m-tag
+                                                     :source      raw-mxc
+                                                     :caption     (.-caption m-content-obj)
+                                                     :html        (when formatted (.-body formatted))
+                                                     :info        (if (and info (.-width info))
+                                                                    (assoc res :w (js/Number (.-width info))
+                                                                           :h (js/Number (.-height info)))
+                                                                    res)})
+                                                  {:unsupported true})})
+                                    "Sticker"
+                                    (let [ffi-source (.-source kind-inner)
+                                          raw-mxc    (extract-mxc-url ffi-source)]
+                                      (swap! state/!media-cache assoc real-id (.-url kind-inner))
+                                      {:source raw-mxc
+                                       :info   (when-let [info (.-info kind-inner)]
+                                                 {:w (some-> info .-width js/Number)
+                                                  :h (some-> info .-height js/Number)})})
+                                    nil)})
+                        "State"
+                        (let [state-content (.-content content-inner)
+                              state-tag     (.-tag state-content)
+                              state-inner   (.-inner state-content)]
+                          {:tag   state-tag
+                           :inner (case state-tag
+                                    "RoomPinnedEvents"
+                                    {:change (some-> state-inner .-change)}
+                                    "RoomAvatar"
+                                    {:url (some-> state-inner .-url)}
+                                    "RoomName"
+                                    {:name (some-> state-inner .-name)}
+                                    {:raw-inner state-inner})})
+                        "FailedToParseMessageLike"
+                        {:error      (.-error content-inner)
+                         :event-type (.-eventType content-inner)}
+                        "RoomMembership" {:change (some-> content-inner .-change .-name)}
+                        "ProfileChange"  {:id real-id}
+                        nil)})
+          virtual
+          {:id   id-str
+           :type :virtual
+           :tag  (.-tag virtual)
+           :ts   (some-> virtual .-inner .-ts js/Number)}
+          :else
+          {:id id-str :type :unknown})))
+
+
+(worker/register :toggle-reaction
+  (fn [{:keys [room-id event-id emoji]}]
+    (go
+      (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
+        (try
+          (<p! (.toggleReaction tl event-id emoji))
+          {:status :success}
+          (catch :default e {:status :error :msg (str e)}))
+        {:status :error :msg "Timeline not found"}))))
+
+(worker/register :toggle-pin
+  (fn [{:keys [room-id msg-id]}]
+    (go
+      (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
+        (try
+          (let [was-pinned? (<p! (.pinEvent tl msg-id))]
+            (when-not was-pinned?
+              (<p! (.unpinEvent tl msg-id))))
+          {:status :success}
+          (catch :default e {:status :error :msg (str e)}))
+        {:status :error :msg "Timeline not found"}))))
+
+
+(worker/register :mark-read
+  (fn [{:keys [room-id event-id]}]
+    (go
+      (if-let [room (.getRoom @state/!client room-id)]
+        (try
+          (<p! (.sendReadReceipt room event-id "m.read"))
+          {:status :success}
+          (catch :default e {:status :error :msg (str e)}))
+        {:status :error :msg "Room not found"}))))
+
+(worker/register :send-receipt
+  (fn [{:keys [room-id event-id]}]
+    (go
+      (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
+        (try
+          (<p! (.sendReadReceipt tl (.-Read ReceiptType) event-id))
+          {:status :success}
+          (catch :default e {:status :error :msg (str e)}))
+        {:status :error :msg "Timeline not found"}))))
+
+
+(worker/register :redact-event
+  (fn [{:keys [room-id msg-id]}]
+    (go
+      (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
+        (try
+          (<p! (.redactEvent tl msg-id))
+          {:status :success}
+          (catch :default e
+            {:status :error :msg (str e)}))
+        {:status :error :msg "Timeline not found"}))))
+
+(worker/register :get-media
+  (fn [{:keys [event-id source]}]
+    (go
+      (try
+        (if-let [ffi-source (get @state/!media-cache event-id)]
+          (let [raw-bytes (<p! (.getMediaContent @state/!client ffi-source))
+                ]
+            {:status :success :bytes raw-bytes})
+
+          (if (and (string? source) (str/starts-with? source "mxc://"))
+            (let [client      @state/!client
+                  hs-url      (.-homeserverUrl (.session client))
+                  token       (.-accessToken (.session client))
+                  server-base (str/replace hs-url #"/+$" "")
+                  resource    (str/replace source #"^mxc://" "")
+                  fetch-url   (str server-base "/_matrix/client/v1/media/download/" resource)
+                  resp        (<p! (js/fetch fetch-url
+                                             #js {:headers #js {"Authorization" (str "Bearer " token)}}))
+                  ]
+              (if (.-ok resp)
+                (let [buf       (<p! (.arrayBuffer resp))
+                      raw-bytes (js/Uint8Array. buf)]
+                  {:status :success :bytes raw-bytes})
+                {:status :error :msg (str "HTTP fetch failed: " (.-status resp))}))
+            {:status :error :msg "No FFI pointer and invalid source."})
+          )
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+(defn make-timeline-item-shim [item event-id]
+  #js {:uniqueId (fn [] #js {:id event-id})
+       :asEvent  (fn [] item)
+       :asVirtual (fn [] nil)})
+
+
+(defn msgtype->rust-tag [msgtype]
+  (case msgtype
+    "m.text"   "Text"
+    "m.emote"  "Emote"
+    "m.notice" "Notice"
+    "m.image"  "Image"
+    "m.video"  "Video"
+    "m.audio"  "Audio"
+    "m.file"   "File"
+    "Text"))
+
+(defn normalize-search-result [hit]
+  (let [evt          (:result hit)
+        raw-content  (:content evt)
+        edited?      (some? (:m.new_content raw-content))
+        real-content (if edited? (:m.new_content raw-content) raw-content)
+        msgtype      (:msgtype real-content)]
+    {:id          (:event_id evt)
+     :internal-id (:event_id evt)
+     :sender-id   (:sender evt)
+     :ts          (:origin_server_ts evt)
+     :is-edited?  edited?
+     :content-tag "MsgLike"
+     :content     {:tag "Message"
+                   :inner {:tag     (msgtype->rust-tag msgtype)
+                           :content real-content}}
+     :type        :timeline}))
+
+(defn fetch-pin-via-ephemeral-timeline [room event-id]
+  (js/Promise.
+   (fn [resolve _]
+     (p/let [focus    (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 1})
+             config   (.create sdk/TimelineConfiguration
+                               #js {:focus             focus
+                                    :dateDividerMode   (.-Daily sdk/DateDividerMode)
+                                    :filter            (new (.. sdk -TimelineFilter -All))
+                                    :trackReadReceipts false})
+             timeline (.timelineWithConfiguration room config)]
+       (let [handle-ref (atom nil)
+             resolved?  (atom false)
+             cleanup!   (fn []
+                          (when-let [h @handle-ref]
+                            (try (.cancel h) (catch :default _)))
+                          (reset! handle-ref nil))]
+
+         (reset! handle-ref
+                 (.addListener timeline
+                   #js {:onUpdate
+                        (fn [_diffs]
+                          (when-not @resolved?
+                            (reset! resolved? true)
+                            (-> (.getEventTimelineItemByEventId timeline event-id)
+                                (p/then (fn [item]
+                                          (cleanup!)
+                                          (if item
+                                            (resolve (wrap-item (make-timeline-item-shim item event-id)))
+                                            (resolve nil))))
+                                (p/catch (fn [err]
+                                           (cleanup!)
+                                           (log/error "Pin resolve failed:" err)
+                                           (resolve nil))))))}))
+         (js/setTimeout (fn []
+                          (when-not @resolved?
+                            (reset! resolved? true)
+                            (cleanup!)
+                            (resolve nil)))
+                        5000))))))
+
+(worker/register :get-pinned-events
+  (fn [{:keys [room-id]}]
+    (go
+      (if-let [room (.getRoom @state/!client room-id)]
+        (try
+          (let [client  @state/!client
+                session (.session client)
+                token   (.-accessToken session)
+                hs      (.-homeserverUrl session)
+                url     (str hs "/_matrix/client/v3/rooms/" room-id "/state/m.room.pinned_events/")
+                resp    (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
+            (if-not (.-ok resp)
+              {:status :success :events []}
+              (let [state-json (<p! (.json resp))
+                    pinned-ids (get (js->clj state-json :keywordize-keys true) :pinned [])]
+                (if (empty? pinned-ids)
+                  {:status :success :events []}
+                  (let [resolved (<p! (p/all (map #(fetch-pin-via-ephemeral-timeline room %) pinned-ids)))]
+                    {:status :success :events (remove nil? resolved)})))))
+          (catch :default e
+            {:status :error :msg (str e)}))
+        {:status :error :msg "Room not found"}))))
+
+(worker/register :search-room
+  (fn [{:keys [room-id query]}]
+    (go
+      (try
+        (let [client       @state/!client
+              session      (.session client)
+              hs           (.-homeserverUrl session)
+              token        (.-accessToken session)
+              base-server  (if (str/starts-with? hs "http") hs (str "https://" hs))
+              clean-server (str/replace base-server #"/+$" "")
+              url          (str clean-server "/_matrix/client/v3/search")
+              body         (clj->js {:search_categories
+                                     {:room_events
+                                      {:search_term query
+                                       :order_by    "recent"
+                                       :filter      {:rooms [room-id]}
+                                       :event_context {:before_limit 1 :after_limit 1}}}})
+              resp         (<p! (js/fetch url
+                                          #js {:method "POST"
+                                               :headers #js {"Authorization" (str "Bearer " token)
+                                                             "Content-Type"  "application/json"}
+                                               :body (js/JSON.stringify body)}))]
+          (if (.-ok resp)
+            (let [json       (<p! (.json resp))
+                  hits       (some-> json (.-search_categories) (.-room_events) (.-results))
+                  normalized (map #(normalize-search-result (js->clj % :keywordize-keys true)) hits)]
+              {:status :success :results normalized})
+            {:status :error :msg (str "Search failed with status: " (.-status resp))}))
+        (catch :default e
+          {:status :error :msg (str e)})))))
