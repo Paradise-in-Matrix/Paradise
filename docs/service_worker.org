@@ -172,11 +172,11 @@ For any other browser fetch we want to simply return it back to the browser to h
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
 (js/self.addEventListener "fetch"
   (fn [event]
-    (let [request   (.-request event)
-          method    (.-method request)
-          url       (js/URL. (.-url request))
-          path      (.-pathname url)
-          auth-path? (str/includes? path "/_matrix/client/v1/media/")
+    (let [request      (.-request event)
+          method       (.-method request)
+          request-url  (js/URL. (.-url request))
+          path         (.-pathname request-url)
+          auth-path?   (str/includes? path "/_matrix/client/v1/media/")
           legacy-path? (or (str/includes? path "/_matrix/media/v3/")
                            (str/includes? path "/_matrix/media/v1/"))]
       (when (= method "GET")
