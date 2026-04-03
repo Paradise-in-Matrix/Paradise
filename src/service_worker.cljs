@@ -1,8 +1,7 @@
 (ns service-worker
   (:require [clojure.string :as str]
             [promesa.core :as p]
-            ["workbox-precaching" :refer [precacheAndRoute cleanupOutdatedCaches]]
-            ))
+            ["workbox-precaching" :refer [precacheAndRoute cleanupOutdatedCaches]]))
 
 (defonce active-sessions (atom {}))
 (defonce session-resolvers (atom []))
@@ -61,11 +60,11 @@
 
 (js/self.addEventListener "fetch"
   (fn [event]
-    (let [request   (.-request event)
-          method    (.-method request)
-          url       (js/URL. (.-url request))
-          path      (.-pathname url)
-          auth-path? (str/includes? path "/_matrix/client/v1/media/")
+    (let [request      (.-request event)
+          method       (.-method request)
+          request-url  (js/URL. (.-url request))
+          path         (.-pathname request-url)
+          auth-path?   (str/includes? path "/_matrix/client/v1/media/")
           legacy-path? (or (str/includes? path "/_matrix/media/v3/")
                            (str/includes? path "/_matrix/media/v1/"))]
       (when (= method "GET")
@@ -79,12 +78,17 @@
                 (p/let [_       (wait-for-session!)
                         session (or (get @active-sessions (.-clientId event))
                                     (first (vals @active-sessions)))
-                        token   (:accessToken session)]
-                  (if-not token
+                        token   (or (:accessToken session) (:token session))
+                        hs-url  (or (:homeserverUrl session) (:hsUrl session) (:hs_url session))]
+                  (if (or (not token)
+                          (not hs-url)
+                          (not= (.-origin request-url) (.-origin (js/URL. hs-url))))
                     (js/Response.error)
                     (let [headers (js/Headers. (.-headers request))]
                       (.set headers "Authorization" (str "Bearer " token))
-                      (p/let [resp (js/fetch (.-url request) #js {:headers headers :mode "cors"})]
+                      (p/let [resp (js/fetch request-url #js {:headers headers
+                                                              :mode "cors"
+                                                              :credentials "omit"})]
                         (when (and (.-ok resp) (< (js/parseInt (.get (.-headers resp) "content-length") 10) 10485760))
                           (.put cache request (.clone resp)))
                         resp)))))))
@@ -95,11 +99,14 @@
                     cached (.match cache request)]
               (if cached
                 cached
-                (p/let [resp (js/fetch request)]
+                (p/let [resp (js/fetch request-url #js {:mode "cors"
+                                                        :credentials "omit"})]
                   (when (and (.-ok resp) (< (js/parseInt (.get (.-headers resp) "content-length") 10) 10485760))
                     (.put cache request (.clone resp)))
                   resp))))
           :else nil)))))
+
+
 
 (js/self.addEventListener "install"
   (fn [event]
@@ -114,7 +121,7 @@
 (def default-icon "/public/res/apple/apple-touch-icon-180x180.png")
 (def default-badge "/public/res/apple/apple-touch-icon-72x72.png")
 
-(defn- get-session-from-vault [user-id]
+#_(defn- get-session-from-vault [user-id]
   (p/create
    (fn [resolve reject]
      (let [req (.open js/indexedDB "sw-vault" 1)]
@@ -137,14 +144,34 @@
                                                (sort-by #(.-updated_at %) >)
                                                first)))))))))))))))
 
+(defn- get-session-from-opfs [user-id]
+  (p/let [dir         (.. js/navigator -storage getDirectory)
+          file-handle (p/catch (.getFileHandle dir "mx_session_v3.json") (fn [_] nil))]
+    (if-not file-handle
+      nil
+      (p/let [file     (.getFile file-handle)
+              text     (.text file)
+              sessions (try (.parse js/JSON text) (catch :default _ #js {}))
+              keys     (js/Object.keys sessions)
+              target-id (or user-id (when (pos? (.-length keys)) (aget keys 0)))]
 
+        (if target-id
+          (let [data (aget sessions target-id)]
+            (if data
+              (let [session (aget data "session")]
+                #js {:token  (aget session "accessToken")
+                     :hs_url (aget session "homeserverUrl")})
+              nil))
+          nil)))))
 
 (defn- fetch-avatar-url [hs-url token mxc-uri]
   (if (and hs-url token mxc-uri)
     (let [media-id (clojure.string/replace mxc-uri "mxc://" "")
           thumb-url (str hs-url "/_matrix/media/v3/thumbnail/" media-id
                          "?width=96&height=96&method=crop")]
-      (-> (js/fetch thumb-url #js {:headers #js {:Authorization (str "Bearer " token)}})
+      (-> (js/fetch thumb-url #js {:headers #js {:Authorization (str "Bearer " token)}
+                                   :mode "cors"
+                                   :credentials "omit"})
           (p/then (fn [resp]
                     (if (.-ok resp)
                       (p/let [blob (.blob resp)]
@@ -156,7 +183,9 @@
 (defn- fetch-event-content [hs-url token room-id event-id]
   (let [url (str hs-url "/_matrix/client/v3/rooms/" (js/encodeURIComponent room-id)
                  "/context/" (js/encodeURIComponent event-id) "?limit=0")]
-    (-> (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})
+    (-> (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}
+                           :mode "cors"
+                           :credentials "omit"})
         (p/then (fn [resp]
                   (if (.-ok resp)
                     (.json resp)
@@ -164,8 +193,7 @@
         (p/then (fn [json]
                   (let [event (.-event json)]
                     {:body (get-in (js->clj event) ["content" "body"])
-                     :sender (or (.-sender event) "Someone")
-                     }))))))
+                     :sender (or (.-sender event) "Someone")}))))))
 
 (defn- show-smart-notification [push-data token hs-url]
   (let [sender        (or (.-sender_display_name push-data) (.-sender push-data) "Someone")
@@ -186,7 +214,8 @@
         (when (= unread-count 0)
           (.clearAppBadge js/navigator))))
 
-    (p/let [icon-url (fetch-avatar-url hs-url token avatar-mxc)]
+    (p/let [;icon-url (fetch-avatar-url hs-url token avatar-mxc)
+            ]
       (.showNotification js/self.registration title
         #js {:body   body
              :icon   (or icon-url default-icon)
@@ -195,13 +224,14 @@
              :data   #js {:room_id room-id}}))))
 
 
+
 (js/self.addEventListener "push"
   (fn [event]
     (let [data (try (.. event -data json) (catch :default _ nil))]
       (when data
         (let [user-id (.-user_id data)]
           (.waitUntil event
-            (p/let [session (get-session-from-vault user-id)
+            (p/let [session (get-session-from-opfs user-id)
                     token   (some-> session .-token)
                     hs-url  (some-> session .-hs_url)]
               (show-smart-notification data token hs-url))))))))
