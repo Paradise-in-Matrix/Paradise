@@ -220,40 +220,19 @@ forward.
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
 (re-frame/reg-event-fx
  :sdk/send-sticker
- (fn [{:keys [db]} [_ room-id mxc alt-text info]]
-   (let [client  (:client db)
-         session (when client (.session client))]
-     (if-not (and client session)
-       (log/error "Cannot send raw sticker: No active session")
-       (let [token   (.-accessToken session)
-             hs      (str/replace (.-homeserverUrl session) #"/+$" "")
-             txn-id  (str "stk-" (.getTime (js/Date.)) "-" (rand-int 10000))
-             url     (str hs "/_matrix/client/v3/rooms/"
-                          (js/encodeURIComponent room-id)
-                          "/send/m.sticker/" txn-id)
-             clean-body (cond
-                          (keyword? alt-text) (name alt-text)
-                          (string? alt-text) alt-text
-                          :else "Sticker")
-             info-obj (js-obj "mimetype" (or (:mimetype info) "image/png"))
-             _        (when (:w info) (aset info-obj "w" (js/Number (:w info))))
-             _        (when (:h info) (aset info-obj "h" (js/Number (:h info))))
-
-             payload  #js {:body clean-body
-                           :url  mxc
-                           :info info-obj}]
-
-         (log/info "Sending RAW m.sticker event to:" url)
-         (-> (js/fetch url #js {:method  "PUT"
-                                :headers #js {:Authorization (str "Bearer " token)
-                                              :Content-Type  "application/json"}
-                                :body    (js/JSON.stringify payload)})
-             (.then (fn [resp]
-                      (if (.-ok resp)
-                        (log/info "Raw Sticker sent successfully!")
-                        (log/error "Server rejected raw sticker:" (.-status resp)))))
-             (.catch #(log/error "Sticker network error:" %)))))
-     {})))
+ (fn [_ [_ room-id mxc alt-text info]]
+   (if-let [pool @login/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :send-raw-sticker
+                                               :arguments {:room-id room-id
+                                                           :mxc mxc
+                                                           :alt-text alt-text
+                                                           :info info}}))]
+         (if (= (:status res) "success")
+           (log/info "Sticker sent!")
+           (log/error "Sticker failed:" (:msg res)))))
+     (log/error "No engine pool to send sticker"))
+   {}))
 #+end_src
 
 
