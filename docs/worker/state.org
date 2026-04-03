@@ -1,0 +1,12 @@
+
+**** Worker State
+
+This file is rather short as it just stores the states to be shared
+around throughout the web worker.
+
+#+begin_src clojurescript :tangle ../../src/worker/state.cljs
+(ns worker.state)
+
+(defonce !client (atom nil))
+(defonce !media-cache (atom {}))
+#+end_src
