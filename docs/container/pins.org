@@ -34,21 +34,11 @@ Doesn't matter how, but we need one of those to render the actual entries.
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
-   [promesa.core :as p]
-   [clojure.string :as str]
-   ["react-virtuoso" :refer [Virtuoso GroupedVirtuoso]]
+   [cljs-workers.core :as main]
+   [client.state :as state]
+   [cljs.core.async :refer [go <!]]
    [reagent.core :as r]
-   [reagent.dom.client :as rdom]
-   [utils.helpers :refer [mxc->url fetch-state-event fetch-room-state]]
    [utils.svg :as icons]
-   [container.reusable :refer [make-timeline-item-shim message-preview-item]]
-   [container.timeline.base :refer [apply-timeline-diffs!]]
-   [container.timeline.item :refer [event-tile wrap-item]]
-   [utils.global-ui :refer [avatar]]
-   ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]
-   )
-  )
-#+end_src
 
 
 **** Current Idea for Implementation
