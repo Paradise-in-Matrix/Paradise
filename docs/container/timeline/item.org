@@ -208,6 +208,7 @@ read receipts. This prevents any sort of spamming to the home server.
            (let [target   (.-target entry)
                  event-id (.getAttribute target "data-event-id")]
              (when event-id
+               (log/error "Read test?")
                (.unobserve observer target)
                (re-frame/dispatch [:msg/mark-visible event-id])
                )))))
