@@ -750,6 +750,7 @@ received an update.
        [:<>
 ;;        ^{:key active-id}
         [virtualized-timeline active-id]
+        [jump-to-present-banner active-id]
         [message-input]
         [status-indicator active-id]])]))
 #+end_src
