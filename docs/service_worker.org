@@ -381,6 +381,7 @@ this functional first.
              :tag    (or room-id "matrix-chat")
              :data   #js {:room_id room-id}}))))
 
+
 #+end_src
 
 
@@ -393,7 +394,7 @@ this functional first.
       (when data
         (let [user-id (.-user_id data)]
           (.waitUntil event
-            (p/let [session (get-session-from-vault user-id)
+            (p/let [session (get-session-from-opfs user-id)
                     token   (some-> session .-token)
                     hs-url  (some-> session .-hs_url)]
               (show-smart-notification data token hs-url))))))))
