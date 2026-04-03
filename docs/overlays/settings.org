@@ -653,12 +653,11 @@ You want to ensure the language options are easy to find for the user.
 ***** TODO Need to add time format implementation
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+
+
 (defn language-time-tab []
   (let [tr          @(re-frame/subscribe [:i18n/tr])
-        locale      @(re-frame/subscribe [:i18n/locale])
-        ;; time-format @(re-frame/subscribe [:settings/time-format])
-
-        ]
+        locale      @(re-frame/subscribe [:i18n/locale])]
     [:div.settings-tab-content
      [:h2.settings-heading (tr [:settings.language/title])]
      [:div.settings-section
@@ -674,16 +673,9 @@ You want to ensure the language options are easy to find for the user.
           [:div.lang-names
            [:div.lang-native native]
            [:div.lang-english label]]
-          (when (= locale id) [icons/check-circle-green])])]
-      #_[:div.settings-spacer]
-      #_[:h3.settings-subheading (tr [:settings.language/time-label])]
-      #_[:div.segmented-control
-       [:button {:class (when (= time-format :h24) "active")
-                 :on-click #(re-frame/dispatch [:settings/set-time-format :h24])}
-        (tr [:settings.language/time-24])]
-       [:button {:class (when (= time-format :h12) "active")
-                 :on-click #(re-frame/dispatch [:settings/set-time-format :h12])}
-        (tr [:settings.language/time-12])]]]]))
+          (when (= locale id) [icons/check-circle-green])])]]]))
+
+
 #+end_src
 
 
@@ -759,6 +751,9 @@ You want to ensure the language options are easy to find for the user.
        {:on-click #(re-frame/dispatch [:app/poll-version true])}
        (tr [:settings.about/check-updates])]]]))
 
+
+
+
 #+end_src
 
 
@@ -779,8 +774,7 @@ Inside the modal this is our sidebar options.
                            [:verification  :settings.tabs/verification]
                            [:accounts      :settings.tabs/accounts]
                            [:notifications :settings.tabs/notifications]
-                           [:language-time :settings.tabs/language-time]
-                           ]]
+                           [:language-time :settings.tabs/language-time]]]
        ^{:key id}
        [:div.settings-tab
         {:class (when (= active-tab id) "is-active")
@@ -817,7 +811,6 @@ Inside the modal this is our sidebar options.
         :language-time [language-time-tab]
         :about         [about-tab]
         [:div {:style {:color "#fff"}} (tr [:settings.modal/not-found])])]]))
-
 #+end_src
 
 
