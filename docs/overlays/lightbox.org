@@ -9,18 +9,12 @@ Lightbox (or image previewer) is how we intend to provide a nice way to interact
 **** Imports
 
 #+begin_src clojurescript :tangle ../../src/overlays/lightbox.cljs
-
 (ns overlays.lightbox
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
-            [taoensso.timbre :as log]
-            [clojure.string :as str]
-            [re-frame.db :as db]
+  (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
             [overlays.base :refer [modal-component]]
             [utils.svg :as icons]
-            [reagent.dom.client :as rdom]))
-
+            ))
 #+end_src
 
 **** Lightbox Component + CSS
@@ -115,10 +109,6 @@ So we define the component contents and then register in the modal multi-method.
 
 (defmethod modal-component :image-lightbox [_]
   image-lightbox-content)
-
-
-
-
 #+end_src
 
 
