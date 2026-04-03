@@ -18,6 +18,7 @@ So this is where we'll start allowing that logic to live.
    [clojure.string :as str]
    [re-frame.core :as re-frame]
    [reagent.core :as r]
+   [taoensso.timbre :as log]
    [utils.svg :as icons]
    [utils.global-ui :refer [avatar long-press-props]]))
 #+end_src
@@ -274,7 +275,6 @@ call controls and some color styling.
 Now before we define the panel we may want to define media buttons...
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
-
 (defn media-button [active? icon-on icon-off title on-click color-active color-inactive]
   [:button.media-btn
    {:style {:background "transparent"
@@ -294,8 +294,6 @@ Now before we define the panel we may want to define media buttons...
 
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
-
-
 (defn active-call-panel []
   (let [active-call-id  @(re-frame/subscribe [:call/active-room])
         audio-on?       @(re-frame/subscribe [:call/audio-enabled?])
@@ -721,6 +719,8 @@ need out.
                    :call-participants activeRoomCallParticipants
                    :avatar-url url
                    :open-menu-fn open-menu}]))))
+
+
 
 #+end_src
 
