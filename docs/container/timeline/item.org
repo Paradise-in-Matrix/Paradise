@@ -179,6 +179,7 @@ that is currently on screen.
    (if-let [room-id (:active-room-id db)]
      (assoc-in db [:read-receipts :pending room-id] event-id)
      db)))
+
 #+end_src
 
 
@@ -193,35 +194,6 @@ Important to note, but the enum here is
 This is useful later if we want to provide the user a toggle
 where they can send read receipts to the server, but not
 to alert other users they read the message.
-
-
-
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(re-frame/reg-event-fx
- :msg/flush-receipts
- (fn [{:keys [db]} _]
-   (let [pending (get-in db [:read-receipts :pending])
-         client  (:client db)]
-     (when (and client (seq pending))
-       (doseq [[room-id event-id] pending]
-         (when (not= (get-in db [:read-receipts :sent room-id]) event-id)
-           (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
-             (-> (.sendReadReceipt timeline (.-Read ReceiptType) event-id )
-                 (.then #(re-frame/dispatch [:msg/receipt-sent room-id event-id]))
-                 (.catch #(log/error "Receipt fail:" %)))
-             (log/error "No timeline for receipt:" room-id)))))
-     {:db (assoc-in db [:read-receipts :pending] {})})))
-#+end_src
-
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(re-frame/reg-event-db
- :msg/receipt-sent
- (fn [db [_ room-id event-id]]
-   (assoc-in db [:read-receipts :sent room-id] event-id)))
-
-(defonce receipt-flusher
-  (js/setInterval #(re-frame/dispatch [:msg/flush-receipts]) 2000))
-#+end_src
 
 
 We want to make sure we observe just the messages in the viewport to deliver
