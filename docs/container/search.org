@@ -22,21 +22,13 @@ https://spec.matrix.org/v1.17/client-server-api/#post_matrixclientv3search
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
-   [promesa.core :as p]
    [clojure.string :as str]
-   ["react-virtuoso" :refer [Virtuoso GroupedVirtuoso]]
+   [cljs-workers.core :as main]
+   [client.state :as state]
+   [cljs.core.async :refer [go <!]]
    [reagent.core :as r]
-   [reagent.dom.client :as rdom]
-   [utils.helpers :refer [mxc->url fetch-state-event]]
    [utils.svg :as icons]
-   [container.reusable :refer [make-timeline-item-shim message-preview-item]]
-   [container.timeline.base :refer [apply-timeline-diffs!]]
-   [container.timeline.item :refer [event-tile]]
-   [utils.svg :as icons]
-   [utils.global-ui :refer [avatar]]
-   ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]
-   )
-  )
+   [container.reusable :refer [message-preview-item]]))
 #+end_src
 
 
