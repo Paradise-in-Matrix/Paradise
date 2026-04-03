@@ -11,8 +11,6 @@ the mechanism wishes to use
 #+begin_src clojurescript :tangle ../../src/client/diff_handler.cljs
 (ns client.diff-handler
   (:require
-   [reagent.core :as r]
-   [reagent.dom.client :as rdom]
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [re-frame.core :as re-frame]))
@@ -91,6 +89,5 @@ speed.
                                        (re-frame/dispatch (conj async-event next-list)))))
                            (p/catch (fn [err]
                                       (log/error "Diff Panic at" db-path ":" err))))))))))
-
 #+end_src
 
