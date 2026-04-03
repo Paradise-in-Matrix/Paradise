@@ -12,7 +12,7 @@ if applicable.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (ns worker.core
   (:require
    [cljs-workers.worker :as worker]
@@ -68,7 +68,7 @@ So the first thing we need to do is actually initialize the
 WASM.
 
 
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :init-wasm
                  (fn [_]
                    (go
@@ -117,7 +117,7 @@ login or restoreSession method depending on what is passed through to restore-or
 Now later we need some helper functions to determine which session we are currently in.
 This is a functionality useful to supporting multiple accounts at once.
 
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (defn maybe-local-session []
   (p/let [store (SessionStore.)
           sessions (.loadSessions store)
@@ -137,7 +137,7 @@ Some important little notes I can add here, but the sliding sync
 version really just determines whether it is enabled or not.
 If the version is anything but 0 then it'll use Sliding Sync.
 
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (defn build-client [hs passphrase? store-id? restore-or-login!]
   (p/let [sdk-root (if (.-ClientBuilder sdk) sdk (.-default sdk))
           ClientBuilder (.-ClientBuilder sdk-root)
@@ -159,14 +159,14 @@ If the version is anything but 0 then it'll use Sliding Sync.
           _ (restore-or-login! client)
           session (.session client)
           _ (or passphrase? (.save store session passphrase store-id))]
-    client))
+     client))
 #+end_src
 
 
 
 Now we can provide our application initialization and attempt to restore the previous login session.
 If the previous login session is found, then we start-syncing and kick off the client's run.
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :bootstrap
   (fn [{:keys [target-user-id]}]
     (go
@@ -236,7 +236,7 @@ spaces and their rooms.
 
 The sync service is the actual service that tries to sync with the home server.
 
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :start-sync
                  (fn [_]
                    (go
@@ -265,7 +265,7 @@ The sync service is the actual service that tries to sync with the home server.
 Fetching the profile is a promise, so it is reasonable for now
 to separate it into its own sort of call instead of just
 bundling in the client context. I may revisit though.
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :fetch-profile
                  (fn [_]
                    (go
@@ -284,7 +284,7 @@ bundling in the client context. I may revisit though.
 This is more or less the same info we store in a session object, so we just neatly
 want to provide the UI a way to request this info. It'll use it in a great number
 of locations.
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :get-client-context
                  (fn [_]
                    (go
@@ -312,7 +312,7 @@ Having written the service worker and notifications for another client before
 these aren't exactly too different. I'll come back to these and document them
 a bit better though. The service worker itself is decently covered though.
 
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :register-pusher
   (fn [{:keys [p256dh auth endpoint app-id push-url app-name lang]}]
     (go
@@ -353,7 +353,7 @@ a bit better though. The service worker itself is decently covered though.
 The Rust-SDK actually neatly handles recovery keys. So we just pass it the module
 it expects and then the recovery key... and that actually is it. It'll handle
 Everything else from there.
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :recover-session
                  (fn [{:keys [recovery-key]}]
                    (go
@@ -377,7 +377,7 @@ Everything else from there.
 For multi-account we need to neatly be able to aggregate the accounts we're signed
 into.
 
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :get-available-accounts
                  (fn [_]
                    (go
@@ -396,7 +396,7 @@ into.
 
 
 And of course we need to be able to grab the account data for an account as well.
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/register :get-account-data
                  (fn [{:keys [event-type]}]
                    (go
@@ -413,7 +413,7 @@ And of course we need to be able to grab the account data for an account as well
 **** Kickoff
 
 Now we need to kick off the bootstrapping immediately, so we do so here.
-#+begin_src clojurescript :tangle ../src/worker.cljs
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
 (worker/bootstrap)
 #+end_src
 
