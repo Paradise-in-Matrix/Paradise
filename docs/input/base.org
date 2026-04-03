@@ -19,15 +19,16 @@ too much detail it is headless, so we can theme and customize it without much fr
             [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [input.drafts :refer [attachment-preview reify-attachment prepare-attachment]]
+            [input.drafts :refer [attachment-preview]]
             [input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
             [input.emotes :refer [emoji-sticker-board]]
             [input.autocomplete :refer [suggestion-menu]]
             [reagent.core :as r]
             [utils.helpers :refer [mxc->url truncate-name]]
             [utils.svg :as icons]
-            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]
-            ))
+            [cljs.core.async :refer [go <!]]
+            [cljs-workers.core :as main]
+            [client.login :as login]))
 #+end_src
 
 
