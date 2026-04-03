@@ -19,14 +19,10 @@ and the tab completion.
 #+begin_src clojurescript :tangle ../../src/input/autocomplete.cljs
 (ns input.autocomplete
   (:require
-   [promesa.core :as p]
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [reagent.core :as r]
-   ["@tiptap/core" :refer [Extension Node mergeAttributes]]
-   [utils.helpers :refer [mxc->url]]
-   ["react" :as react]))
+   [utils.helpers :refer [mxc->url]]))
 #+end_src
 
 
