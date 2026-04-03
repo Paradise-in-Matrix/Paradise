@@ -45,48 +45,7 @@ Doesn't matter how, but we need one of those to render the actual entries.
 
 
 #+begin_src clojurescript :tangle ../../src/container/pins.cljs
-(defn fetch-pin-via-ephemeral-timeline [room event-id]
-  (js/Promise.
-   (fn [resolve _]
-     (p/let [focus    (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 1})
-             config   (.create sdk/TimelineConfiguration
-                               #js {:focus             focus
-                                    :dateDividerMode   (.-Daily sdk/DateDividerMode)
-                                    :filter            (new (.. sdk -TimelineFilter -All))
-                                    :trackReadReceipts false})
-             timeline (.timelineWithConfiguration room config)]
-       (let [handle-ref (atom nil)
-             resolved?  (atom false)
-             cleanup!   (fn []
-                          (when-let [h @handle-ref]
-                            (try (.cancel h) (catch :default _)))
-                          (reset! handle-ref nil))]
 
-         (reset! handle-ref
-                 (.addListener timeline
-                   #js {:onUpdate
-                        (fn [_diffs]
-                          (when-not @resolved?
-                            (reset! resolved? true)
-                            (-> (.getEventTimelineItemByEventId timeline event-id)
-                                (p/then (fn [item]
-                                          (cleanup!)
-                                          (if item
-                                            (resolve (wrap-item
-                                                       (make-timeline-item-shim item event-id)))
-
-                                            (resolve nil))))
-                                (p/catch (fn [err]
-                                           (cleanup!)
-                                           (log/error "Shim wrapping failed:" err)
-                                           (resolve nil))))))}))
-
-         (js/setTimeout (fn []
-                          (when-not @resolved?
-                            (reset! resolved? true)
-                            (cleanup!)
-                            (resolve nil)))
-                        5000))))))
 
 #+end_src
 
