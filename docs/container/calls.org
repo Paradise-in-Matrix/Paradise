@@ -17,6 +17,8 @@ magnitudes simpler.
 (ns container.call.events
   (:require [re-frame.core :as rf]
             [taoensso.timbre :as log]
+            [cljs-workers.core :as main]
+            [client.state :as state]
             [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
 #+end_src
 
