@@ -1,0 +1,81 @@
+
+** Worker Members
+
+**** Preface
+
+
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/worker/members.cljs
+(ns worker.members
+  (:require [cljs-workers.worker :as worker]
+            [clojure.string :as str]
+            [worker.state :as state])
+  (:require-macros [cljs.core.async.macros :refer [go]]
+                   [cljs.core.async.interop :refer [<p!]]))
+#+end_src
+
+
+
+
+
+#+begin_src clojurescript :tangle ../../src/worker/members.cljs
+(defn- drain-members-iterator [iterator]
+  (let [results (transient [])]
+    (loop []
+      (let [chunk (.nextChunk iterator 100)]
+        (if (and chunk (> (.-length chunk) 0))
+          (do
+            (doseq [m chunk]
+              (when m
+                (let [user-id      (.-userId m)
+                      membership   (.-tag (.-membership m))
+                      display-name (.-displayName m)
+                      local-part   (or (second (re-find #"^@([^:]+)" user-id)) user-id)
+                      raw-pl       (or (some-> m .-powerLevel .-inner .-value) 0)
+                      pl           (js/Number raw-pl)
+                      avatar-mxc   (.-avatarUrl m)]
+                  (conj! results {:user-id      user-id
+                                  :membership   membership
+                                  :power-level  pl
+                                  :display-name (or display-name user-id)
+                                  :sort-name    (str/lower-case (or display-name local-part))
+                                  :avatar-mxc   avatar-mxc}))))
+            (recur))
+          (persistent! results))))))
+
+(worker/register :fetch-room-members
+  (fn [{:keys [room-id]}]
+    (go
+      (try
+        (if-let [room (.getRoom @state/!client room-id)]
+          (let [iterator (<p! (.members room))]
+            (try
+              (let [members (drain-members-iterator iterator)]
+                {:status :success :members members})
+              (finally
+                (.uniffiDestroy iterator))))
+          {:status :error :msg "Room not found"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+(worker/register :fetch-power-level-tags
+  (fn [{:keys [room-id]}]
+    (go
+      (try
+        (let [client     @state/!client
+              session    (.session client)
+              token      (.-accessToken session)
+              hs-url     (.-homeserverUrl session)
+              clean-base (str/replace hs-url #"/+$" "")
+              url        (str clean-base "/_matrix/client/v3/rooms/" (js/encodeURIComponent room-id) "/state/in.cinny.room.power_level_tags/")]
+          (let [resp (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
+            (if (.-ok resp)
+              (let [data (<p! (.json resp))]
+                {:status :success :tags (js->clj data :keywordize-keys true)})
+              {:status :success :tags {}})))
+        (catch :default e
+          {:status :error :msg (str e)})))))
+#+end_src
