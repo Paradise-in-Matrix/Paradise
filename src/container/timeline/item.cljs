@@ -1,174 +1,21 @@
 (ns container.timeline.item
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
+  (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [re-frame.db :as db]
-            ["react-virtuoso" :refer [Virtuoso]]
             [reagent.core :as r]
-            [reagent.dom :as rd]
-            [reagent.dom.client :as rdom]
+            [cljs-workers.core :as main]
+            [client.state :as state]
+            [cljs.core.async :refer [go <!]]
             [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-time linkify-text truncate-name]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
-            [input.base :refer [message-input inline-editor]]
-            [navigation.rooms.room-summary :refer [build-room-summary]]
-            [utils.svg :as icons]
-            [client.diff-handler :refer [apply-matrix-diffs]]
-            ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent ReceiptType]]
-            ))
-
-(defn wrap-item [ffi-item]
-  (let [raw-id (.uniqueId ffi-item)
-        id-str (if raw-id (or (.-id raw-id) raw-id) (str "virt-" (hash ffi-item)))
-        event (.asEvent ffi-item)
-        virtual (.asVirtual ffi-item)]
-    (cond event
-          (let [sender-profile (.-senderProfile event)
-                inner-profile  (when sender-profile (.-inner sender-profile))
-                sender-avatar  (or (when inner-profile (.-avatarUrl inner-profile))
-                                   (.-sender event))
-                sender-name    (or (when inner-profile (.-displayName inner-profile))
-                                   (.-sender event))
-                sender-id      (.-sender event)
-                is-editable?   (.-isEditable event)
-                is-own?        (.-isOwn event)
-                e-t-id         (.-eventOrTransactionId event)
-                e-t-tag        (.-tag e-t-id)
-                e-t-inner      (.-inner e-t-id)
-                real-id        (if (= e-t-tag "EventId")
-                                 (.-eventId e-t-inner)
-                                 (.-transactionId e-t-inner))
-;;                _ (js/console.error event)
-                content        (.-content event)
-                content-tag    (.-tag content)
-                content-inner  (.-inner content)
-                content-inner-content (when content-inner (.-content content-inner))
-
-                reactions (when-let [reactions-raw (and content-inner-content (.-reactions content-inner-content))]
-                            (mapv (fn [r]
-                                    (let [emoji      (get r "key")
-                                          senders    (get r "senders")
-                                          sender-ids (set (map #(get % "senderId") senders))]
-                                      [emoji (count senders) sender-ids]))
-                                  (js->clj reactions-raw)))
-
-                read-by (let [receipts (.-readReceipts event)]
-                          (if (and receipts (> (.-size receipts) 0))
-                            (vec (js/Array.from (.keys receipts)))))]
-
-            {:id                      real-id
-             :internal-id             id-str
-             :event-or-transaction-id e-t-id
-             :type                    :event
-             :sender-name             sender-name
-             :sender-id               sender-id
-             :sender-avatar           sender-avatar
-             :ts                      (js/Number (.-timestamp event))
-             :reactions               reactions
-             :read-by                 read-by
-             :is-own?                 is-own?
-             :is-editable?            is-editable?
-             :content-tag             content-tag
-             :content (case content-tag
-
-                        "MsgLike"
-                        (let [msg-like-content (.-content content-inner)
-                              kind             (.-kind msg-like-content)
-                              kind-tag         (.-tag kind)
-                              kind-inner       (.-inner kind)]
-                          {:tag kind-tag
-                           :in-reply-to
-                           (when-let [reply-ffi (.-inReplyTo msg-like-content)]
-                             {:event-id (.eventId reply-ffi)})
-                           :inner (case kind-tag
-                                    "Message"
-                                    (let [actual        (.-content kind-inner)
-                                          m-type        (.-msgType actual)
-                                          m-tag         (.-tag m-type)
-                                          m-inner       (.-inner m-type)
-                                          m-content-obj (.-content m-inner)]
-                                      {:tag m-tag
-                                       :content (case m-tag
-                                                  ("Text" "Emote" "Notice")
-                                                  {:body (.-body m-content-obj)
-                                                   :is-edited? (.-isEdited actual)
-                                                   :html (some-> m-content-obj .-formatted .-body)}
-                                                  ("Image" "Video" "Audio" "File" "Sticker")
-                                                  (let [formatted (.-formattedCaption m-content-obj)
-                                                        info      (.-info m-content-obj)
-                                                        res       {:mimetype (some-> info .-mimetype)
-                                                                   :size     (some-> info .-size js/Number)}]
-                                                    {:tag         m-tag
-                                                     :ffi-content m-content-obj
-                                                     :source      (.-source m-content-obj)
-                                                     :caption     (.-caption m-content-obj)
-                                                     :html        (when formatted (.-body formatted))
-                                                     :info        (if (and info (.-width info))
-                                                                    (assoc res :w (js/Number (.-width info))
-                                                                           :h (js/Number (.-height info)))
-                                                                    res)})
-                                                  {:unsupported true})})
-                                    "Sticker"
-                                    {:source (.-source kind-inner)
-                                     :info   (when-let [info (.-info kind-inner)]
-                                               {:w (some-> info .-width js/Number)
-                                                :h (some-> info .-height js/Number)})}
-                                    nil)})
-                        "State"
-                        (let [state-content (.-content content-inner)
-                              state-tag     (.-tag state-content)
-                              state-inner   (.-inner state-content)]
-                          {:tag   state-tag
-                           :inner (case state-tag
-                                    "RoomPinnedEvents"
-                                    {:change (some-> state-inner .-change)}
-                                    "RoomAvatar"
-                                    {:url (some-> state-inner .-url)}
-                                    "RoomName"
-                                    {:name (some-> state-inner .-name)}
-                                    {:raw-inner state-inner})})
-                        "FailedToParseMessageLike"
-                        {:error      (.-error content-inner)
-                         :event-type (.-eventType content-inner)}
-                        "RoomMembership" {:change (some-> content-inner .-change .-name)}
-                        "ProfileChange"  {:id real-id}
-                        nil)})
-
-          virtual
-          {:id   id-str
-           :type :virtual
-           :tag  (.-tag virtual)
-           :ts   (some-> virtual .-inner .-ts js/Number)}
-
-          :else
-          {:id id-str :type :unknown})))
-
-
-(re-frame/reg-event-fx
- :sdk/toggle-reaction
- (fn [{:keys [db]} [_ room-id event-or-transaction-id emoji-key]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (if-not timeline
-       (log/error "No timeline found for reaction in room" room-id)
-       (try
-         (log/error event-or-transaction-id)
-         (-> (.toggleReaction timeline event-or-transaction-id emoji-key)
-             (.then (fn [added?]
-                      (if added?
-                        (log/info "Reaction added:" emoji-key)
-                        (log/info "Reaction removed:" emoji-key))))
-             (.catch #(log/error "Failed to toggle reaction:" %)))
-         (catch :default e
-           (log/error "FFI Reaction Toggle Panic:" e)))))
-   {}))
-
+            [input.base :refer [inline-editor]]
+            [utils.svg :as icons]))
 
 (re-frame/reg-event-db
  :msg/open-reaction-picker
  (fn [db [_ room-id event-or-transaction-id  x y]]
    (assoc db :active-reaction-picker {:room-id room-id :event-or-transaction-id event-or-transaction-id  :x x :y y})))
-
 
 (re-frame/reg-event-db
  :msg/close-reaction-picker
@@ -179,7 +26,6 @@
  :msg/active-reaction-picker
  (fn [db _]
    (:active-reaction-picker db)))
-
 
 (re-frame/reg-event-db
  :ui/open-reaction-details
@@ -195,122 +41,84 @@
  :ui/active-reaction-details
  (fn [db _]
    (:active-reaction-details db)))
-  
+
+(re-frame/reg-sub
+ :sdk/homeserver-url
+ (fn [db _]
+   (:homeserver-url db)))
+
 
 
 
 
 
 (re-frame/reg-event-fx
+ :sdk/toggle-reaction
+ (fn [_ [_ room-id event-id emoji-key]]
+   (main/do-with-pool! @state/!engine-pool {:handler :toggle-reaction
+                                            :arguments {:room-id room-id :event-id event-id :emoji emoji-key}})
+   {}))
+
+(re-frame/reg-event-fx
  :msg/toggle-pin
- (fn [{:keys [db]} [_ room-id msg-id]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (if-not timeline
-       (log/error "No timeline found for pinning")
-       (-> (.pinEvent timeline msg-id)
-           (.then (fn [was-pinned?]
-                    (if was-pinned?
-                      (log/info "Message pinned:" msg-id)
-                      (-> (.unpinEvent timeline msg-id)
-                          (.then #(log/info "Message unpinned:" msg-id))
-                          (.catch #(js/console.error %))))))
-           (.catch #(js/console.error %)))))
+ (fn [_ [_ room-id msg-id]]
+   (main/do-with-pool! @state/!engine-pool {:handler :toggle-pin
+                                            :arguments {:room-id room-id :msg-id msg-id}})
    {}))
 
 (re-frame/reg-event-fx
  :msg/delete
- (fn [{:keys [db]} [_ room-id msg-id]]
-   (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (-> (.redactEvent timeline msg-id)
-         (.then #(log/debug "Message deleted optimistically:" msg-id))
-         (.catch #(log/error "Failed to redact message:" %)))
-     (log/error "No timeline found in db for room:" room-id))
-   {}))
-
-
-(re-frame/reg-event-fx
- :msg/reply
- (fn [{:keys [db]} [_ room-id reply-to-msg-id text html]]
-   (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (try
-       (let [content-obj (.messageEventContentFromHtml sdk text (or html text))]
-         (-> (.sendReply timeline content-obj reply-to-msg-id js/undefined)
-             (.then (fn [_]
-                      (log/debug "Reply sent to timeline")
-                      (re-frame/dispatch [:msg/clear-input-context])))
-             (.catch #(log/error "Failed to send reply:" %))))
-       (catch :default e
-         (log/error "FFI Reply Panic:" e)))
-     (log/error "No timeline found in db for room:" room-id))
+ (fn [_ [_ room-id msg-id]]
+   (main/do-with-pool! @state/!engine-pool {:handler :redact-event
+                                            :arguments {:room-id room-id :msg-id msg-id}})
    {}))
 
 
 
 (re-frame/reg-event-fx
  :msg/edit
- (fn [{:keys [db]} [_ room-id item text html]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])
-         {:keys [event-or-transaction-id]} item
-         msg-tag     (get-in item [:content :inner :tag])
-         msg-content (get-in item [:content :inner :content])]
-     (if-not timeline
-       (log/error "Timeline not found")
-       (try
-         (let [formatted (if-not (str/blank? html)
-                           #js {:format (.new (.-Html (.-MessageFormat sdk)))
-                                :body html}
-                           js/undefined)
-               without-relation
-               (if (contains? #{"Image" "Video" "Audio" "File"} msg-tag)
-                 (let [ffi-content (:ffi-content msg-content)
-                       updated-ffi (js/Object.assign #js {} ffi-content
-                                                     #js {:caption text
-                                                          :formattedCaption formatted})
-                       msg-type    (.new (aget MessageType msg-tag) #js {:content updated-ffi})
-                       global-msg  #js {:msgType msg-type :mentions #js {:userIds #js [] :room false}}]
-                   (.contentWithoutRelationFromMessage sdk global-msg))
-                 (.messageEventContentFromHtml sdk text (or html text)))
+ (fn [_ [_ room-id item text html]]
+   (let [msg-tag     (get-in item [:content :inner :tag])
+         ffi-content (get-in item [:content :inner :content :ffi-content])]
+     (go
+       (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                         {:handler :send-message
+                                          :arguments {:room-id room-id
+                                                      :text text
+                                                      :html html
+                                                      :context {:mode "edit"
+                                                                :target (:id item)
+                                                                :msg-tag msg-tag
+                                                                :ffi-content ffi-content}}}))]
+         (log/info "Edit dispatch result:" res))))
+   {:dispatch [:input/clear-context room-id]}))
 
-               edited-content #js {:tag "RoomMessage"
-                                   :inner #js {:content without-relation}}]
-           (-> (.edit timeline event-or-transaction-id edited-content js/undefined)
-               (.then #(log/info (str msg-tag " edited successfully!")))
-               (.catch #(log/error "Timeline Edit Promise Failed:" %))))
-         (catch :default e
-           (log/error "FFI Edit Panic:" e))))
-     {})))
+
+
 
 (re-frame/reg-event-fx
  :room/mark-read
- (fn [{:keys [db]} [_ room-id event-id]]
-   (let [client (:client db)
-         room (.getRoom client room-id)]
-     (when (and room event-id)
-       (log/error room)
-       (-> (.sendReadReceipt room event-id "m.read")
-           (p/catch #(log/error "Failed to send receipt" %))))
-     {})))
-
-(re-frame/reg-event-db
- :msg/mark-visible
- (fn [db [_ event-id]]
-   (if-let [room-id (:active-room-id db)]
-     (assoc-in db [:read-receipts :pending room-id] event-id)
-     db)))
+ (fn [_ [_ room-id event-id]]
+   (main/do-with-pool! @state/!engine-pool {:handler :mark-read
+                                            :arguments {:room-id room-id :event-id event-id}})
+   {}))
 
 (re-frame/reg-event-fx
  :msg/flush-receipts
  (fn [{:keys [db]} _]
-   (let [pending (get-in db [:read-receipts :pending])
-         client  (:client db)]
-     (when (and client (seq pending))
+   (let [pending (get-in db [:read-receipts :pending])]
+     (when (seq pending)
        (doseq [[room-id event-id] pending]
          (when (not= (get-in db [:read-receipts :sent room-id]) event-id)
-           (if-let [timeline (get-in db [:timeline-subs room-id :timeline])]
-             (-> (.sendReadReceipt timeline (.-Read ReceiptType) event-id )
-                 (.then #(re-frame/dispatch [:msg/receipt-sent room-id event-id]))
-                 (.catch #(log/error "Receipt fail:" %)))
-             (log/error "No timeline for receipt:" room-id)))))
+           (go
+             (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                               {:handler :send-receipt
+                                                :arguments {:room-id room-id :event-id event-id}}))]
+               (log/error event-id)
+               (log/error res)
+               (if (= (:status res) "success")
+                 (re-frame/dispatch [:msg/receipt-sent room-id event-id])
+                 (log/error "Receipt flush failed:" res)))))))
      {:db (assoc-in db [:read-receipts :pending] {})})))
 
 (re-frame/reg-event-db
@@ -321,6 +129,14 @@
 (defonce receipt-flusher
   (js/setInterval #(re-frame/dispatch [:msg/flush-receipts]) 2000))
 
+(re-frame/reg-event-db
+ :msg/mark-visible
+ (fn [db [_ event-id]]
+   (if-let [room-id (:active-room-id db)]
+     (assoc-in db [:read-receipts :pending room-id] event-id)
+     db)))
+
+
 (defonce visibility-observer
   (delay
     (js/IntersectionObserver.
@@ -330,26 +146,26 @@
            (let [target   (.-target entry)
                  event-id (.getAttribute target "data-event-id")]
              (when event-id
+               (log/error "Read test?")
                (.unobserve observer target)
                (re-frame/dispatch [:msg/mark-visible event-id])
                )))))
      #js {:threshold 0.5})))
 
+
 (defn build-message-actions [tr item active-room current-user-id x y]
   (let [msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)
         is-mine? (or (:is-own? item)
-                     (= (:sender item) current-user-id))
-       ]
+                     (= (:sender item) current-user-id))]
     (cond-> [{:id "react"
               :label (tr [:container.timeline.item/react])
               :icon [icons/smiley]
               :action #(re-frame/dispatch [:ui/open-popover :reaction-picker
-                       {:room-id active-room
-                        :msg-id  e-t-id
-                        :x       x
-                        :y       y
-                        }])}
+                                           {:room-id active-room
+                                            :msg-id  e-t-id
+                                            :x       x
+                                            :y       y}])}
 
              {:id "reply" :label (tr [:container.timeline.item/reply]) :icon [icons/reply]
               :action #(re-frame/dispatch [:input/set-context active-room :reply item])}
@@ -358,18 +174,17 @@
                {:id "edit" :label (tr [:container.timeline.item/edit-message]) :icon [icons/edit]
                 :action #(re-frame/dispatch [:input/set-context active-room :edit item])})
              {:id "thread" :label  (tr [:container.timeline.item/start-thread]) :icon [icons/thread] :action #(re-frame/dispatch [:msg/thread active-room msg-id])}
-             {:id "copy"   :label (tr [:container.timeline.item/copy-text])      :icon [icons/copy] :action #(js/navigator.clipboard.writeText (or (get-in item [:content :body]) ""))}
-             {:id "link"   :label (tr [:container.timeline.item/copy-link])     :icon [icons/link] :action #(log/info "Copy permalink for" msg-id)}
-             {:id "pin"    :label (tr [:container.timeline.item/pin])     :icon [icons/pins] :action
+             {:id "copy"   :label (tr [:container.timeline.item/copy-text])       :icon [icons/copy] :action #(js/navigator.clipboard.writeText (or (get-in item [:content :body]) ""))}
+             {:id "link"   :label (tr [:container.timeline.item/copy-link])       :icon [icons/link] :action #(log/info "Copy permalink for" msg-id)}
+             {:id "pin"    :label (tr [:container.timeline.item/pin])       :icon [icons/pins] :action
               #(re-frame/dispatch [:msg/toggle-pin active-room msg-id])}
-             {:id "source" :label (tr [:container.timeline.item/source])     :icon [icons/search] :action #(re-frame/dispatch [:msg/view-source msg-id])}]
+             {:id "source" :label (tr [:container.timeline.item/source])       :icon [icons/search] :action #(re-frame/dispatch [:msg/view-source msg-id])}]
       is-mine? (conj {:id "delete" :label (tr [:container.timeline.item/delete])  :icon [icons/trash] :class-name "danger" :action #(re-frame/dispatch [:msg/delete active-room e-t-id])}))))
 
+
 (defn message-hover-toolbar [tr item active-room current-user-id]
-  (let [
-        msg-id   (:id item)
-        e-t-id   (:event-or-transaction-id item)
-        ]
+  (let [msg-id   (:id item)
+        e-t-id   (:event-or-transaction-id item)]
     [:div.message-hover-toolbar
      [:div.toolbar-btn
       {:title    (tr [:container.timeline.item/react])
@@ -390,14 +205,12 @@
      [:div.toolbar-btn
       {:title (tr [:container.timeline.item/reply])
        :on-click #(re-frame/dispatch [:input/set-context active-room :reply item])}
-      [icons/reply]
-      ]
+      [icons/reply]]
      (when (:is-own? item)
        [:div.toolbar-btn
         {:title (tr [:container.timeline.item/edit-message])
          :on-click #(re-frame/dispatch [:input/set-context active-room :edit item])}
-        [icons/edit]
-        ])
+        [icons/edit]])
      [:div.toolbar-btn
       {:title (tr [:container.timeline.item/more])
        :on-click (fn [e]
@@ -406,11 +219,10 @@
                          my (.-clientY e)]
                      (re-frame/dispatch
                       [:context-menu/open
-                       {:x mx
-                        :y my
+                       {:x mx :y my
                         :items (build-message-actions tr item active-room current-user-id mx my)}])))}
-      [icons/more]]
-     ]))
+      [icons/more]]]))
+
 
 (defn state-event-view [{:keys [sender-name content]}]
   (let [{:keys [tag inner]} content]
@@ -428,20 +240,20 @@
         "RoomAvatar"       (str sender-name " changed the room avatar.")
         (str sender-name " updated " tag))]]))
 
+
 (defn message-text [{:keys [body html]}]
   (if (seq html)
     (into [:span.body.formatted] (sanitize-custom-html html))
     [:span.body (linkify-text body)]))
 
-
-(defn async-media-wrapper [content {:keys [class default-ratio]} render-fn]
-  (r/with-let [client       @(re-frame/subscribe [:sdk/client])
-               media-source (:source content)
+(defn async-media-wrapper [event content {:keys [class default-ratio]} render-fn]
+  (r/with-let [_ (log/error "Load media")
+               room-id      @(re-frame/subscribe [:rooms/active-id])
+               event-id     (:id event)
                info         (:info content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
-
                style        (if valid-dims?
                               {:aspect-ratio (str w " / " h)
                                :max-width (str "min(" w "px, 400px)")
@@ -450,73 +262,84 @@
                               {:aspect-ratio (str default-ratio)
                                :max-width "300px"
                                :background "var(--bg-secondary)"})
-
                !blob-url    (r/atom nil)
-               _            (when (and client media-source)
-                              (p/let [bytes (.getMediaContent client media-source)
-                                      blob  (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
-                                      url   (js/URL.createObjectURL blob)]
-                                (reset! !blob-url url)))]
+
+
+               _            (go
+                              (let [pool @state/!engine-pool
+                                    res  (<! (main/do-with-pool! pool {:handler :get-media
+                                                                       :arguments {:room-id room-id
+                                                                                   :event-id event-id
+                                                                                   :source (or (:source content) (:url content))}}))]
+
+
+                                (when (= (:status res) "success")
+                                  (let [bytes-arr (clj->js (:bytes res))
+                                        bytes     (js/Uint8Array. bytes-arr)
+                                        blob      (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
+                                        url       (js/URL.createObjectURL blob)]
+                                    (reset! !blob-url url)))))]
     (let [url @!blob-url]
       [:div.media-container {:class class :style style}
        (if url
          (render-fn url (or (:caption content) (:filename content) "media"))
          [:div.message-image-placeholder
-          {:style {:width "100%"
-                   :height "100%"
-                   :display "flex"
-                   :align-items "center"
-                   :justify-content "center"}}
+          {:style {:width "100%" :height "100%" :display "flex" :align-items "center" :justify-content "center"}}
           [:div.spinner]])])
     (finally
       (when-let [url @!blob-url]
         (js/URL.revokeObjectURL url)))))
 
 
-(defn image-message [content]
+
+
+
+(defn image-message [event content]
   [:div.image-attachment-container
-   [async-media-wrapper content {:class "media-image" :default-ratio 1.33}
+   [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
-      [:img {:src url
-             :alt alt-text
-             :loading "eager"
-             :on-click #(re-frame/dispatch
-                         [:ui/open-modal :image-lightbox
-                          {:url url
-                           :backdrop-props {:class "lightbox-backdrop"}
-                           :window-props   {:style {:background "transparent"
-                                                    :box-shadow "none"
-                                                    :width "100%"
-                                                    :height "100%"
-                                                    :max-width "none"
-                                                    :max-height "none"
-                                                    :padding 0}}}])
-             :style {:width "100%"
-                     :height "100%"
-                     :display "block"
-                     :object-fit "contain"
-                     :cursor "zoom-in"}}])]])
+      [:img {:src url :alt alt-text :loading "eager"
+             :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox {:url url}])
+             :style {:width "100%" :height "100%" :display "block" :object-fit "contain" :cursor "zoom-in"}}])]
+   (when (seq (:caption content))
+     [:div.media-caption
+      [message-text content]])])
 
 
-(defn video-message [content]
-  (async-media-wrapper content {:class "media-video" :default-ratio 1.77}
+
+
+
+(defn video-message [event content]
+  [:div.video-attachment-container
+   [async-media-wrapper event content {:class "media-video" :default-ratio 1.77}
     (fn [url _]
-      [:video {:src url :controls true :style {:width "100%" :height "100%" :display "block"}} ])))
+      [:video {:src url :controls true :style {:width "100%" :height "100%" :display "block"}} ])]
+   (when (seq (:caption content))
+     [:div.media-caption
+      [message-text content]])])
 
-(defn sticker-message [content]
-  (async-media-wrapper content {:class "media-sticker" :default-ratio 1.0}
-    (fn [url alt]
-      [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])))
+(defn sticker-message [event content]
+  [async-media-wrapper event content {:class "media-sticker" :default-ratio 1.0}
+   (fn [url alt]
+     [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])])
 
-(defn file-message [{:keys [caption source info]} tr]
-  [:div.file-attachment
-   [:a {:href (mxc->url source) :target "_blank" :className "file-link"}
-    [:span.file-icon [icons/file]]
-    [:span.file-name (or caption (tr [:container.timeline.status/file-download]))]
-    (when-let [size (:size info)]
-      [:span.file-size (str "(" (quot size 1024) " KB)")])]])
+(defn file-message [event content tr]
+  (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
+        {:keys [caption source info]} content]
+    [:div.file-attachment-container
+     [:div.file-attachment
+      [:a {:href (mxc->url source {:homeserver hs-url :type :download}) :target "_blank" :className "file-link"}
+       [:span.file-icon [icons/file]]
+       [:span.file-name (or caption (tr [:container.timeline.status/file-download]))]
+       (when-let [size (:size info)]
+         [:span.file-size (str "(" (quot size 1024) " KB)")])]]
+     (when (seq (:caption content))
+       [:div.media-caption
+        [message-text content]])]))
 
-(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg]
+
+
+(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
      (when in-reply-to
@@ -530,51 +353,49 @@
              (get-in reply-msg [:content :inner :content :body]
                      (tr [:container.timeline.status/media-preview]))]]
            [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
+
      (case msg-type-tag
        "Text"    [message-text content-map]
-       "Image"   [image-message content-map]
-       "Video"   [video-message content-map]
-       "Sticker" [sticker-message content-map]
-       "File"    [file-message content-map tr]
+       "Image"   [image-message event content-map]
+       "Video"   [video-message event content-map]
+       "Sticker" [sticker-message event content-map]
+       "File"    [file-message event content-map tr]
        [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
      (when is-edited?
        [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
 
+
 (defn reaction-row [{:keys [reactions my-id members-map active-room event-id]}]
-  [:div.reactions-row
-   (for [[emoji count senders] reactions]
-     ^{:key emoji}
-     (let [hover-text (->> senders
-                           (map (fn [uid]
-                                  (or (:display-name (get members-map uid))
-                                      uid)))
-                           (str/join ", "))]
-       [:span.reaction-pill
-        {:class (when (contains? senders my-id) "active")
-         :title hover-text
-         :on-context-menu (fn [e]
-                            (.preventDefault e)
-                            (.stopPropagation e)
-                            (re-frame/dispatch
-                             [:ui/open-modal :reaction-details
-                              {:room-id active-room
-                               :reactions reactions
-                               :window-props {:style {:max-width "400px" :min-height "300px"}}}]))
-         :on-click (fn [e]
-                     (.preventDefault e)
-                     (.stopPropagation e)
-                     (re-frame/dispatch [:sdk/toggle-reaction active-room event-id emoji]))
-         :style {:cursor "pointer" :user-select "none"}}
-        (if (str/starts-with? emoji "mxc://")
-          [:img.reaction-custom
-           {:src (mxc->url emoji {:width 32 :height 32 :method "crop"})
-            :style {:pointer-events "none"}}]
-          [:span.reaction-emoji
-           {:style {:pointer-events "none"}}
-           emoji])
-        [:span.reaction-count
-         {:style {:pointer-events "none"}}
-         count]]))])
+  (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])]
+    [:div.reactions-row
+     (for [[emoji count senders] reactions]
+       ^{:key emoji}
+       (let [hover-text (->> senders
+                             (map (fn [uid]
+                                    (or (:display-name (get members-map uid)) uid)))
+                             (str/join ", "))]
+         [:span.reaction-pill
+          {:class (when (contains? senders my-id) "active")
+           :title hover-text
+           :on-context-menu (fn [e]
+                              (.preventDefault e)
+                              (.stopPropagation e)
+                              (re-frame/dispatch
+                               [:ui/open-modal :reaction-details
+                                {:room-id active-room
+                                 :reactions reactions
+                                 :window-props {:style {:max-width "400px" :min-height "300px"}}}]))
+           :on-click (fn [e]
+                       (.preventDefault e)
+                       (.stopPropagation e)
+                       (re-frame/dispatch [:sdk/toggle-reaction active-room event-id emoji]))
+           :style {:cursor "pointer" :user-select "none"}}
+          (if (str/starts-with? emoji "mxc://")
+            [:img.reaction-custom
+             {:src (mxc->url emoji {:homeserver hs-url :width 32 :height 32 :method "crop"})
+              :style {:pointer-events "none"}}]
+            [:span.reaction-emoji {:style {:pointer-events "none"}} emoji])
+          [:span.reaction-count {:style {:pointer-events "none"}} count]]))]))
 
 (defn system-event-view [icon text]
   [:div.timeline-system-event
@@ -592,6 +413,7 @@
         tr               @(re-frame/subscribe [:i18n/tr])
         active-room      @(re-frame/subscribe [:rooms/active-id])
         my-profile       @(re-frame/subscribe [:sdk/profile])
+        hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
         is-mobile?       @(re-frame/subscribe [:ui/mobile?])
         my-id            (:user-id my-profile)
         edit-context     @(re-frame/subscribe [:input/context active-room])
@@ -602,7 +424,7 @@
         member-data      (get members-map sender-id)
         popover-member   {:user-id sender-id
                           :display-name (or (:display-name member-data) sender-name)
-                          :avatar-url (or (:avatar-url member-data) (mxc->url sender-avatar))
+                          :avatar-url (or (:avatar-url member-data) (mxc->url sender-avatar {:homeserver hs-url :type :thumbnail :width 48 :height 48}))
                           :power-level (or (:power-level member-data) 0)}
         open-menu-fn     (fn [mx my]
                            (re-frame/dispatch
@@ -620,7 +442,7 @@
       [swipe-to-action-wrapper
        {:can-edit? is-own?
         :enabled? is-mobile?
-         :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
+        :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
         :wrapper-props (merge (long-press-props open-menu-fn)
                               {:class (str "timeline-message"
                                            (if (= content-tag "MsgLike") " is-message" " is-system")
@@ -640,7 +462,9 @@
           (= content-tag "MsgLike")
           (let [{:keys [tag inner in-reply-to]} content
                 reply-id  (:event-id in-reply-to)
-                reply-msg (when reply-id @(re-frame/subscribe [:timeline/events-map active-room reply-id]))]
+                events-map  @(re-frame/subscribe [:timeline/events-map active-room])
+                reply-msg (get events-map reply-id)
+                ]
             [:<>
              (when-not merge-with-prev?
                [:div.timeline-header
@@ -650,11 +474,11 @@
              [:div.timeline-body
               (cond
                 is-editing-this? [inline-editor item active-room]
-                (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg]
+                (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
                 (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
                 (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
                 (= tag "Message") (let [{m-tag :tag m-content :content} inner]
-                                    [render-message-content tr m-tag m-content in-reply-to reply-msg])
+                                    [render-message-content tr m-tag m-content in-reply-to reply-msg item])
                 :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]])
 
           (= content-tag "RoomMembership")
@@ -664,26 +488,17 @@
           [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
 
           (= content-tag "State")
-                    [state-event-view item]
+          [state-event-view item]
 
-           :else
-          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])]
-
-          )
-
+          :else
+          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])
 
         (when (seq reactions)
           [reaction-row {:reactions reactions
                          :my-id my-id
                          :members-map members-map
                          :active-room active-room
-                         :event-id (:event-or-transaction-id item)}])
-        #_(when (seq read-by)
-            [:div.read-receipts-row
-             [:span.receipt-count (str "✓ " (count read-by))]])]
-
-       ]
-      )))
+                         :event-id (:event-or-transaction-id item)}])]])))
 
 (defn event-tile [item]
   (let [id (:id item)
@@ -691,19 +506,16 @@
         node-ref (volatile! nil)]
     (r/create-class
      {:display-name (str "event-tile-" id)
-
       :component-did-mount
       (fn [this]
         (let [node @node-ref]
           (when (and node (not is-virtual?) @visibility-observer)
             (.observe @visibility-observer node))))
-
       :component-will-unmount
       (fn [this]
         (let [node @node-ref]
           (when (and node (not is-virtual?) @visibility-observer)
             (.unobserve @visibility-observer node))))
-
       :reagent-render
       (fn [item]
         [:div {:data-event-id id
