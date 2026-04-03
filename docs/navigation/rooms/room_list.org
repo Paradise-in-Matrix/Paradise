@@ -20,60 +20,6 @@
 
 
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-(re-frame/reg-event-db
- :rooms/parent-resolved
- (fn [db _]
-   (update-in db [:ui :parent-refresh-counter] (fnil inc 0))))
-
-(defonce !parent-queue (atom {}))
-
-(defn enqueue-parent-check! [room-id]
-  (swap! !parent-queue update room-id #(if % % 0)))
-
-(defn process-parent-queue! []
-  (let [queue         @!parent-queue
-        db            @re-frame.db/app-db
-        space-service (:space-service db)
-        cache         (get db :rooms-unfiltered-cache {})]
-    (when (and space-service (seq queue))
-      (-> (p/all
-           (map (fn [[id attempts]]
-                  (if-let [room (get cache id)]
-                    (-> (.joinedParentsOfChild space-service id)
-                        (p/then (fn [parents]
-                                  (if (pos? (alength parents))
-                                    {:id id :status :success :parents parents :room room}
-                                    {:id id :status :retry :attempts (inc attempts)})))
-                        (p/catch (fn [e]
-                                   (js/console.error "Queue FFI fail for" id e)
-                                   {:id id :status :retry :attempts (inc attempts)})))
-                    (p/resolved {:id id :status :drop})))
-                queue))
-
-          (p/then (fn [results]
-                    (doseq [res results]
-                      (when (= (:status res) :success)
-                        (let [room (:room res)
-                              parents (:parents res)]
-                          (aset room "parents" parents)
-                          (aset room "first-parent-id" (.-roomId (aget parents 0))))))
-
-                    (let [to-keep (reduce (fn [acc res]
-                                            (if (and (= (:status res) :retry)
-                                                     (< (:attempts res) 3))
-                                              (assoc acc (:id res) (:attempts res))
-                                              acc))
-                                          {}
-                                          results)]
-                      (reset! !parent-queue to-keep)
-
-                      (when (some #(= (:status %) :success) results)
-                        (re-frame/dispatch [:rooms/parent-resolved]))
-
-                      (when (seq to-keep)
-                        (js/setTimeout process-parent-queue! 2000)))))))))
-#+end_src
 
 
 
