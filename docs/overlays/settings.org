@@ -55,17 +55,14 @@ scaffolding.
 
 (re-frame/reg-event-fx
  :sdk/fetch-own-profile
- (fn [{:keys [db]} _]
-   (let [client (:client db)]
-     (when client
-       (p/let [user-id      (.userId client)
-               display-name (.displayName client)
-               avatar-url   (.avatarUrl client)]
-         (re-frame/dispatch [:sdk/set-own-profile
-                             {:user-id      user-id
-                              :display-name display-name
-                              :avatar-url   avatar-url}])))
-     {})))
+ (fn [_ _]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :fetch-profile}))]
+         (when (= (:status res) "success")
+           (re-frame/dispatch [:sdk/set-own-profile (:profile res)]))))
+     (log/error "Cannot fetch profile: engine pool missing"))
+   {}))
 
 (re-frame/reg-event-db
  :sdk/set-own-profile
