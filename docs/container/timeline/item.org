@@ -10,24 +10,18 @@ It is convenient to define the actual items that make up a timeline.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (ns container.timeline.item
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
+  (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [re-frame.db :as db]
-            ["react-virtuoso" :refer [Virtuoso]]
             [reagent.core :as r]
-            [reagent.dom :as rd]
-            [reagent.dom.client :as rdom]
+            [cljs-workers.core :as main]
+            [client.state :as state]
+            [cljs.core.async :refer [go <!]]
             [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-time linkify-text truncate-name]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
-            [input.base :refer [message-input inline-editor]]
-            [navigation.rooms.room-summary :refer [build-room-summary]]
-            [utils.svg :as icons]
-            [client.diff-handler :refer [apply-matrix-diffs]]
-            ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent ReceiptType]]
-            ))
+            [input.base :refer [inline-editor]]
+            [utils.svg :as icons]))
 #+end_src
 
 
