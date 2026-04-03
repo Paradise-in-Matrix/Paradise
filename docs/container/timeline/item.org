@@ -412,10 +412,10 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn sticker-message [content]
-  (async-media-wrapper content {:class "media-sticker" :default-ratio 1.0}
-    (fn [url alt]
-      [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])))
+(defn sticker-message [event content]
+  [async-media-wrapper event content {:class "media-sticker" :default-ratio 1.0}
+   (fn [url alt]
+     [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])])
 #+end_src
 
 
