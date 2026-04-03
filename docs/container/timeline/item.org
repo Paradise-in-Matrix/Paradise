@@ -420,13 +420,19 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn file-message [{:keys [caption source info]} tr]
-  [:div.file-attachment
-   [:a {:href (mxc->url source) :target "_blank" :className "file-link"}
-    [:span.file-icon [icons/file]]
-    [:span.file-name (or caption (tr [:container.timeline.status/file-download]))]
-    (when-let [size (:size info)]
-      [:span.file-size (str "(" (quot size 1024) " KB)")])]])
+(defn file-message [event content tr]
+  (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
+        {:keys [caption source info]} content]
+    [:div.file-attachment-container
+     [:div.file-attachment
+      [:a {:href (mxc->url source {:homeserver hs-url :type :download}) :target "_blank" :className "file-link"}
+       [:span.file-icon [icons/file]]
+       [:span.file-name (or caption (tr [:container.timeline.status/file-download]))]
+       (when-let [size (:size info)]
+         [:span.file-size (str "(" (quot size 1024) " KB)")])]]
+     (when (seq (:caption content))
+       [:div.media-caption
+        [message-text content]])]))
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
