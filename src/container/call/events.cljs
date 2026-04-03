@@ -1,6 +1,8 @@
 (ns container.call.events
   (:require [re-frame.core :as rf]
             [taoensso.timbre :as log]
+            [cljs-workers.core :as main]
+            [client.state :as state]
             [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
 
 (defn click-iframe-button! [iframe-ref test-id]
@@ -10,8 +12,6 @@
       (if-let [btn (.querySelector doc (str "[data-testid='" test-id "']"))]
         (.click btn)
         (log/error "Could not find button with test-id:" test-id)))))
-
-
 
 (defn send-widget-action! [db action data]
   (let [is-primary? (get-in db [:call :primary-iframe?] true)
@@ -29,6 +29,17 @@
           (catch :default e
             (log/error "Failed to send action" action "to iframe:" e)))))))
 
+(rf/reg-event-fx
+ :call/recv-widget-message
+ (fn [{:keys [db]} [_ msg-string]]
+   (let [is-primary? (get-in db [:call :primary-iframe?] true)
+         iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
+     (when-let [iframe @iframe-ref]
+       (try
+         (.postMessage (.-contentWindow iframe) (js/JSON.parse msg-string) "*")
+         (catch :default e
+           (log/error "Failed to pipe worker message to iframe:" e)))))
+   {}))
 
 (rf/reg-event-fx
  :call/hangup
@@ -66,9 +77,6 @@
                            :video_enabled new-state})
      {:db (assoc-in db [:call :video-enabled?] new-state)})))
 
-
-
-
 (rf/reg-event-fx
  :call/toggle-deafen
  (fn [{:keys [db]} _]
@@ -77,10 +85,7 @@
          is-primary?         (get-in db [:call :primary-iframe?] true)
          iframe-ref          (if is-primary? primary-iframe-ref backup-iframe-ref)]
      (apply-iframe-sound-state! iframe-ref (not new-deafen-state))
-
      {:db (assoc-in db [:call :deafened?] new-deafen-state)})))
-
-
 
 (rf/reg-event-fx
  :call/toggle-screen-share
@@ -88,8 +93,7 @@
    (let [is-primary? (get-in db [:call :primary-iframe?] true)
          iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
      (click-iframe-button! iframe-ref "incall_screenshare")
-     {}))
-)
+     {})))
 
 (rf/reg-event-fx
  :call/open-settings
@@ -116,20 +120,18 @@
  :call/teardown
  (fn [{:keys [db]} _]
    (log/info "Call: Tearing down persistent call layer")
-   (let [client (get-in db [:call :embedded-client])]
-     (when client
-       (.destroy client)))
+   (when-let [pool @state/!engine-pool]
+     (main/do-with-pool! pool {:handler :teardown-widget}))
+
    (when-let [p-iframe @primary-iframe-ref] (set! (.-src p-iframe) "about:blank"))
    (when-let [b-iframe @backup-iframe-ref] (set! (.-src b-iframe) "about:blank"))
 
    {:db (-> db
-            (assoc-in [:call :embedded-client] nil)
             (assoc-in [:call :active-room-id] nil)
             (assoc-in [:call :is-active?] false)
             (assoc :main-focus :timeline))}))
 
-(rf/reg-event-db
- :call/set-active-room
+(rf/reg-event-db :call/set-active-room
  (fn [db [_ room-id]]
    (log/info "Call: Setting active room to" room-id)
    (-> db
@@ -137,28 +139,22 @@
        (assoc-in [:call :audio-enabled?] true)
        (assoc-in [:call :video-enabled?] false))))
 
-(rf/reg-event-db
- :call/set-active
+(rf/reg-event-db :call/set-active
  (fn [db [_ active?]]
    (assoc-in db [:call :is-active?] active?)))
 
-
-(rf/reg-event-db
- :call/update-media-state
+(rf/reg-event-db :call/update-media-state
  (fn [db [_ {:keys [audio video]}]]
    (-> db
        (assoc-in [:call :audio-enabled?] audio)
        (assoc-in [:call :video-enabled?] video))))
 
-(rf/reg-sub :call/deafened? (fn [db _] (get-in db [:call :deafened?] false)))
-(rf/reg-sub :call/screen-sharing? (fn [db _] (get-in db [:call :screen-sharing?] false)))
-(rf/reg-sub :call/audio-enabled? (fn [db _] (get-in db [:call :audio-enabled?] true)))
-(rf/reg-sub :call/video-enabled? (fn [db _] (get-in db [:call :video-enabled?] false)))
-(rf/reg-sub :call/chat-open?     (fn [db _] (get-in db [:call :chat-open?] false)))
-(rf/reg-sub :call/state (fn [db _] (:call db)))
-(rf/reg-sub :call/active-room (fn [db _] (get-in db [:call :active-room-id])))
-(rf/reg-sub :call/is-active? (fn [db _] (get-in db [:call :is-active?])))
-(rf/reg-sub
- :call/is-primary-iframe?
- (fn [db _]
-   (get-in db [:call :primary-iframe?] true)))
+(rf/reg-sub :call/deafened?        (fn [db _] (get-in db [:call :deafened?] false)))
+(rf/reg-sub :call/screen-sharing?  (fn [db _] (get-in db [:call :screen-sharing?] false)))
+(rf/reg-sub :call/audio-enabled?   (fn [db _] (get-in db [:call :audio-enabled?] true)))
+(rf/reg-sub :call/video-enabled?   (fn [db _] (get-in db [:call :video-enabled?] false)))
+(rf/reg-sub :call/chat-open?       (fn [db _] (get-in db [:call :chat-open?] false)))
+(rf/reg-sub :call/state            (fn [db _] (:call db)))
+(rf/reg-sub :call/active-room      (fn [db _] (get-in db [:call :active-room-id])))
+(rf/reg-sub :call/is-active?       (fn [db _] (get-in db [:call :is-active?])))
+(rf/reg-sub :call/is-primary-iframe? (fn [db _] (get-in db [:call :primary-iframe?] true)))
