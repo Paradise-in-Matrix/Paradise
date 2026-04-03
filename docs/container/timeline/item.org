@@ -222,21 +222,20 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+
 (defn build-message-actions [tr item active-room current-user-id x y]
   (let [msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)
         is-mine? (or (:is-own? item)
-                     (= (:sender item) current-user-id))
-       ]
+                     (= (:sender item) current-user-id))]
     (cond-> [{:id "react"
               :label (tr [:container.timeline.item/react])
               :icon [icons/smiley]
               :action #(re-frame/dispatch [:ui/open-popover :reaction-picker
-                       {:room-id active-room
-                        :msg-id  e-t-id
-                        :x       x
-                        :y       y
-                        }])}
+                                           {:room-id active-room
+                                            :msg-id  e-t-id
+                                            :x       x
+                                            :y       y}])}
 
              {:id "reply" :label (tr [:container.timeline.item/reply]) :icon [icons/reply]
               :action #(re-frame/dispatch [:input/set-context active-room :reply item])}
@@ -245,12 +244,13 @@ read receipts. This prevents any sort of spamming to the home server.
                {:id "edit" :label (tr [:container.timeline.item/edit-message]) :icon [icons/edit]
                 :action #(re-frame/dispatch [:input/set-context active-room :edit item])})
              {:id "thread" :label  (tr [:container.timeline.item/start-thread]) :icon [icons/thread] :action #(re-frame/dispatch [:msg/thread active-room msg-id])}
-             {:id "copy"   :label (tr [:container.timeline.item/copy-text])      :icon [icons/copy] :action #(js/navigator.clipboard.writeText (or (get-in item [:content :body]) ""))}
-             {:id "link"   :label (tr [:container.timeline.item/copy-link])     :icon [icons/link] :action #(log/info "Copy permalink for" msg-id)}
-             {:id "pin"    :label (tr [:container.timeline.item/pin])     :icon [icons/pins] :action
+             {:id "copy"   :label (tr [:container.timeline.item/copy-text])       :icon [icons/copy] :action #(js/navigator.clipboard.writeText (or (get-in item [:content :body]) ""))}
+             {:id "link"   :label (tr [:container.timeline.item/copy-link])       :icon [icons/link] :action #(log/info "Copy permalink for" msg-id)}
+             {:id "pin"    :label (tr [:container.timeline.item/pin])       :icon [icons/pins] :action
               #(re-frame/dispatch [:msg/toggle-pin active-room msg-id])}
-             {:id "source" :label (tr [:container.timeline.item/source])     :icon [icons/search] :action #(re-frame/dispatch [:msg/view-source msg-id])}]
+             {:id "source" :label (tr [:container.timeline.item/source])       :icon [icons/search] :action #(re-frame/dispatch [:msg/view-source msg-id])}]
       is-mine? (conj {:id "delete" :label (tr [:container.timeline.item/delete])  :icon [icons/trash] :class-name "danger" :action #(re-frame/dispatch [:msg/delete active-room e-t-id])}))))
+
 #+end_src
 
 
