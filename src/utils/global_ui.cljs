@@ -1,13 +1,10 @@
 (ns utils.global-ui
   (:require
- [promesa.core :as p]
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
-   [re-frame.db :as db]
    [reagent.core :as r]
    [overlays.base :refer [modal-component popover-component]]
    [utils.svg :as icons]
-;;   [input.emotes :refer [emoji-sticker-board]]
    ))
 
 (defn click-away-wrapper
