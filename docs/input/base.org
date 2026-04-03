@@ -253,9 +253,7 @@ forward.
 (re-frame/reg-event-db
  :input/set-context
  (fn [db [_ room-id mode target-item]]
-   (assoc-in db [:input-context room-id]
-             {:mode mode
-              :target target-item})))
+   (assoc-in db [:input-context room-id] {:mode mode :target target-item})))
 
 (re-frame/reg-event-db
  :input/clear-context
