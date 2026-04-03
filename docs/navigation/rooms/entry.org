@@ -367,13 +367,7 @@ ever do this once per room.
 (re-frame/reg-sub
  :room/is-call?
  (fn [db [_ room-id]]
-   (let [preview   (get-in db [:room-previews room-id])
-         room-type (:room-type preview)]
-     (if (map? room-type)
-       (and (= "Custom" (:tag room-type))
-            (= "org.matrix.msc3417.call" (get-in room-type [:inner :value])))
-       (and (= "Custom" (some-> room-type .-tag))
-            (= "org.matrix.msc3417.call" (some-> room-type .-inner .-value)))))))
+   (get-in db [:room-previews room-id :is-call?])))
 #+end_src
 
 
