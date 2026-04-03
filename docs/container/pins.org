@@ -53,23 +53,7 @@ Doesn't matter how, but we need one of those to render the actual entries.
 
 **** Reframe Subscriptions and Events
 
-
 ***** Fetching
-
-
-Similar to other instances where the sdk has proven lacking,
-we find ourselves probing the server unfortunately directly.
-Normally we'd just get the pinnedEventIds from the sync,
-but those are always empty in our testing.
-
-I assume in the most recent version this isn't the case.
-Looking at implementations in the most popular client...
-that would appear to be the case. The PinnedEvents focused
-timeline would've been perfect here.
-
-Instead, we'll fetch the event IDs directly. The thought
-here is that the actual request is rather small
-usually; so this shouldn't be too taxing.
 
 #+begin_src clojurescript :tangle ../../src/container/pins.cljs
 (re-frame/reg-fx
