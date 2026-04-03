@@ -445,11 +445,14 @@ logic that is to be used from the main application itself.
 #+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
 (ns service-worker-handler
   (:require
-            [taoensso.timbre :as log]
-            [client.config :refer [check-remote-version]]
-            [re-frame.db :as db]
-            [promesa.core :as p]
-            [re-frame.core :as re-frame]))
+   [taoensso.timbre :as log]
+   [client.config :refer [check-remote-version]]
+   [re-frame.db :as db]
+   [promesa.core :as p]
+   [re-frame.core :as re-frame]
+   [cljs-workers.core :as main]
+   [client.state :as state]
+   [cljs.core.async :refer [go <!]]))
 #+end_src
 
 
