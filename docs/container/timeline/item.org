@@ -256,10 +256,8 @@ read receipts. This prevents any sort of spamming to the home server.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn message-hover-toolbar [tr item active-room current-user-id]
-  (let [
-        msg-id   (:id item)
-        e-t-id   (:event-or-transaction-id item)
-        ]
+  (let [msg-id   (:id item)
+        e-t-id   (:event-or-transaction-id item)]
     [:div.message-hover-toolbar
      [:div.toolbar-btn
       {:title    (tr [:container.timeline.item/react])
@@ -280,14 +278,12 @@ read receipts. This prevents any sort of spamming to the home server.
      [:div.toolbar-btn
       {:title (tr [:container.timeline.item/reply])
        :on-click #(re-frame/dispatch [:input/set-context active-room :reply item])}
-      [icons/reply]
-      ]
+      [icons/reply]]
      (when (:is-own? item)
        [:div.toolbar-btn
         {:title (tr [:container.timeline.item/edit-message])
          :on-click #(re-frame/dispatch [:input/set-context active-room :edit item])}
-        [icons/edit]
-        ])
+        [icons/edit]])
      [:div.toolbar-btn
       {:title (tr [:container.timeline.item/more])
        :on-click (fn [e]
@@ -296,11 +292,9 @@ read receipts. This prevents any sort of spamming to the home server.
                          my (.-clientY e)]
                      (re-frame/dispatch
                       [:context-menu/open
-                       {:x mx
-                        :y my
+                       {:x mx :y my
                         :items (build-message-actions tr item active-room current-user-id mx my)}])))}
-      [icons/more]]
-     ]))
+      [icons/more]]]))
 #+end_src
 
 
@@ -308,6 +302,7 @@ read receipts. This prevents any sort of spamming to the home server.
 **** State Event Rendering
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+
 (defn state-event-view [{:keys [sender-name content]}]
   (let [{:keys [tag inner]} content]
     [:div.timeline-state-event
@@ -323,6 +318,7 @@ read receipts. This prevents any sort of spamming to the home server.
         "RoomName"         (str sender-name " changed the room name to: " (:name inner))
         "RoomAvatar"       (str sender-name " changed the room avatar.")
         (str sender-name " updated " tag))]]))
+
 #+end_src
 
 
@@ -335,7 +331,6 @@ read receipts. This prevents any sort of spamming to the home server.
   (if (seq html)
     (into [:span.body.formatted] (sanitize-custom-html html))
     [:span.body (linkify-text body)]))
-
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
