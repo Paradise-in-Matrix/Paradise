@@ -341,7 +341,9 @@ this functional first.
 (defn- fetch-event-content [hs-url token room-id event-id]
   (let [url (str hs-url "/_matrix/client/v3/rooms/" (js/encodeURIComponent room-id)
                  "/context/" (js/encodeURIComponent event-id) "?limit=0")]
-    (-> (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})
+    (-> (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}
+                           :mode "cors"
+                           :credentials "omit"})
         (p/then (fn [resp]
                   (if (.-ok resp)
                     (.json resp)
