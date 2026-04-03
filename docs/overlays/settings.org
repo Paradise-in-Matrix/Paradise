@@ -23,18 +23,18 @@ Not entirely important to read, but certainly interesting.
   (:require
    [promesa.core :as p]
    [re-frame.core :as re-frame]
-   [re-frame.db :as db]
    [reagent.core :as r]
-   ["react-virtuoso" :refer [Virtuoso]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [navigation.rooms.room-list :refer [parse-room]]
    [utils.svg :as icons]
    [overlays.base :refer [modal-component]]
-   [utils.global-ui :refer [click-away-wrapper global-context-menu]]
    [utils.helpers :refer [mxc->url]]
-   [taoensso.tempura :as tr]
    [taoensso.timbre :as log]
-   [utils.macros :refer [config]]))
+   [utils.macros :refer [config]]
+   [cljs.core.async :refer [go <!]]
+   [cljs-workers.core :as main]
+   [client.state :as state]
+   ))
+
+
 #+end_src
 
 
