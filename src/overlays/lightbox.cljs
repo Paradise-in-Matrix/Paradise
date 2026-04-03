@@ -1,15 +1,9 @@
-
 (ns overlays.lightbox
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
-            [taoensso.timbre :as log]
-            [clojure.string :as str]
-            [re-frame.db :as db]
+  (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
             [overlays.base :refer [modal-component]]
             [utils.svg :as icons]
-            [reagent.dom.client :as rdom]))
-
+            ))
 
 (defn image-lightbox-content [{:keys [url]}]
   (r/with-let [!state           (r/atom {:scale 1 :last-scale 1 :x 0 :y 0 :last-x 0 :last-y 0 :start-dist 0})
@@ -93,6 +87,3 @@
 
 (defmethod modal-component :image-lightbox [_]
   image-lightbox-content)
-
-
-
