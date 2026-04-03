@@ -81,26 +81,56 @@ https://matrix-org.github.io/matrix-rust-sdk/
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
 
 
+#+end_src
 
 
+
+In order to send images or videos appropriately, we need to ensure we're providing
+the info section. Now while spec doesn't explicitly require this, it does ease
+viewing for other clients. However, even if we don't clients will natively handle
+it.
+Important to note we must do this here as this is when the browser is loading the
+buffer of data so we can actually check the data associated and pass it on.
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
-(re-frame/reg-event-fx
- :sdk/handle-file-drop
- (fn [{:keys [db]} [_ room-id files]]
-   (doseq [raw-file files]
-     (let [reader      (js/FileReader.)
-           preview-url (js/URL.createObjectURL raw-file)
-           mime        (.-type raw-file)
-           filename    (.-name raw-file)]
+
+(defn extract-metadata [raw-file]
+  (p/create
+   (fn [resolve _]
+     (let [mime      (.-type raw-file)
+           is-image? (str/starts-with? mime "image/")
+           is-video? (str/starts-with? mime "video/")
+           reader    (js/FileReader.)]
        (set! (.-onload reader)
              (fn [e]
-               (let [buffer (.. e -target -result)
-                     attachment {:buffer      buffer
-                                 :mime        mime
-                                 :filename    filename
-                                 :preview-url preview-url}]
-                 (re-frame/dispatch [:composer/add-attachment room-id attachment]))))
-       (.readAsArrayBuffer reader raw-file)))
+               (let [buffer      (.. e -target -result)
+                     base-att    {:buffer      buffer
+                                  :mime        mime
+                                  :filename    (.-name raw-file)
+                                  :size        (.-size raw-file)
+                                  :preview-url (js/URL.createObjectURL raw-file)}]
+                 (if (or is-image? is-video?)
+                   (let [el  (if is-image? (js/Image.) (js/document.createElement "video"))
+                         url (js/URL.createObjectURL raw-file)]
+                     (if is-image?
+                       (set! (.-onload el)
+                             (fn []
+                               (js/URL.revokeObjectURL url)
+                               (resolve (assoc base-att :width (.-width el) :height (.-height el)))))
+                       (set! (.-onloadedmetadata el)
+                             (fn []
+                               (js/URL.revokeObjectURL url)
+                               (resolve (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
+                     (set! (.-src el) url))
+                   (resolve base-att)))))
+       (.readAsArrayBuffer reader raw-file)))))
+
+(re-frame/reg-event-fx
+ :sdk/handle-file-drop
+ (fn [_ [_ room-id files]]
+   (doseq [raw-file files]
+     (-> (extract-metadata raw-file)
+         (p/then (fn [attachment]
+                   (re-frame/dispatch [:composer/add-attachment room-id attachment])))))
    {}))
 #+end_src
 
