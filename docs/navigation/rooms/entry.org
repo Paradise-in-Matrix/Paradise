@@ -274,6 +274,7 @@ call controls and some color styling.
 Now before we define the panel we may want to define media buttons...
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+
 (defn media-button [active? icon-on icon-off title on-click color-active color-inactive]
   [:button.media-btn
    {:style {:background "transparent"
@@ -293,6 +294,8 @@ Now before we define the panel we may want to define media buttons...
 
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+
+
 (defn active-call-panel []
   (let [active-call-id  @(re-frame/subscribe [:call/active-room])
         audio-on?       @(re-frame/subscribe [:call/audio-enabled?])
