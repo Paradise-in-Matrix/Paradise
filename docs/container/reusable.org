@@ -274,7 +274,6 @@ as often times these on-off events are useful to be used as a jump-to.
      [:button.jump-btn
       {:on-click #(re-frame/dispatch [:room/pretty-jump room-id (:id event)])}
       (tr [:container/jump-to-message])]]))
-
 #+end_src
 
 
@@ -339,9 +338,6 @@ as often times these on-off events are useful to be used as a jump-to.
 .timeline-item.jump-target {
     animation: highlight-pulse 2s ease-out;
 }
-
-
-
 #+end_src
 
 
