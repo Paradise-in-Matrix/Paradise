@@ -679,6 +679,8 @@ Now this is actually what we provide to the Virtuoso list for rendering the
 individual elements. Effectively just a fancy destructure to grab the values we
 need out.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+
+
 (defn render-room-item [tr client rooms active-space active-room closed-drawers active-filter]
   (fn [_ raw-room]
     (let [{:keys [id roomId name is-space? isSpace depth
