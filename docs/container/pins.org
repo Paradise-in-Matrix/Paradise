@@ -43,27 +43,6 @@ Doesn't matter how, but we need one of those to render the actual entries.
 
 #+end_src
 
-**** Current Idea for Implementation
-
-
-The current best rendering idea is to actually boot a new timeline for EACH
-pinned item and render that timeline as a single event tile.
-It'll be immensely overkill, but it'll absolutely work within the constraints
-of the SDK.
-
-
-**** Ephemeral Timelines
-
-
-Now the abomination below is what we've described above.
-The goal for this is to render a single event on a timeline.
-We grab the event and its content and then dispose of the timeline
-then we load the next.
-We expect this to not be the cheapest operation, but given the
-alternatives it isn't exactly the worst. Fetching the event
-content directly from the server would be silly.
-From what I can tell we can't fetch arbitrary events from the server
-so we can manipulate what we are dealt by sync.
 
 #+begin_src clojurescript :tangle ../../src/container/pins.cljs
 (defn fetch-pin-via-ephemeral-timeline [room event-id]
