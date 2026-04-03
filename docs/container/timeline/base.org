@@ -14,24 +14,21 @@ we've made interop with the WASM bindings.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (ns container.timeline.base
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
+  (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
             [re-frame.db :as db]
-            ["react-virtuoso" :refer [Virtuoso]]
-            ["virtua" :refer [VList Virtualizer]]
+            [cljs-workers.core :as main]
+            [cljs.core.async :refer [go <!]]
+            ["virtua" :refer [Virtualizer]]
             [reagent.core :as r]
+            [client.state :as state]
             [reagent.dom.client :as rdom]
             [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-readers join-names get-status-string]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
-            [container.timeline.item :refer [event-tile wrap-item connected-event-tile]]
+            [container.timeline.item :refer [event-tile connected-event-tile]]
             [container.reusable :refer [room-header]]
-            [input.base :refer [message-input inline-editor]]
-            [navigation.rooms.room-summary :refer [build-room-summary]]
-            [client.diff-handler :refer [apply-matrix-diffs]]
-            ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]))
 #+end_src
 
 
