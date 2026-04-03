@@ -22,6 +22,12 @@ Probably needs a better name (and logical grouping)
 **** Login Reframe Components
 
 #+begin_src clojurescript :tangle ../../src/auth/events.cljs
+
+(re-frame/reg-event-db
+ :auth/set-status
+ (fn [db [_ status]]
+   (assoc db :auth-status status)))
+
 (re-frame/reg-sub
  :auth/status
  (fn [db _] (:auth-status db)))
