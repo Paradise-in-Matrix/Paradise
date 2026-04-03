@@ -29,15 +29,6 @@ we've made interop with the WASM bindings.
             [utils.svg :as icons]
             [container.timeline.item :refer [event-tile connected-event-tile]]
             [container.reusable :refer [room-header]]
-#+end_src
-
-
-**** Timeline Queue
-
-This is our diff trigger method. On a diff returned from the Rust SDK
-It then takes the diff and tells reframe what to update the timeline
-to now display. This could be just *adding* a single message or swapping
-rooms.
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defonce !timeline-queues (atom {}))
 
