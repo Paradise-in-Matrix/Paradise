@@ -1,22 +1,138 @@
 (ns input.drafts
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
+  (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [reagent.core :as r]
-            ["react" :as react]
             [utils.svg :as icons]
-            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
+            [cljs.core.async :refer [go <!]]
+            [cljs-workers.core :as main]
+            [client.state :as state]
+            ))
+
+(re-frame/reg-event-fx
+ :composer/clear-after-submit
+ (fn [{:keys [db]} [_ room-id]]
+   (doseq [att (get-in db [:drafts room-id :attachments] [])]
+     (when (:preview-url att)
+       (js/URL.revokeObjectURL (:preview-url att))))
+   {:db (-> db
+            (assoc-in [:drafts room-id :attachments] [])
+            (assoc-in [:composer room-id] {:text ""
+                                           :html ""
+                                           :loaded-text ""
+                                           :uploading? false}))
+    :dispatch [:composer/persist-draft room-id]}))
+
+
+
+(re-frame/reg-event-fx
+ :composer/persist-draft
+ (fn [{:keys [db]} [_ room-id]]
+   (let [attachments (get-in db [:drafts room-id :attachments] [])
+         {:keys [text html]} (get-in db [:composer room-id])]
+
+     (if-let [pool @state/!engine-pool]
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :persist-draft
+                                                 :arguments {:room-id room-id
+                                                             :text (or text "")
+                                                             :html (or html "")
+                                                             :attachments attachments}}))]
+           (when (= (:status res) "error")
+             (log/error "Draft Persist failed:" (:msg res)))))
+       (log/error "No engine pool for draft auto-save"))
+     {})))
+
+
+(re-frame/reg-sub
+ :composer/cached-html
+ (fn [db [_ room-id]]
+   (get-in db [:composer room-id :html])))
+
+(re-frame/reg-event-fx
+ :composer/on-change
+ (fn [{:keys [db]} [_ room-id text html]]
+   (let [old-timer (get-in db [:composer room-id :save-timer])]
+     (when old-timer (js/clearTimeout old-timer))
+     {:db (update-in db [:composer room-id]
+                     merge
+                     {:text text
+                      :html html
+                      :loaded-text nil
+                      :save-timer (js/setTimeout
+                                   #(re-frame/dispatch [:composer/persist-draft room-id])
+                                   500)})})))
+
+
+(re-frame/reg-event-fx
+ :composer/add-attachment
+ (fn [{:keys [db]} [_ room-id attachment]]
+   {:db (update-in db [:drafts room-id :attachments] (fnil conj []) attachment)
+    :dispatch [:composer/persist-draft room-id]}))
+
+(re-frame/reg-sub
+ :composer/attachments
+ (fn [db [_ room-id]]
+   (get-in db [:drafts room-id :attachments] [])))
+
+
+(re-frame/reg-event-fx
+ :composer/remove-attachment
+ (fn [{:keys [db]} [_ room-id index]]
+   (let [attachment (get-in db [:drafts room-id :attachments index])]
+     (when (:preview-url attachment)
+       (js/URL.revokeObjectURL (:preview-url attachment))))
+   {:db (update-in db [:drafts room-id :attachments]
+                   (fn [atts] (vec (concat (take index atts) (drop (inc index) atts)))))
+    :dispatch [:composer/persist-draft room-id]}))
+
+(re-frame/reg-event-fx
+ :composer/load-draft
+ (fn [_ [_ room-id]]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :load-draft
+                                               :arguments {:room-id room-id}}))]
+         (when (and (= (:status res) "success") (:draft res))
+           (re-frame/dispatch [:composer/draft-loaded room-id (:draft res)]))))
+     (log/error "No engine pool to load draft"))
+   {}))
+
+
+(re-frame/reg-event-fx
+ :composer/draft-loaded
+ (fn [{:keys [db]} [_ room-id draft]]
+   (let [plain-text (:text draft)
+         html-text  (:html draft)
+         raw-atts   (:attachments draft)
+         restored-atts
+         (mapv (fn [att]
+                 (let [raw-bytes (js/Uint8Array. (:buffer att))
+                       blob      (js/Blob. #js [raw-bytes] #js {:type (:mimetype att)})
+                       url       (js/URL.createObjectURL blob)]
+                   (assoc att :preview-url url)))
+               raw-atts)]
+     {:db (-> db
+              (assoc-in [:composer room-id :loaded-text] (or html-text plain-text))
+              (assoc-in [:drafts room-id :attachments] restored-atts))})))
+
+(re-frame/reg-sub
+ :composer/loaded-text
+ (fn [db [_ room-id]]
+   (get-in db [:composer room-id :loaded-text] "")))
+
 
 (defn reify-attachment [att]
   (let [mime (or (:mime att) "application/octet-stream")
-        file-info #js {:mimetype mime
+        file-info #js {:mime mime
                        :size (js/BigInt (.-byteLength (:buffer att)))
+                       :height (js/BigInt (:height att))
+                       :width (js/BigInt (:width att))
                        :thumbnailInfo js/undefined
                        :thumbnailSource js/undefined}
         source (.new (.-Data (.-UploadSource sdk))
                      #js {:bytes (:buffer att)
                           :filename (:filename att)})]
+    (log/error file-info)
     (cond
       (str/starts-with? mime "image/")
       (.new (.-Image (.-DraftAttachment sdk))
@@ -31,8 +147,52 @@
       (.new (.-File (.-DraftAttachment sdk))
             #js {:fileInfo file-info :source source}))))
 
+(defn create-media-source [url]
+  (.fromUrl MediaSource url))
+
+(defn create-image-info [att source]
+  (let [{:keys [width height size mime blurhash is-animated]} att]
+
+    (js/console.error source)
+    #js {:height          (if height (js/BigInt height) js/undefined)
+         :width           (if width (js/BigInt width) js/undefined)
+         :mimetype        (if mime mime js/undefined)
+         :size            (if size (js/BigInt size) js/undefined)
+         :thumbnailInfo  #js {
+                           :height (if height (js/BigInt height) js/undefined)
+                           :width   (if width (js/BigInt width) js/undefined)
+                           :mimetype  (if mime mime js/undefined)
+                           :size (if size (js/BigInt size) js/undefined)
+                           } ;; js/undefined
+         :thumbnailSource js/undefined
+         :blurhash        (if blurhash blurhash js/undefined)
+         :isAnimated      (if (some? is-animated) is-animated js/undefined)}))
+
+(defn create-video-info [att source]
+  (let [{:keys [width height size mime blurhash duration]} att]
+    #js {:duration        (if duration duration js/undefined)
+         :height          (if height (js/BigInt height) js/undefined)
+         :width           (if width (js/BigInt width) js/undefined)
+         :mimetype        (if mime mime js/undefined)
+         :size            (if size (js/BigInt size) js/undefined)
+         :thumbnailInfo   #js {
+                           :height (if height (js/BigInt height) js/undefined)
+                           :width   (if width (js/BigInt width) js/undefined)
+                           :mimetype  (if mime mime js/undefined)
+                           :size (if size (js/BigInt size) js/undefined)
+                           } ;; js/undefined
+         :thumbnailSource js/undefined
+         :blurhash        (if blurhash blurhash js/undefined)}))
+
+(defn create-audio-info [att source]
+  (let [{:keys [size mime duration]} att]
+    #js {:duration (if duration duration js/undefined)
+         :size     (if size (js/BigInt size) js/undefined)
+         :mimetype (if mime mime js/undefined)}))
+
 (defn prepare-attachment [sdk att]
   (let [mime      (or (:mime att) "application/octet-stream")
+        _ (log/error att)
         file-info #js {:mimetype mime
                        :size (js/BigInt (.-byteLength (:buffer att)))
                        :thumbnailInfo js/undefined
@@ -48,17 +208,24 @@
                (str/starts-with? mime "audio/") "Audio"
                :else                            "File")}))
 
+
+
+
+
 (defn attachment-preview [room-id attachment index]
   [:div.attachment-preview
-   (let [{:keys [mime preview-url filename]} attachment]
+   (let [{:keys [mimetype mime preview-url filename]} attachment
+         resolved-mime (or mime mimetype "application/octet-stream")
+         _ (log/error attachment)
+         ]
      (cond
-       (str/starts-with? mime "image/")
+       (str/starts-with? resolved-mime "image/")
        [:img.preview-image {:src preview-url}]
-       (or (str/starts-with? mime "audio/")
-           (str/starts-with? mime "video/"))
+       (or (str/starts-with? resolved-mime "audio/")
+           (str/starts-with? resolved-mime "video/"))
        [:div.preview-media-placeholder
         [:span [icons/chevron-right]]
-        [:span.mime-label (last (str/split mime #"/"))]]
+        [:span.mime-label (last (str/split resolved-mime #"/"))]]
        :else
        [:div.preview-file
         [icons/file]
@@ -67,64 +234,46 @@
     {:on-click #(re-frame/dispatch [:composer/remove-attachment room-id index])}
     [icons/exit]]])
 
-  (re-frame/reg-event-fx
- :composer/save-draft
- (fn [{:keys [db]} [_ room-id text html buffer filename mime]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (try
-       (let [file-info #js {:mimetype        (or mime "application/octet-stream")
-                            :size            (js/BigInt (.-byteLength buffer))
-                            :thumbnailInfo   js/undefined
-                            :thumbnailSource js/undefined}
-             upload-source (.new (.-Data (.-UploadSource sdk))
-                                 #js {:bytes buffer :filename filename})
-             attachment (.new (.-File (.-DraftAttachment sdk))
-                              #js {:fileInfo file-info
-                                   :source upload-source})
-             draft-type (.new (.-NewMessage (.-ComposerDraftType sdk)))
-             draft (.. (.-ComposerDraft sdk)
-                       (create #js {:plainText   text
-                                    :htmlText    (or html js/undefined)
-                                    :draftType   draft-type
-                                    :attachments #js [attachment]}))]
-         (log/info "Saving reified draft for room:" room-id)
-         (.setComposerDraft timeline draft file-info))
-       (catch :default e
-         (log/error "Draft Reification Failure:" e)))
-     {})))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :composer/clear-after-submit
- (fn [db [_ room-id]]
-   (-> db
-       (assoc-in [:drafts room-id :attachments] [])
-       (assoc-in [:composer room-id] {:text ""
-                                      :html ""
-                                      :loaded-text ""
-                                      :uploading? false}))))
+ (fn [{:keys [db]} [_ room-id]]
+   (doseq [att (get-in db [:drafts room-id :attachments] [])]
+     (when (:preview-url att)
+       (js/URL.revokeObjectURL (:preview-url att))))
+   {:db (-> db
+            (assoc-in [:drafts room-id :attachments] [])
+            (assoc-in [:composer room-id] {:text ""
+                                           :html ""
+                                           :loaded-text ""
+                                           :uploading? false}))
+    :dispatch [:composer/persist-draft room-id]}))
+
+
 
 (re-frame/reg-event-fx
  :composer/persist-draft
  (fn [{:keys [db]} [_ room-id]]
-   (let [client (:client db)
-         room   (when client (.getRoom client room-id))
-         attachments (get-in db [:drafts room-id :attachments])
+   (let [attachments (get-in db [:drafts room-id :attachments] [])
          {:keys [text html]} (get-in db [:composer room-id])]
-     (when (and room (not (str/blank? text)))
-       (try
-         (let [draft-type (.new (.-NewMessage (.-ComposerDraftType sdk)))
-               _ (log/debug attachments)
-               draft-atts (clj->js (map reify-attachment attachments))
-               draft (.. (.-ComposerDraft sdk)
-                         (create #js {:plainText text
-                                      :htmlText (or html js/undefined)
-                                      :draftType draft-type
-                                      :attachments draft-atts}))]
-           (log/debug "Auto-saving draft for" room-id "with" (count attachments) "attachments")
-           (-> (.saveComposerDraft room draft js/undefined)
-               (.catch #(log/error "Auto-save failed:" %))))
-         (catch :default e (log/error "Draft Persist Panic:" e))))
+
+     (if-let [pool @state/!engine-pool]
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :persist-draft
+                                                 :arguments {:room-id room-id
+                                                             :text (or text "")
+                                                             :html (or html "")
+                                                             :attachments attachments}}))]
+           (when (= (:status res) "error")
+             (log/error "Draft Persist failed:" (:msg res)))))
+       (log/error "No engine pool for draft auto-save"))
      {})))
+
+
+(re-frame/reg-sub
+ :composer/cached-html
+ (fn [db [_ room-id]]
+   (get-in db [:composer room-id :html])))
 
 (re-frame/reg-event-fx
  :composer/on-change
@@ -135,80 +284,96 @@
                      merge
                      {:text text
                       :html html
+                      :loaded-text nil
                       :save-timer (js/setTimeout
                                    #(re-frame/dispatch [:composer/persist-draft room-id])
-                                   1000)})})))
+                                   500)})})))
 
-(re-frame/reg-event-db
+
+(re-frame/reg-event-fx
  :composer/add-attachment
- (fn [db [_ room-id attachment]]
-   (update-in db [:drafts room-id :attachments] (fnil conj []) attachment)))
-
+ (fn [{:keys [db]} [_ room-id attachment]]
+   {:db (update-in db [:drafts room-id :attachments] (fnil conj []) attachment)
+    :dispatch [:composer/persist-draft room-id]}))
 
 (re-frame/reg-sub
  :composer/attachments
  (fn [db [_ room-id]]
    (get-in db [:drafts room-id :attachments] [])))
 
-(re-frame/reg-event-db
+
+(re-frame/reg-event-fx
  :composer/remove-attachment
- (fn [db [_ room-id index]]
+ (fn [{:keys [db]} [_ room-id index]]
    (let [attachment (get-in db [:drafts room-id :attachments index])]
      (when (:preview-url attachment)
        (js/URL.revokeObjectURL (:preview-url attachment))))
-   (update-in db [:drafts room-id :attachments]
-              (fn [atts] (vec (concat (take index atts) (drop (inc index) atts)))))))
+   {:db (update-in db [:drafts room-id :attachments]
+                   (fn [atts] (vec (concat (take index atts) (drop (inc index) atts)))))
+    :dispatch [:composer/persist-draft room-id]}))
 
 (re-frame/reg-event-fx
  :composer/load-draft
- (fn [{:keys [db]} [_ room-id]]
-   (let [client (:client db)
-         room (when client (.getRoom client room-id))]
-     (when room
-       (-> (.loadComposerDraft room js/undefined)
-           (.then (fn [draft]
-                    (when draft
-                      (re-frame/dispatch [:composer/draft-loaded room-id draft]))))
-           (.catch #(log/error "Failed to load draft:" %))))
-     {})))
+ (fn [_ [_ room-id]]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :load-draft
+                                               :arguments {:room-id room-id}}))]
+         (when (and (= (:status res) "success") (:draft res))
+           (re-frame/dispatch [:composer/draft-loaded room-id (:draft res)]))))
+     (log/error "No engine pool to load draft"))
+   {}))
+
 
 (re-frame/reg-event-fx
  :composer/draft-loaded
  (fn [{:keys [db]} [_ room-id draft]]
-   (let [plain-text (.-plainText draft)
-         html-text  (.-htmlText draft)
-         ffi-atts   (or (.-attachments draft) #js [])
-         _ (js/console.log ffi-atts)
+   (let [plain-text (:text draft)
+         html-text  (:html draft)
+         raw-atts   (:attachments draft)
          restored-atts
          (mapv (fn [att]
-                 (try
-                   (let [tag    (.-tag att)
-                         inner  (.-inner att)
-                         source (.-source inner)
-                         data-inner (.-inner source)
-                         buffer   (.-bytes data-inner)
-                         filename (.-filename data-inner)
-                         mime (case tag
-                                "Image" (.-mimetype (.-imageInfo inner))
-                                "Video" (.-mimetype (.-videoInfo inner))
-                                "Audio" (.-mimetype (.-audioInfo inner))
-                                "File"  (.-mimetype (.-fileInfo inner))
-                                "application/octet-stream")
-                         blob (js/Blob. #js [buffer] #js {:type mime})
-                         url  (js/URL.createObjectURL blob)]
-                     {:buffer buffer
-                      :mime mime
-                      :filename filename
-                      :preview-url url})
-                   (catch :default e
-                     (log/error "Failed to restore individual attachment:" e)
-                     nil)))
-               ffi-atts)]
+                 (let [raw-bytes (js/Uint8Array. (:buffer att))
+                       blob      (js/Blob. #js [raw-bytes] #js {:type (:mimetype att)})
+                       url       (js/URL.createObjectURL blob)]
+                   (assoc att :preview-url url)))
+               raw-atts)]
      {:db (-> db
               (assoc-in [:composer room-id :loaded-text] (or html-text plain-text))
-              (assoc-in [:drafts room-id :attachments] (vec (remove nil? restored-atts))))})))
+              (assoc-in [:drafts room-id :attachments] restored-atts))})))
 
 (re-frame/reg-sub
  :composer/loaded-text
  (fn [db [_ room-id]]
    (get-in db [:composer room-id :loaded-text] "")))
+
+(defn send-attachments! [sdk timeline room attachments text html]
+  (let [total (count attachments)]
+    (p/let [_ (p/loop [idx 0]
+                (when (< idx total)
+                  (let [att       (nth attachments idx)
+                        is-last?  (= idx (dec total))
+                        {:keys [source #_info type]} (prepare-attachment sdk att)
+
+
+                        info (case type
+                               "Image" (create-image-info att source)
+                               "Video" (create-video-info att source)
+                               "Audio" (create-audio-info att source)
+                               js/undefined)
+                        caption   (if is-last? (or text js/undefined) (:filename att))
+                        formatted (if (and is-last? (not (str/blank? html)))
+                                    #js {:format (.new (.-Html (.-MessageFormat sdk)))
+                                         :body html}
+                                    js/undefined)
+                        params    (.. sdk -UploadParameters
+                                      (create #js {:source source
+                                                   :caption (or caption js/undefined)
+                                                   :formattedCaption (or formatted js/undefined)}))]
+                    (.sendFile timeline params info)
+                    (p/do! (p/delay 100)
+                           (p/recur (inc idx))))))]
+      (.clearComposerDraft room js/undefined)
+      (doseq [att attachments]
+        (js/URL.revokeObjectURL (:preview-url att)))
+      true)))
