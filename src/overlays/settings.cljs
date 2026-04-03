@@ -2,18 +2,18 @@
   (:require
    [promesa.core :as p]
    [re-frame.core :as re-frame]
-   [re-frame.db :as db]
    [reagent.core :as r]
-   ["react-virtuoso" :refer [Virtuoso]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [navigation.rooms.room-list :refer [parse-room]]
    [utils.svg :as icons]
    [overlays.base :refer [modal-component]]
-   [utils.global-ui :refer [click-away-wrapper global-context-menu]]
    [utils.helpers :refer [mxc->url]]
-   [taoensso.tempura :as tr]
    [taoensso.timbre :as log]
-   [utils.macros :refer [config]]))
+   [utils.macros :refer [config]]
+   [cljs.core.async :refer [go <!]]
+   [cljs-workers.core :as main]
+   [client.state :as state]
+   ))
+
+
 
 (re-frame/reg-sub
  :sdk/profile
@@ -24,17 +24,14 @@
 
 (re-frame/reg-event-fx
  :sdk/fetch-own-profile
- (fn [{:keys [db]} _]
-   (let [client (:client db)]
-     (when client
-       (p/let [user-id      (.userId client)
-               display-name (.displayName client)
-               avatar-url   (.avatarUrl client)]
-         (re-frame/dispatch [:sdk/set-own-profile
-                             {:user-id      user-id
-                              :display-name display-name
-                              :avatar-url   avatar-url}])))
-     {})))
+ (fn [_ _]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :fetch-profile}))]
+         (when (= (:status res) "success")
+           (re-frame/dispatch [:sdk/set-own-profile (:profile res)]))))
+     (log/error "Cannot fetch profile: engine pool missing"))
+   {}))
 
 (re-frame/reg-event-db
  :sdk/set-own-profile
@@ -42,29 +39,11 @@
    (assoc db :current-user profile)))
 
 
-#_(re-frame/reg-event-fx
- :settings/open
- (fn [{:keys [db]} _]
-   {:db (assoc db :settings/open? true)
-    :fx [[:dispatch [:settings/load-accounts]]]}))
-
 (re-frame/reg-event-fx
  :settings/open
  (fn [{:keys [db]} _]
    {:fx [[:dispatch [:ui/open-modal :settings {}]]
          [:dispatch [:settings/load-accounts]]]}))
-
-
-
-#_(re-frame/reg-event-db
- :settings/close
- (fn [db _]
-   (assoc db :settings/open? false)))
-
-#_(re-frame/reg-sub
- :settings/is-open?
- (fn [db _]
-   (:settings/open? db false)))
 
 (re-frame/reg-event-db
  :settings/set-tab
@@ -76,27 +55,26 @@
  (fn [db _]
    (:settings/active-tab db :my-account)))
 
-(re-frame/reg-fx
- :matrix/recover-session
- (fn [{:keys [client recovery-key]}]
-   (let [encryption-module (.encryption client)]
-     (-> (.recover encryption-module recovery-key)
-         (p/then (fn [_]
-                   (log/info "Session successfully verified and recovered!")
-                   (re-frame/dispatch [:sdk/verification-success])))
-         (p/catch (fn [e]
-                    (log/error "Verification failed:" e)
-                    (re-frame/dispatch [:sdk/verification-error (.-message e)])))))))
-
 (re-frame/reg-event-fx
  :sdk/submit-verification
  (fn [{:keys [db]} [_ recovery-key]]
-   (let [client (:client db)]
-     (if client
+   (if-let [pool @state/!engine-pool]
+     (do
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :recover-session
+                                                 :arguments {:recovery-key recovery-key}}))]
+           (if (= (:status res) "success")
+             (do
+               (log/info "Session successfully verified and recovered!")
+               (re-frame/dispatch [:sdk/verification-success]))
+             (do
+               (log/error "Verification failed:" (:msg res))
+               (re-frame/dispatch [:sdk/verification-error (:msg res)])))))
        {:db (assoc db :verification/status :verifying
-                      :verification/error nil)
-        :matrix/recover-session {:client client :recovery-key recovery-key}}
-       (log/error "Cannot verify: No client active")))))
+                      :verification/error nil)})
+     (do
+       (log/error "Cannot verify: No engine pool active")
+       {}))))
 
 (re-frame/reg-event-db
  :sdk/verification-success
@@ -117,7 +95,6 @@
 (re-frame/reg-sub
  :verification/error
  (fn [db _] (:verification/error db)))
-
 
 
 (defn sidebar-profile-mini []
@@ -187,6 +164,7 @@
               (tr [:settings.verification.status/is-verifying])
               (tr [:settings.verification.status/verify-action]))]]])])))
 
+
 (defn my-account-tab [profile]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:<>
@@ -201,7 +179,22 @@
             (tr [:settings.profile/unknown-user]))]
        [:div.profile-id (:user-id profile)]]]]))
 
+
+
 (defn url-base64->uint8-array [base64-string]
+  (let [padding (.repeat "=" (mod (- 4 (mod (.-length base64-string) 4)) 4))
+        base64 (-> (.replace base64-string (js/RegExp. "-" "g") "+")
+                   (.replace (js/RegExp. "_" "g") "/")
+                   (str padding))
+        raw-data (js/atob base64)
+        output-array (js/Uint8Array. (.-length raw-data))]
+    (dotimes [i (.-length raw-data)]
+      (aset output-array i (.charCodeAt raw-data i)))
+    output-array))
+
+
+
+  (defn url-base64->uint8-array [base64-string]
   (let [padding (.repeat "=" (mod (- 4 (mod (.-length base64-string) 4)) 4))
         base64 (-> (.replace base64-string (js/RegExp. "-" "g") "+")
                    (.replace (js/RegExp. "_" "g") "/")
@@ -220,77 +213,56 @@
 
 (re-frame/reg-event-fx
  :push/enable
- (fn [{:keys [db]} _]
-   (let [client (:client db)]
-     (if-not (and client (exists? js/window.PushManager) (exists? js/navigator.serviceWorker))
-       (do (log/error "Push messaging is not supported.") {})
-       (-> (p/let [permission (js/Notification.requestPermission)]
-             (if (= permission "granted")
-               (p/let [reg (.-ready js/navigator.serviceWorker)
-                       existing-sub (.getSubscription (.-pushManager reg))
-                       _ (log/warn (js/JSON.stringify existing-sub))
-                       sub (if existing-sub
-                             existing-sub
-                             (.subscribe (.-pushManager reg)
-                                         #js {:userVisibleOnly true
-                                              :applicationServerKey (url-base64->uint8-array (:vapid-key config))}))]
-                 (re-frame/dispatch [:push/register-pusher sub]))
-               (log/warn "Notification permission denied.")))
-           (p/catch #(log/error "Push setup failed:" %)))))
+ (fn [_ _]
+   (if-not (and (exists? js/window.PushManager) (exists? js/navigator.serviceWorker))
+     (do (log/error "Push messaging is not supported.") {})
+     (-> (p/let [permission (js/Notification.requestPermission)]
+           (if (= permission "granted")
+             (p/let [reg (.-ready js/navigator.serviceWorker)
+                     existing-sub (.getSubscription (.-pushManager reg))
+                     sub (if existing-sub
+                           existing-sub
+                           (.subscribe (.-pushManager reg)
+                                       #js {:userVisibleOnly true
+                                            :applicationServerKey (url-base64->uint8-array (:vapid-key config))}))]
+               (re-frame/dispatch [:push/register-pusher sub]))
+             (log/warn "Notification permission denied.")))
+         (p/catch #(log/error "Push setup failed:" %))))
    {}))
-
-
-
 
 (re-frame/reg-event-fx
  :push/register-pusher
- (fn [{:keys [db]} [_ subscription]]
-   (let [client   (:client db)
-         hs-url   (.homeserver client)
-         token    (try (.-accessToken (.session client))
-                       (catch :default _
-                         (.. client -session -accessToken)))
-         sub-json (.toJSON subscription)
-         p256dh   (.. sub-json -keys -p256dh)
-         auth     (.. sub-json -keys -auth)
-         endpoint (.-endpoint sub-json)
-         app-id   (:app-id config)
-         push-url (:push-url config)
-         payload {:kind "http"
-                  :app_id app-id
-                  :pushkey p256dh
-                  :app_display_name (:app-name config)
-                  :device_display_name "Web Browser"
-                  :lang (or js/navigator.language "en")
-                  :append false
-                  :data {:url push-url
-                         :events_only true
-                         :endpoint endpoint
-                         :p256dh p256dh
-                         :auth auth}}]
-     (cond
-       (not token)  (log/error "Missing Access Token!")
-       (not app-id) (log/error "Missing app-id! Did you restart Vite after editing .env?")
-       (not push-url)(log/error "Missing push-url! Did you restart Vite after editing .env?")
-       (not p256dh) (log/error "Missing p256dh key from browser subscription!")
-       (not auth)   (log/error "Missing auth key from browser subscription!")
-       :else
-       (do
-         (log/error payload)
-         (-> (js/fetch (clean-url hs-url "/_matrix/client/v3/pushers/set")
-                     #js {:method "POST"
-                          :headers #js {:Authorization (str "Bearer " token)
-                                        :Content-Type "application/json"}
-                          :body (js/JSON.stringify (clj->js payload))})
-           (p/then (fn [resp]
-                     (if (.-ok resp)
-                       (do
-                         (log/info "Pusher registered successfully!")
-                         (re-frame/dispatch [:push/set-status :enabled]))
-                       (p/let [err-body (.json resp)]
-                         (log/error "HS Rejected Pusher:" (js->clj err-body))))))
-           (p/catch #(log/error "Network error:" %)))))
-     {})))
+ (fn [_ [_ subscription]]
+   (if-let [pool @state/!engine-pool]
+     (let [sub-json (.toJSON subscription)
+           p256dh   (.. sub-json -keys -p256dh)
+           auth     (.. sub-json -keys -auth)
+           endpoint (.-endpoint sub-json)
+           app-id   (:app-id config)
+           push-url (:push-url config)]
+       (cond
+         (not app-id)   (log/error "Missing app-id!")
+         (not push-url) (log/error "Missing push-url!")
+         (not p256dh)   (log/error "Missing p256dh key from browser subscription!")
+         (not auth)     (log/error "Missing auth key from browser subscription!")
+         :else
+         (go
+           (let [res (<! (main/do-with-pool! pool
+                                             {:handler :register-pusher
+                                              :arguments {:p256dh   p256dh
+                                                          :auth     auth
+                                                          :endpoint endpoint
+                                                          :app-id   app-id
+                                                          :push-url push-url
+                                                          :app-name (:app-name config)
+                                                          :lang     (or js/navigator.language "en")}}))]
+             (if (= (:status res) "success")
+               (do
+                 (log/info "Pusher registered successfully!")
+                 (re-frame/dispatch [:push/set-status :enabled]))
+               (log/error "HS Rejected Pusher:" (:msg res)))))))
+     (log/error "Cannot register pusher: no engine pool"))
+   {}))
 
 (re-frame/reg-event-db
  :push/set-status
@@ -320,6 +292,10 @@
          {:on-click #(re-frame/dispatch [:push/enable])}
          (tr [:settings.notifications/enable-btn])])]]))
 
+
+
+
+
 (re-frame/reg-fx
  :idb/fetch-sessions
  (fn [on-success-event]
@@ -345,10 +321,18 @@
                    (.close db)
                    (re-frame/dispatch (conj on-success-event []))))))))))
 
+
 (re-frame/reg-event-fx
  :settings/load-accounts
- (fn [{:keys [db]} _]
-   {:idb/fetch-sessions [:settings/set-accounts]}))
+ (fn [_ _]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :get-available-accounts}))]
+         (if (= (:status res) "success")
+           (re-frame/dispatch [:settings/set-accounts (:accounts res)])
+           (log/error "Failed to fetch accounts from worker:" (:msg res)))))
+     (log/warn "Cannot load accounts: No engine pool"))
+   {}))
 
 (re-frame/reg-event-db
  :settings/set-accounts
@@ -398,12 +382,10 @@
         (str "+ " (tr [:settings.accounts/add-account]))]]]]))
 
 
+
 (defn language-time-tab []
   (let [tr          @(re-frame/subscribe [:i18n/tr])
-        locale      @(re-frame/subscribe [:i18n/locale])
-        ;; time-format @(re-frame/subscribe [:settings/time-format])
-
-        ]
+        locale      @(re-frame/subscribe [:i18n/locale])]
     [:div.settings-tab-content
      [:h2.settings-heading (tr [:settings.language/title])]
      [:div.settings-section
@@ -419,16 +401,9 @@
           [:div.lang-names
            [:div.lang-native native]
            [:div.lang-english label]]
-          (when (= locale id) [icons/check-circle-green])])]
-      #_[:div.settings-spacer]
-      #_[:h3.settings-subheading (tr [:settings.language/time-label])]
-      #_[:div.segmented-control
-       [:button {:class (when (= time-format :h24) "active")
-                 :on-click #(re-frame/dispatch [:settings/set-time-format :h24])}
-        (tr [:settings.language/time-24])]
-       [:button {:class (when (= time-format :h12) "active")
-                 :on-click #(re-frame/dispatch [:settings/set-time-format :h12])}
-        (tr [:settings.language/time-12])]]]]))
+          (when (= locale id) [icons/check-circle-green])])]]]))
+
+
 
 (defn about-tab []
   (let [tr       @(re-frame/subscribe [:i18n/tr])
@@ -452,6 +427,9 @@
        (tr [:settings.about/check-updates])]]]))
 
 
+
+
+
 (defn settings-sidebar [active-tab]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.settings-sidebar
@@ -460,8 +438,7 @@
                            [:verification  :settings.tabs/verification]
                            [:accounts      :settings.tabs/accounts]
                            [:notifications :settings.tabs/notifications]
-                           [:language-time :settings.tabs/language-time]
-                           ]]
+                           [:language-time :settings.tabs/language-time]]]
        ^{:key id}
        [:div.settings-tab
         {:class (when (= active-tab id) "is-active")
@@ -493,7 +470,6 @@
         :language-time [language-time-tab]
         :about         [about-tab]
         [:div {:style {:color "#fff"}} (tr [:settings.modal/not-found])])]]))
-
 
 (defmethod modal-component :settings [_]
   settings-content)
