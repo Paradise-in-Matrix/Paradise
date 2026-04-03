@@ -624,11 +624,10 @@ component.
         active-space    @(re-frame/subscribe [:spaces/active-metadata])
         closed-drawers  @(re-frame/subscribe [:rooms/closed-drawers])
         active-filter   @(re-frame/subscribe [:room-list/active-filter])
-        client          @(re-frame/subscribe [:sdk/client])
+        client          nil
         room-array      (to-array rooms)]
     [:div.sidebar-rooms
      [:div.room-list-header
-
       (if active-space
         [:h3.room-list-header (:name active-space)]
         [:h3.room-list-header (tr [:navigation.room-list.headers/home])])]
@@ -639,6 +638,7 @@ component.
        [:div.room-collection
         [virtualized-room-list tr client room-array active-space active-room closed-drawers active-filter]])
      [active-call-panel]]))
+
 #+end_src
 
 
