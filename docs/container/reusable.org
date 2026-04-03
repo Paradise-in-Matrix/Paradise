@@ -256,35 +256,9 @@ so we'll keep them nicely collected here.
     flex-direction: row;
 
 }
-
-
-
 #+end_src
 
 
-
-**** Generic Event Rendering
-
-
-Occasionally we may wish to re-use the Event Tile from within the Timeline.
-It makes sense, we already have clearly defined rendering logic for an event
-and there isn't a good reason to redo it.
-However, it does expect three methods within that won't exist usually in
-generic items. So we need to neatly wrap our item to match the shape expected.
-
-
-***** Shim
-
-
-#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
-(defn make-timeline-item-shim [item event-id]
-  (log/error item)
-  #js {:uniqueId (fn []
-                   #js {:id event-id})
-       :asEvent  (fn []
-                   item)
-       :asVirtual (fn [] nil)})
-#+end_src
 
 
 ***** Message With Jump To
