@@ -100,10 +100,11 @@ export default defineConfig(({ mode }) => {
         optimizeDeps: {
             include: ["react", "react-dom"],
             esbuildOptions: {
-                target: "esnext",
+                target: "es2022",
             },
         },
         build: {
+            target: "es2022",
             outDir: "../dist",
             terserOptions: {
                 keep_classnames: true,
