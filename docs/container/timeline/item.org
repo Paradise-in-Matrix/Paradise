@@ -334,14 +334,14 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn async-media-wrapper [content {:keys [class default-ratio]} render-fn]
-  (r/with-let [client       @(re-frame/subscribe [:sdk/client])
-               media-source (:source content)
+(defn async-media-wrapper [event content {:keys [class default-ratio]} render-fn]
+  (r/with-let [_ (log/error "Load media")
+               room-id      @(re-frame/subscribe [:rooms/active-id])
+               event-id     (:id event)
                info         (:info content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
-
                style        (if valid-dims?
                               {:aspect-ratio (str w " / " h)
                                :max-width (str "min(" w "px, 400px)")
@@ -350,7 +350,6 @@ read receipts. This prevents any sort of spamming to the home server.
                               {:aspect-ratio (str default-ratio)
                                :max-width "300px"
                                :background "var(--bg-secondary)"})
-
                !blob-url    (r/atom nil)
                _            (when (and client media-source)
                               (p/let [bytes (.getMediaContent client media-source)
