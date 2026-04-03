@@ -73,11 +73,11 @@ Doesn't matter how, but we need one of those to render the actual entries.
 ***** Saving and Getting
 
 #+begin_src clojurescript :tangle ../../src/container/pins.cljs
+
 (re-frame/reg-event-db
  :room/save-pinned-events
  (fn [db [_ room-id pinned-events]]
    (assoc-in db [:rooms/data room-id :pinned-events] pinned-events)))
-
 
 (re-frame/reg-sub
  :room/pinned-events
