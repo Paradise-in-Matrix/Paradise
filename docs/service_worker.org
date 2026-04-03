@@ -351,8 +351,7 @@ this functional first.
         (p/then (fn [json]
                   (let [event (.-event json)]
                     {:body (get-in (js->clj event) ["content" "body"])
-                     :sender (or (.-sender event) "Someone")
-                     }))))))
+                     :sender (or (.-sender event) "Someone")}))))))
 
 (defn- show-smart-notification [push-data token hs-url]
   (let [sender        (or (.-sender_display_name push-data) (.-sender push-data) "Someone")
