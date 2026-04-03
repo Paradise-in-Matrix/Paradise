@@ -31,30 +31,10 @@ It is convenient to define the actual items that make up a timeline.
 ***** Reframe Events and Subscriptions
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(re-frame/reg-event-fx
- :sdk/toggle-reaction
- (fn [{:keys [db]} [_ room-id event-or-transaction-id emoji-key]]
-   (let [timeline (get-in db [:timeline-subs room-id :timeline])]
-     (if-not timeline
-       (log/error "No timeline found for reaction in room" room-id)
-       (try
-         (log/error event-or-transaction-id)
-         (-> (.toggleReaction timeline event-or-transaction-id emoji-key)
-             (.then (fn [added?]
-                      (if added?
-                        (log/info "Reaction added:" emoji-key)
-                        (log/info "Reaction removed:" emoji-key))))
-             (.catch #(log/error "Failed to toggle reaction:" %)))
-         (catch :default e
-           (log/error "FFI Reaction Toggle Panic:" e)))))
-   {}))
-
-
 (re-frame/reg-event-db
  :msg/open-reaction-picker
  (fn [db [_ room-id event-or-transaction-id  x y]]
    (assoc db :active-reaction-picker {:room-id room-id :event-or-transaction-id event-or-transaction-id  :x x :y y})))
-
 
 (re-frame/reg-event-db
  :msg/close-reaction-picker
@@ -65,7 +45,6 @@ It is convenient to define the actual items that make up a timeline.
  :msg/active-reaction-picker
  (fn [db _]
    (:active-reaction-picker db)))
-
 
 (re-frame/reg-event-db
  :ui/open-reaction-details
@@ -81,7 +60,6 @@ It is convenient to define the actual items that make up a timeline.
  :ui/active-reaction-details
  (fn [db _]
    (:active-reaction-details db)))
-  
 #+end_src
 
 
