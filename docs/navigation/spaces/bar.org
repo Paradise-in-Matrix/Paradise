@@ -11,19 +11,17 @@ not (among many other indicators).
 
 #+begin_src clojurescript :tangle ../../../src/navigation/spaces/bar.cljs
 (ns navigation.spaces.bar
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
-            [re-frame.db :as db]
-            [reagent.core :as r]
-            ["react-virtuoso" :refer [Virtuoso]]
-            [client.state :as state :refer [sdk-world]]
-            [navigation.rooms.room-list :refer [process-parent-queue!]]
-            [client.diff-handler :refer [apply-matrix-diffs apply-generic-diffs!]]
-            [overlays.settings :refer [sidebar-profile-mini]]
-            [utils.svg :as icons]
-            [utils.helpers :refer [mxc->url]]
-            [utils.global-ui :refer [avatar]]
-            [taoensso.timbre :as log]))
+  (:require
+   [re-frame.core :as re-frame]
+   [reagent.core :as r]
+   ["react-virtuoso" :refer [Virtuoso]]
+   [cljs-workers.core :as main]
+   [client.state :as state]
+   [cljs.core.async :refer [go <!]]
+   [overlays.settings :refer [sidebar-profile-mini]]
+   [utils.svg :as icons]
+   [utils.helpers :refer [mxc->url]]
+   [utils.global-ui :refer [avatar]]))
 #+end_src
 
 
