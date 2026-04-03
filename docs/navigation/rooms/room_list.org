@@ -19,26 +19,6 @@
 #+end_src
 
 
-**** Parent Child Mapping Space Rooms
-
-We need to create a queuing mechanism to properly load in the parentage for rooms.
-If we do this correctly then we can build out the graph ourselves for determining
-what a Space structure is. Currently we're using the assumption that the first
-parent is the direct expected parent, but at some point we may want to try
-to support more dynamic behavior.
-
-Now we do this because when the Rust SDK starts, the SpaceService is still waiting
-for the RoomListService to fully populate before it tries to make a DAG of the
-Spaces. Even when it makes the DAG we can't really directly interact with it, so
-instead we use the fact it exposes the parentage through a method named
-joinedParentsOfChild. This is our key to building this 'tree' out.
-
-Because we need the tree to calculate things from Space room list display
-to calculating the notification total in the spaces, we do need to ensure
-this works... and works well. So we build out our list and then pass it to our
-queue here which periodically retries to populate the parentage for the given room.
-After a number of fails we just simply determine that the room is an orphan and
-remove it from the queue as well.
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
 (re-frame/reg-event-db
