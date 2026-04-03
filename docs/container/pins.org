@@ -56,33 +56,17 @@ Doesn't matter how, but we need one of those to render the actual entries.
 ***** Fetching
 
 #+begin_src clojurescript :tangle ../../src/container/pins.cljs
-(re-frame/reg-fx
- :fetch-room-pins
- (fn [{:keys [room room-id homeserver token]}]
-   (p/let [pinned-data (fetch-room-state homeserver token room-id "m.room.pinned_events" "" identity)
-           pinned-ids  (get pinned-data :pinned [])
-           resolved-events
-           (p/all
-            (for [eid pinned-ids]
-              (-> (fetch-pin-via-ephemeral-timeline room eid)
-                  (p/catch (fn [err]
-                             (log/error "Pin resolve failed for" eid err)
-                             nil)))))]
-     (re-frame/dispatch [:room/save-pinned-events room-id (remove nil? resolved-events)]))))
-
-
 (re-frame/reg-event-fx
  :room/fetch-pinned-events
  (fn [{:keys [db]} [_ room-id]]
-   (let [client   (:client db)
-         session  (some-> client (.session))
-         room     (some-> client (.getRoom room-id))]
-     (if (and client session room)
-       {:fetch-room-pins {:token      (.-accessToken session)
-                          :homeserver (.-homeserverUrl session)
-                          :room-id    room-id
-                          :room       room}}
-       (log/error "Cannot fetch pins: Missing client, session, or room for:" room-id)))))
+   (go
+     (let [pool @state/!engine-pool
+           res  (<! (main/do-with-pool! pool {:handler :get-pinned-events
+                                              :arguments {:room-id room-id}}))]
+       (if (= (:status res) "success")
+         (re-frame/dispatch [:room/save-pinned-events room-id (:events res)])
+         (log/error "Failed to fetch pinned events:" (:msg res)))))
+   {}))
 #+end_src
 
 
