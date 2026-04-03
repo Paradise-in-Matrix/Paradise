@@ -748,7 +748,7 @@ received an update.
      (if-not active-id
        [:div.timeline-empty "Select a room to start chatting."]
        [:<>
-        ^{:key active-id}
+;;        ^{:key active-id}
         [virtualized-timeline active-id]
         [message-input]
         [status-indicator active-id]])]))
