@@ -1,9 +1,6 @@
 (ns input.composer
-    (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
-            [taoensso.timbre :as log]
-            [clojure.string :as str]
-            [reagent.core :as r]
+    (:require
+     [clojure.string :as str]
             [utils.helpers :refer [mxc->url url->mxc]]
             [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
             ["react" :as react]
@@ -13,8 +10,7 @@
             ["@tiptap/extension-mention" :default Mention]
             ["@tiptap/extension-link" :default Link]
             ["@tiptap/core" :refer [Extension Node mergeAttributes]]
-            ["prosemirror-state" :refer [Plugin PluginKey]]
-            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
+            ["prosemirror-state" :refer [Plugin PluginKey]]))
 
 (defn renderHtml [^js props]
   (let [attrs         (.-HTMLAttributes props)
@@ -132,7 +128,6 @@
                                                             true)
                                                           false)))}}})]))}))
 
-
 (def submit-extension
   (.create Extension
            #js {:name "submitExtension"
@@ -156,6 +151,7 @@
         on-files     (.. props -children -onFiles)
         on-change    (.. props -children -onChange)
         loaded-text  (.. props -children -loadedText)
+        cached-html  (.. props -children -cachedHtml)
         placeholder  (.. props -children -placeholder)
         on-ready     (.. props -children -onEditorReady)
         latest-cbs   (react/useRef #js {:onSend on-send :onFiles on-files})
@@ -179,7 +175,7 @@
                                       (.configure Link #js {:openOnClick false
                                                             :autolink true
                                                             :linkOnPaste true})]
-                     :content (or loaded-text "")
+                     :content (or cached-html loaded-text "")
                      :editable (boolean active-id)
                      :onUpdate (fn [ctx]
                                  (when on-change
@@ -191,7 +187,14 @@
                      :editorProps #js {:attributes #js {:class "tiptap-editor-surface"}}}
                 #js [active-id])]
 
-
+    (react/useEffect
+     (fn []
+       (when (and editor loaded-text)
+         (let [current-html (.getHTML editor)]
+           (when (not= current-html loaded-text)
+             (.commands.setContent editor loaded-text))))
+       js/undefined)
+     #js [editor loaded-text])
 
     (if-not editor
       (react/createElement "div" #js {:className "timeline-input-wrapper"}
@@ -201,4 +204,4 @@
                            #js {:key (str "editor-surface-" active-id)
                                 :className "timeline-input-wrapper"
                                 :onClick (fn [] (.commands.focus editor))}
-  (react/createElement EditorContent #js {:editor editor})))))
+                           (react/createElement EditorContent #js {:editor editor})))))
