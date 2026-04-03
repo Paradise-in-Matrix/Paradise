@@ -1,20 +1,11 @@
 (ns navigation.rooms.entry
   (:require
    [clojure.string :as str]
-   [promesa.core :as p]
    [re-frame.core :as re-frame]
-   [taoensso.timbre :as log]
-   [re-frame.db :as db]
-   ["react-virtuoso" :refer [Virtuoso]]
-   [promesa.core :as p]
    [reagent.core :as r]
+   [taoensso.timbre :as log]
    [utils.svg :as icons]
-   [reagent.dom.client :as rdom]
-   [navigation.rooms.room-summary :refer [build-room-summary]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [utils.global-ui :refer [avatar long-press-props]]
-   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory RoomListLoadingState]])
-  (:require-macros [utils.macros :refer [ocall oget]]))
+   [utils.global-ui :refer [avatar long-press-props]]))
 
 (defn build-room-actions [tr room-id room-name is-space?]
   [{:id "mark-read"
@@ -92,137 +83,154 @@
          #(re-frame/dispatch [:call/toggle-screen-share])
          "var(--accent-color)" "var(--text-normal)"]]])))
 
-(defn room-type-call? [db room-id]
-  (let [summary (get-in db [:rooms-unfiltered-cache room-id])
-        preview (when summary (aget summary "room-preview"))
-        info    (some-> preview deref .info)
-        type    (some-> info .-roomType)]
-    (and (= "Custom" (some-> type .-tag))
-         (= "org.matrix.msc3417.call" (some-> type .-inner .-value)))))
-
 (re-frame/reg-sub
  :room/is-call?
  (fn [db [_ room-id]]
-   (room-type-call? db room-id)))
+   (get-in db [:room-previews room-id :is-call?])))
 
-(defn room-item [{:keys [id name indent is-space? is-closed? is-call? has-call?
-                        active-room unread? highlight? notif-count
-                        call-participants avatar-url space-id active-filter open-menu-fn]}]
-  (let [active? (= id active-room)
-        tr      @(re-frame/subscribe [:i18n/tr])
-        ]
-    [:div.room-container
-     (if is-space?
-       [:div.room-drawer-header
-        (merge {:style {:padding-left (str indent "px")}
-                :class (when is-closed? "collapsed")
-                :on-click #(re-frame/dispatch [:rooms/toggle-drawer id])
-                :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
-               (long-press-props #(open-menu-fn nil %1 %2)))
-        [:span.drawer-arrow (if is-closed? [icons/chevron-down] [icons/chevron-down])]
-        [:span.drawer-name (str/upper-case name)]]
 
-       [:div.room-item
-        (merge {:style {:padding-left (str indent "px")}
-                :class [(when active? "active")
-                        (when unread? "has-unread")
-                        (when highlight? "has-highlight")]
-                :on-click #(re-frame/dispatch [:rooms/select id])
-                :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
-               (long-press-props #(open-menu-fn nil %1 %2)))
+;; We should probably cache the DM avatars for quicker loading. We can update that
+;; saved value and the shown avatar on load. Realistically
+;; in the future the rust-sdk will give us the avatar for a DM without any hassle
+;; Also likely important to note that we only bother loading the member list
+;; for DMs because of this issue. Otherwise that piece can be removed as well.
+(defn room-item [{:keys [id name indent is-space? is-closed? is-dm? has-call?
+                         active-room unread? highlight? notif-count
+                         call-participants avatar-url space-id active-filter open-menu-fn]}]
+  (let [active?  (= id active-room)
+        tr       @(re-frame/subscribe [:i18n/tr])
+        is-call? @(re-frame/subscribe [:room/is-call? id])
+        profile  @(re-frame/subscribe [:sdk/profile])
+        my-id    (:user-id profile)
+        needs-members?  (or (and is-dm? (not avatar-url)) has-call?)
+        members-map     @(re-frame/subscribe [:room/members-map id])
+        members-loading? @(re-frame/subscribe [:room/members-loading? id])]
 
-        (cond
-          is-call?
-          [icons/speaker {:has-call? has-call? :style {:margin-right "8px"}}]
-          (and (= active-filter "people")
-               (not space-id)
-;;               avatar-url
-               )
-          [avatar {:id id :name name :url avatar-url :size 24 :status :online}]
-          :else
-          [icons/hash])
-        [:span.room-name name]
-        [:div.room-item-right
-         [:div.room-hover-actions
-          (when is-call?
-            [:div.action-icon.chat-action
-             {:title
-              (tr [:navigation.room-list/view-chat])
+    (when (and needs-members? (not members-loading?) (empty? members-map))
+      (re-frame/dispatch [:room/fetch-members id]))
+
+    (let [other-user   (when (and is-dm? (seq members-map))
+                         (->> (vals members-map)
+                              (remove #(= (:user-id %) my-id))
+                              first))
+          final-avatar (or avatar-url (:avatar-url other-user))
+          final-name   (if (and is-dm? other-user (= name "Loading..."))
+                         (:display-name other-user)
+                         name)
+
+          resolved-participants (map (fn [p]
+                                       (let [p-id (or (:userId p) p)
+                                             member-info (get members-map p-id)]
+                                         {:id p-id
+                                          :name (or (:displayName p) (:display-name member-info) p-id)
+                                          :avatar-url (or (:avatarUrl p) (:avatar-url member-info))}))
+                                     call-participants)]
+
+      [:div.room-container
+       (if is-space?
+         [:div.room-drawer-header
+          (merge {:style {:padding-left (str indent "px")}
+                  :class (when is-closed? "collapsed")
+                  :on-click #(re-frame/dispatch [:rooms/toggle-drawer id])
+                  :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
+                 (long-press-props #(open-menu-fn nil %1 %2)))
+          [:span.drawer-arrow (if is-closed? [icons/chevron-down] [icons/chevron-down])]
+          [:span.drawer-name (str/upper-case final-name)]]
+
+         [:div.room-item
+          (merge {:style {:padding-left (str indent "px")}
+                  :class [(when active? "active")
+                          (when unread? "has-unread")
+                          (when highlight? "has-highlight")]
+                  :on-click #(re-frame/dispatch [:rooms/select id])
+                  :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
+                 (long-press-props #(open-menu-fn nil %1 %2)))
+
+          (cond
+            is-call?
+            [icons/speaker {:has-call? has-call? :style {:margin-right "8px"}}]
+            (or is-dm? (and (= active-filter "people") (not space-id)))
+            [avatar {:id id :name final-name :url final-avatar :size 24 :status :online}]
+            :else
+            [icons/hash])
+          [:span.room-name final-name]
+          [:div.room-item-right
+           [:div.room-hover-actions
+            (when is-call?
+              [:div.action-icon.chat-action
+               {:title
+                (tr [:navigation.room-list/view-chat])
+                :on-click (fn [e]
+                            (.stopPropagation e)
+                            (re-frame/dispatch [:rooms/select id {:force-lobby? true :focus-override :timeline}]))}
+               [icons/chat-bubble]])
+            [:div.action-icon.settings-action
+             {:title (tr [:navigation.room-list/room-settings])
               :on-click (fn [e]
                           (.stopPropagation e)
-                          (re-frame/dispatch [:rooms/select id {:force-lobby? true :focus-override :timeline}]))}
-             [icons/chat-bubble]])
-          [:div.action-icon.settings-action
-           {:title (tr [:navigation.room-list/room-settings])
-            :on-click (fn [e]
-                        (.stopPropagation e)
-                        (re-frame/dispatch [:rooms/open-settings id]))}
-           [icons/settings {:animate :spin}]]]
-         (when has-call?
-           [:div.call-participants.hide-on-desktop
-            (for [participant call-participants]
-              (let [p-id (or (:userId participant) participant)]
-                ^{:key (str "mobile-call-" p-id)}
+                          (re-frame/dispatch [:rooms/open-settings id]))}
+             [icons/settings {:animate :spin}]]]
+           (when has-call?
+             [:div.call-participants.hide-on-desktop
+              (for [p resolved-participants]
+                ^{:key (str "mobile-call-" (:id p))}
                 [:div.participant-avatar-ring
-                 [avatar {:id p-id :url (:avatarUrl participant) :size 20}]]))])
+                 [avatar {:id (:id p) :url (:avatar-url p) :size 20}]])])
 
-         (when unread?
-           [:div.notification-badge
-            {:class (when highlight? "highlight")}
-            (if (> notif-count 99) "99+" notif-count)])]])
-     (when (and has-call? (not is-closed?))
-       [:div.desktop-call-list.hide-on-mobile
-        {:style {:padding-left (str (+ indent 24) "px")}}
-        (for [participant call-participants]
-          (let [p-id   (or (:userId participant) participant)
-                p-name (or (:displayName participant) p-id)]
-            ^{:key (str "desktop-call-" p-id)}
+           (when unread?
+             [:div.notification-badge
+              {:class (when highlight? "highlight")}
+              (if (> notif-count 99) "99+" notif-count)])]])
+       (when (and has-call? (not is-closed?))
+         [:div.desktop-call-list.hide-on-mobile
+          {:style {:padding-left (str (+ indent 24) "px")}}
+          (for [p resolved-participants]
+            ^{:key (str "desktop-call-" (:id p))}
             [:div.call-participant-item
              {:on-click (fn [e]
                           (.stopPropagation e)
-                          (re-frame/dispatch [:ui/open-user-profile p-id]))}
-             [avatar {:id p-id :name p-name :url (:avatarUrl participant) :size 20}]
-             [:span.participant-name p-name]]))])]))
-
+                          (re-frame/dispatch [:ui/open-user-profile (:id p)]))}
+             [avatar {:id (:id p) :name (:name p) :url (:avatar-url p) :size 20}]
+             [:span.participant-name (:name p)]])])])))
 
 (defn render-room-item [tr client rooms active-space active-room closed-drawers active-filter]
   (fn [_ raw-room]
-    (let [{:keys [id roomId name is-space? isSpace depth
-                  notification-count unreadNotificationsCount
-                  highlight-count unreadMentionsCount
-                  avatar avatarUrl activeRoomCallParticipants]
-           :or {activeRoomCallParticipants []}
-           :as room} (if (map? raw-room) raw-room (js->clj raw-room :keywordize-keys true))
-          id          (or id roomId)
-          room-name   (or name "Loading...")
-          space?      (or is-space? isSpace)
-          notif-count (or notification-count unreadNotificationsCount 0)
-          high-count  (or highlight-count unreadMentionsCount 0)
-          url         (or avatar avatarUrl)
-          depth       (or depth 0)
-          is-call?    (room-type-call? @re-frame.db/app-db id)
+    (let [r           (if (map? raw-room) raw-room (js->clj raw-room :keywordize-keys true))
+          id          (or (:id r) (:roomId r))
+          room-name   (or (:name r) "Loading...")
+          space?      (or (:is-space? r) (:isSpace r))
+          dm?         (or (:is-direct? r) (:isDirect r) (:is-direct r))
+          notif-count (or (:notification-count r) (:unreadNotificationsCount r) 0)
+          high-count  (or (:highlight-count r) (:unreadMentionsCount r) 0)
+          url         (or (:avatar r) (:avatarUrl r))
+          depth       (or (:depth r) 0)
+          call-parts  (or (:active-room-call-participants r)
+                          (:activeRoomCallParticipants r)
+                          (:active_room_call_participants r)
+                          [])
           open-menu   (fn [e mx my]
                         (when e (.preventDefault e) (.stopPropagation e))
                         (re-frame/dispatch
                          [:context-menu/open
                           {:x mx :y my
-                           :items (build-room-actions tr id room-name space? #_is-call?)}]))]
-;;      (log/error active-space)
+                           :items (build-room-actions tr id room-name space?)}]))]
       (r/as-element
        [room-item {:tr tr
                    :id id
                    :name room-name
                    :indent (* depth 12)
                    :is-space? space?
+                   :is-dm? dm?
                    :is-closed? (contains? closed-drawers id)
-                   :is-call? is-call?
-                   :has-call? (seq activeRoomCallParticipants)
+                   :has-call? (seq call-parts)
                    :active-room active-room
                    :space-id (:id active-space)
                    :active-filter active-filter
                    :unread? (pos? notif-count)
                    :highlight? (pos? high-count)
                    :notif-count notif-count
-                   :call-participants activeRoomCallParticipants
+                   :call-participants call-parts
                    :avatar-url url
                    :open-menu-fn open-menu}]))))
+
+
