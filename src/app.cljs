@@ -15,10 +15,9 @@
    [client.config :refer [load-config check-remote-version load-i18n]]
    [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay]]
-["@capacitor/status-bar" :refer [StatusBar]]
- [utils.macros :refer [i18n-data]]
+   ["@capacitor/status-bar" :refer [StatusBar]]
+   [utils.macros :refer [i18n-data]]
    [utils.svg :as icons]
-   [client.login :refer [bootstrap!]]
    [navigation.rooms.room-list :refer [room-list]]
    [container.base :refer [container]]
    ))
@@ -279,6 +278,8 @@
                 (mount-root)
                 (js/setInterval #(re-frame/dispatch [:app/poll-version false]) (* 1000 60 15))))
       (p/catch #(log/error "App initialization failed:" %))))
+
+
 
 
 (defn ^:after-load re-render []
