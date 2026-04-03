@@ -279,7 +279,7 @@ this functional first.
 (def default-icon "/public/res/apple/apple-touch-icon-180x180.png")
 (def default-badge "/public/res/apple/apple-touch-icon-72x72.png")
 
-(defn- get-session-from-vault [user-id]
+#_(defn- get-session-from-vault [user-id]
   (p/create
    (fn [resolve reject]
      (let [req (.open js/indexedDB "sw-vault" 1)]
