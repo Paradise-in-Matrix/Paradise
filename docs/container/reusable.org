@@ -11,16 +11,10 @@ so we'll keep them nicely collected here.
 
 #+begin_src clojurescript :tangle ../../src/container/reusable.cljs
 (ns container.reusable
-            (:require [re-frame.core :as re-frame]
-            [taoensso.timbre :as log]
-            [re-frame.db :as db]
-            ["react-virtuoso" :refer [Virtuoso]]
+  (:require [re-frame.core :as re-frame]
             [container.timeline.item :refer [event-tile]]
-            [promesa.core :as p]
-            [reagent.core :as r]
-            [reagent.dom.client :as rdom]
-            [utils.svg :as icons]
-            ))
+            [utils.svg :as icons]))
+
 #+end_src
 
 
