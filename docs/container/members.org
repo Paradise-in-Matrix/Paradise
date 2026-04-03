@@ -33,25 +33,9 @@ diffs like Timeline, Spaces, and Rooms.
    [client.state :as state]))
 
 
-**** Fetch Member List
 
-Digging into it, it appear that the rust-sdk doesn't do members with a diff.
-Fair enough. Instead we can just dump the member iterator for the given
-room. We want to also reify the resulting objects so we can sort
-the entries by the local part of the user id or display name or by the
-power level.
+#+end_src
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
-(defn drain-members-iterator [iterator]
-  (let [total-len (.len iterator)
-        results (transient [])]
-    (loop []
-      (let [chunk (.nextChunk iterator 100)]
-        (if (and chunk (> (.-length chunk) 0))
-          (do
-            (reduce (fn [acc item] (conj! acc item)) results chunk)
-            (recur))
-          (persistent! results))))))
 
 (re-frame/reg-event-fx
  :room/fetch-members
