@@ -9,15 +9,13 @@
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
 (ns navigation.rooms.room-list
   (:require
-   [promesa.core :as p]
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
-   [re-frame.db :as db]
+   [cljs-workers.core :as main]
+   [client.state :as state]
    ["react-virtuoso" :refer [Virtuoso]]
-   [navigation.rooms.room-summary :refer [build-room-summary]]
-   [navigation.rooms.entry :refer [build-room-actions render-room-item active-call-panel room-type-call?]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory]]))
+   [navigation.rooms.entry :refer [render-room-item active-call-panel]]
+   [cljs.core.async :refer [go <!]]))
 #+end_src
 
 
