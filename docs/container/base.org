@@ -42,7 +42,6 @@ This is more or less where the layout and control of the container's contents wi
    [:h3 "Active Threads"]
    [:div "Thread 1..."]
   [:div "Thread 2..."]])
-
 #+end_src
 
 
@@ -111,8 +110,3 @@ This is more or less where the layout and control of the container's contents wi
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/container/base.cljs
-
-
-
-#+end_src
