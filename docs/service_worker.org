@@ -302,7 +302,25 @@ this functional first.
                                                (sort-by #(.-updated_at %) >)
                                                first)))))))))))))))
 
+(defn- get-session-from-opfs [user-id]
+  (p/let [dir         (.. js/navigator -storage getDirectory)
+          file-handle (p/catch (.getFileHandle dir "mx_session_v3.json") (fn [_] nil))]
+    (if-not file-handle
+      nil
+      (p/let [file     (.getFile file-handle)
+              text     (.text file)
+              sessions (try (.parse js/JSON text) (catch :default _ #js {}))
+              keys     (js/Object.keys sessions)
+              target-id (or user-id (when (pos? (.-length keys)) (aget keys 0)))]
 
+        (if target-id
+          (let [data (aget sessions target-id)]
+            (if data
+              (let [session (aget data "session")]
+                #js {:token  (aget session "accessToken")
+                     :hs_url (aget session "homeserverUrl")})
+              nil))
+          nil)))))
 
 (defn- fetch-avatar-url [hs-url token mxc-uri]
   (if (and hs-url token mxc-uri)
