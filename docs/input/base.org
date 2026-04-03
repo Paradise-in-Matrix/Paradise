@@ -396,6 +396,7 @@ Ideally, we should break this apart more later.
              #js {:activeId active-id
                   :key (str "editor-" active-id)
                   :loadedText loaded-text
+                  :cachedHtml cached-html
                   :onChange (fn [text html]
                               (re-frame/dispatch [:composer/on-change active-id text html]))
                   :onSend (fn [text html]
@@ -408,11 +409,10 @@ Ideally, we should break this apart more later.
                                   (re-frame/dispatch [:composer/submit active-id text matrix-html])
                                   true)
                                 false)))
-
                   :onFiles (fn [files]
                              (let [file-array (js/Array.from files)]
                                (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))
-                  :placeholder (tr [:composer/placeholder]) ;; Not sure if needed since we use loaded-text
+                  :placeholder (tr [:composer/placeholder])
                   :onEditorReady #(reset! !editor %)
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
                   :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
