@@ -1,46 +1,20 @@
 (ns container.timeline.base
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
+  (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
             [re-frame.db :as db]
-            ["react-virtuoso" :refer [Virtuoso]]
-            ["virtua" :refer [VList Virtualizer]]
+            [cljs-workers.core :as main]
+            [cljs.core.async :refer [go <!]]
+            ["virtua" :refer [Virtualizer]]
             [reagent.core :as r]
+            [client.state :as state]
             [reagent.dom.client :as rdom]
             [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-readers join-names get-status-string]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
-            [container.timeline.item :refer [event-tile wrap-item connected-event-tile]]
+            [container.timeline.item :refer [event-tile connected-event-tile]]
             [container.reusable :refer [room-header]]
-            [input.base :refer [message-input inline-editor]]
-            [navigation.rooms.room-summary :refer [build-room-summary]]
-            [client.diff-handler :refer [apply-matrix-diffs]]
-            ["ffi-bindings" :as sdk :refer [RoomMessageEventContentWithoutRelation MessageType EditedContent TimelineConfiguration]]))
-
-(defonce !timeline-queues (atom {}))
-
-
-(defn apply-timeline-diffs! [room-id source updates]
-  (let [q-key [room-id source]]
-    (swap! !timeline-queues update q-key #(or % (p/resolved [])))
-    (swap! !timeline-queues
-           (fn [queues]
-             (update queues q-key
-                     (fn [prev-promise]
-                       (-> prev-promise
-                           (p/then (fn [current-events]
-                                     (apply-matrix-diffs current-events updates wrap-item)))
-                           (p/then (fn [next-events]
-                                     (let [tagged-events (mapv #(assoc % :timeline-source source) next-events)]
-                                       (re-frame/dispatch [:sdk/update-timeline room-id source tagged-events])
-                                       tagged-events)))
-                           (p/catch (fn [err]
-                                      (js/console.error "Timeline Diff Panic for room" room-id source ":" err)
-                                      (get-in @re-frame.db/app-db [:timeline-data room-id source] [])))))))))
-  nil)
-
-
+            [input.base :refer [message-input]]))
 
 (defn get-event-id [e]
   (cond
@@ -55,7 +29,6 @@
 
     :else
     (:internal-id e)))
-
 
 (defn deduplicate-events [raw-events]
   (->> raw-events
@@ -96,6 +69,15 @@
                  (conj processed new-item)
                  (if curr-is-msg? new-item last-msg)))))))
 
+(defn check-timeline-gap [focused-data live-data]
+  (if (or (empty? focused-data) (empty? live-data))
+    false
+    (let [newest-focused (last (filter #(= (:type %) :event) focused-data))
+          oldest-live    (first (filter #(= (:type %) :event) live-data))]
+      (and newest-focused
+           oldest-live
+           (< (+ (:ts newest-focused) 100) (:ts oldest-live))))))
+
 (defn process-timeline [raw-events]
   (if (empty? raw-events)
     []
@@ -104,13 +86,22 @@
          enrich-timeline-items)))
 
 
+(re-frame/reg-sub
+ :timeline/has-gap?
+ (fn [db [_ room-id]]
+   (let [focused-data (get-in db [:timeline-data room-id :focused] [])
+         live-data    (get-in db [:timeline-data room-id :live] [])]
+     (check-timeline-gap focused-data live-data))))
 
 (re-frame/reg-sub
  :timeline/raw-events
  (fn [db [_ room-id]]
    (let [focused-data (get-in db [:timeline-data room-id :focused] [])
-         live-data    (get-in db [:timeline-data room-id :live] [])]
-     (concat focused-data live-data))))
+         live-data    (get-in db [:timeline-data room-id :live] [])
+         has-gap?     (check-timeline-gap focused-data live-data)]
+     (if has-gap?
+       focused-data
+       (concat focused-data live-data)))))
 
 (re-frame/reg-event-db
  :sdk/update-timeline
@@ -138,126 +129,45 @@
  (fn [events _]
    (into {} (map (juxt :id identity) events))))
 
-
-
 (re-frame/reg-event-fx
  :sdk/boot-timeline
  (fn [{:keys [db]} [_ room-id]]
    (if (get-in db [:timeline-subs room-id])
      (do (log/warn "Prevented duplicate timeline boot for:" room-id) {})
-     (let [client (:client db)]
-       (when-let [room (.getRoom client room-id)]
-         (p/let [latest-event (.latestEvent room)
-                 event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))
-                 ]
-           (if event-id
-             (do
-               (log/info "Latest event found. Booting Oreo Concat for:" room-id)
-               (re-frame/dispatch [:timeline/set-loading room-id true])
-               (-> (p/let [f-focus  (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 40})
-                           f-config (.create TimelineConfiguration #js {:focus f-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
-                           f-tl     (.timelineWithConfiguration room f-config)]
-                     (let [f-handle (.addListener f-tl #js {:onUpdate #(apply-timeline-diffs! room-id :focused %)})]
-                       (re-frame/dispatch [:sdk/save-focused-timeline room-id f-tl f-handle])
-                       (re-frame/dispatch [:timeline/set-loading room-id false])
-                       (-> (.paginateBackwards f-tl 20) (p/catch #(log/error "Focused bck pag failed:" %)))))
-                   (p/catch #(log/error "Focused boot failed:" %)))
-               (-> (p/let [l-focus  (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false})
-                           l-config (.create TimelineConfiguration #js {:focus l-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
-                           l-tl     (.timelineWithConfiguration room l-config)]
-                     (let [l-handle (.addListener l-tl #js {:onUpdate #(apply-timeline-diffs! room-id :live %)})
-                           t-handle (.subscribeToTypingNotifications room #js {:call #(re-frame/dispatch [:sdk/update-typing-users room-id %])})
-                           p-handle (.subscribeToBackPaginationStatus l-tl #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])})]
-                       (re-frame/dispatch [:sdk/save-live-timeline room-id l-tl l-handle t-handle p-handle])
-                       (-> (.paginateBackwards l-tl 50 js/undefined) (p/catch #(log/error "Live pag failed:" %)))))
-                   (p/catch #(log/error "Live boot failed:" %))))
-             (do
-               (log/info "No latest event found. Booting standard Live timeline:" room-id)
-               (re-frame/dispatch [:timeline/set-loading room-id true])
-               (-> (p/let [l-focus  (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents false})
-                           l-config (.create TimelineConfiguration #js {:focus l-focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts true :reportUtds false :internalIdPrefix js/undefined})
-                           l-tl     (.timelineWithConfiguration room l-config)]
-                     (let [l-handle (.addListener l-tl #js {:onUpdate #(apply-timeline-diffs! room-id :live %)})
-                           t-handle (.subscribeToTypingNotifications room #js {:call #(re-frame/dispatch [:sdk/update-typing-users room-id %])})
-                           p-handle (.subscribeToBackPaginationStatus l-tl #js {:onUpdate #(re-frame/dispatch [:sdk/update-pagination-status room-id %])})]
-                       (re-frame/dispatch [:sdk/save-live-timeline room-id l-tl l-handle t-handle p-handle])
-                       (-> (.paginateBackwards l-tl 20 js/undefined)
-                           (p/then #(re-frame/dispatch [:timeline/set-loading room-id false]))
-                           (p/catch #(do (log/error "Live paginate failed" %)
-                                         (re-frame/dispatch [:timeline/set-loading room-id false]))))))
-                   (p/catch #(log/error "Standard Live boot failed:" %))))))
-         {})))))
+     (do
+       (main/do-with-pool! @state/!engine-pool {:handler :boot-timeline
+                                                :arguments {:room-id room-id}})
+       {:db (assoc-in db [:timeline-subs room-id] true)}))))
 
 (re-frame/reg-event-fx
- :room/boot-focused-timeline
- (fn [{:keys [db]} [_ room-id event-id]]
-   (let [client (:client db)
-         room   (.getRoom client room-id)]
-     (when room
-       (-> (p/let [focus  (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 40})
-                   config (.create sdk/TimelineConfiguration #js {:focus focus :filter (new (.. sdk -TimelineFilter -All)) :dateDividerMode (.-Daily sdk/DateDividerMode) :trackReadReceipts false})
-                   timeline (.timelineWithConfiguration room config)]
-             (let [listener  #js {:onUpdate #(apply-timeline-diffs! room-id :focused %)}
-                   tl-handle (.addListener timeline listener)]
-               (re-frame/dispatch [:sdk/save-focused-timeline room-id timeline tl-handle])
-               (-> (.paginateForwards timeline 10) (p/catch #(log/error "Jump fwd fail" %)))
-               (-> (.paginateBackwards timeline 5) (p/catch #(log/error "Jump bck fail" %)))))
-           (p/catch #(log/error "Focused timeline boot failed:" %))))
-     {})))
+ :sdk/cleanup-timeline
+ (fn [{:keys [db]} [_ room-id]]
+   (main/do-with-pool! @state/!engine-pool {:handler :cleanup-timeline
+                                            :arguments {:room-id room-id}})
+   {:db (-> db
+            (update :timeline-subs dissoc room-id)
+            (update :timeline-data dissoc room-id))}))
 
-
-
-(re-frame/reg-event-db
- :sdk/save-focused-timeline
- (fn [db [_ room-id timeline handle]]
-   (-> db
-       (assoc-in [:timeline-subs room-id :focused-timeline] timeline)
-       (assoc-in [:timeline-subs room-id :focused-handle] handle))))
-
-(re-frame/reg-event-db
- :sdk/save-live-timeline
- (fn [db [_ room-id timeline handle t-handle p-handle]]
-   (-> db
-       (assoc-in [:timeline-subs room-id :timeline] timeline)
-       (assoc-in [:timeline-subs room-id :live-handle] handle)
-       (assoc-in [:timeline-subs room-id :typing-handle] t-handle)
-       (assoc-in [:timeline-subs room-id :pag-handle] p-handle)
-       (assoc-in [:timeline/ui-metadata room-id :initialized?] true))))
+(re-frame/reg-event-fx
+ :sdk/back-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
+         loading-forward? (get-in db [:timeline/loading-forward? room-id])]
+     (if (and room-id (not loading-back?) (not loading-forward?))
+       (do
+         (log/info "Triggering Worker Back Paginate for" room-id)
+         (go
+           (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                             {:handler :paginate-timeline
+                                              :arguments {:room-id room-id :direction :back :amount 50}}))]
+             (re-frame/dispatch [:sdk/pagination-complete room-id])))
+         {:db (assoc-in db [:timeline/loading-more? room-id] true)})
+       {}))))
 
 (re-frame/reg-event-db
  :timeline/set-loading
  (fn [db [_ room-id loading?]]
    (assoc-in db [:timeline/loading-more? room-id] loading?)))
-
-(re-frame/reg-event-fx
- :sdk/cleanup-timeline
- (fn [{:keys [db]} [_ room-id]]
-   (when-let [subs (get-in db [:timeline-subs room-id])]
-     (doseq [handle-key [:tl-handle :focused-handle :live-handle :pag-handle :typing-handle]]
-       (when-let [handle (get subs handle-key)]
-         (try
-           (.cancel handle)
-           (catch :default e
-             (log/warn "Failed to cancel handle:" handle-key e))))))
-   (swap! !timeline-queues dissoc [room-id :focused] [room-id :live])
-   {:db (-> db
-            (update :timeline-subs dissoc room-id)
-            (update :timeline-data dissoc room-id))}))
-
-(re-frame/reg-event-db
- :sdk/set-timeline-initialized
- (fn [db [_ room-id]]
-   (assoc-in db [:timeline/ui-metadata room-id :initialized?] true)))
-
-(re-frame/reg-event-fx
- :sdk/preload-timelines
- (fn [{:keys [db]} [_ room-ids]]
-   (let [active-subs   (get db :timeline-subs {})
-         rooms-to-boot (remove #(contains? active-subs %) (take 100 room-ids))]
-     (if (seq rooms-to-boot)
-       {:dispatch-n (map (fn [rid] [:sdk/boot-timeline rid]) rooms-to-boot)}
-       {}))))
-
 
 (re-frame/reg-event-db
  :sdk/pagination-complete
@@ -265,50 +175,6 @@
    (-> db
        (assoc-in [:timeline/loading-more? room-id] false)
        (assoc-in [:timeline/ui-metadata room-id :pending-anchor] nil))))
-
-
-(re-frame/reg-event-fx
- :sdk/back-paginate
- (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])
-         timeline         (or (get-in db [:timeline-subs room-id :timeline])
-                              (get-in db [:timeline-subs room-id :focused-timeline]))
-         raw-events       (get-in db [:timeline-data room-id :live] (get-in db [:timeline-data room-id :focused] []))
-         processed        (process-timeline raw-events)
-         anchor-id        (:id (first (filter #(= (:type %) :event) processed)))]
-     (if (and room-id (not loading-back?) (not loading-forward?) timeline)
-       (do
-         (log/info "Triggering SDK Back Paginate for" room-id)
-         (-> (.paginateBackwards timeline 50 js/undefined)
-             (p/then #(re-frame/dispatch [:sdk/pagination-complete room-id]))
-             (p/catch (fn [err]
-                        (log/error "Back Pagination failed:" err)
-                        (re-frame/dispatch [:sdk/pagination-complete room-id]))))
-         {:db (-> db
-                  (assoc-in [:timeline/loading-more? room-id] true)
-                  (assoc-in [:timeline/ui-metadata room-id :pending-anchor] anchor-id))})
-       {}))))
-
-(re-frame/reg-event-fx
- :sdk/forward-paginate
- (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])
-         dead?            (get-in db [:timeline/forward-dead? room-id])
-         timeline         (or (get-in db [:timeline-subs room-id :timeline])
-                              (get-in db [:timeline-subs room-id :focused-timeline]))]
-     (if (and timeline (not loading-back?) (not loading-forward?) (not dead?))
-       (do
-         (log/info "Triggering SDK Forward Paginate for" room-id)
-         (-> (.paginateForwards timeline 50 js/undefined)
-             (p/then #(re-frame/dispatch [:sdk/forward-pagination-complete room-id]))
-             (p/catch (fn [err]
-                        (log/error "Forward Pagination panicked/dead:" err)
-                        (re-frame/dispatch [:sdk/forward-pagination-dead room-id]))))
-         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
-       {}))))
-
 
 (re-frame/reg-event-db
  :sdk/forward-pagination-complete
@@ -349,12 +215,23 @@
             (update :timeline/jump-target-id dissoc room-id))
     :dispatch-later [{:ms 300
                       :dispatch [:room/execute-return-to-live room-id]}]}))
-
 (re-frame/reg-event-fx
  :room/execute-return-to-live
  (fn [{:keys [db]} [_ room-id]]
    {:dispatch-n [[:sdk/cleanup-timeline room-id]
                  [:sdk/boot-timeline room-id]]}))
+
+(re-frame/reg-event-fx
+ :room/jump-to-present
+ (fn [{:keys [db]} [_ room-id]]
+   (main/do-with-pool! @state/!engine-pool {:handler :cleanup-timeline
+                                            :arguments {:room-id room-id}})
+   {:db (-> db
+            (update-in [:timeline-subs room-id] dissoc :focused-timeline :focused-handle)
+            (assoc-in [:timeline-data room-id :focused] [])
+            (assoc-in [:timeline/ui-state room-id :animating-jump?] true))
+    :dispatch-later [{:ms 50
+                      :dispatch [:room/jump-to-live-bottom room-id]}]}))
 
 (re-frame/reg-sub
  :timeline/ui-state
@@ -387,7 +264,6 @@
    (some? (get-in db [:timeline/jump-target-id room-id]))))
 
 
-
 (defn followers-indicator [active-room]
   (let [reader-ids  @(re-frame/subscribe [:timeline/latest-readers])
         members-map @(re-frame/subscribe [:room/members-map active-room])
@@ -404,7 +280,6 @@
         (format-readers names)
         "\u00A0")]
      ]))
-
 
 (re-frame/reg-event-db
  :sdk/clear-stale-typing
@@ -449,6 +324,7 @@
          others        (remove #(= % my-id) read-by)]
      others)))
 
+
 (defn status-indicator [active-room]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         typing-info   @(re-frame/subscribe [:room/typing-users active-room])
@@ -479,8 +355,6 @@
         [:span.text (get-status-string tr :reading reader-names)]]
        :else
        [:span.text {:key "empty"} "\u00A0"])]))
-
-
 
 
 
@@ -521,6 +395,31 @@
               (tr [:container.timeline/return-to-live])
               (tr [:container.timeline/jump-to-bottom]))]]))
 
+(defn jump-to-present-banner [room-id]
+  (let [has-gap? @(re-frame/subscribe [:timeline/has-gap? room-id])
+        tr       @(re-frame/subscribe [:i18n/tr])]
+    (when has-gap?
+      [:button.jump-to-present-banner
+       {:style {:position "absolute"
+                :bottom "80px"
+                :left "50%"
+                :transform "translateX(-50%)"
+                :z-index 50
+                :background "var(--accent-color, #5865F2)"
+                :color "white"
+                :padding "8px 16px"
+                :border-radius "16px"
+                :border "none"
+                :box-shadow "0 4px 12px rgba(0,0,0,0.3)"
+                :cursor "pointer"
+                :font-weight "600"
+                :display "flex"
+                :align-items "center"
+                :gap "8px"
+                :transition "transform 0.2s"}
+        :on-click #(re-frame/dispatch [:room/jump-to-present room-id])}
+       [:span (tr [:container.timeline/new-messages-below "New Messages"])]
+       ])))
 
 
 (defn virtualized-timeline [initial-room-id]
@@ -554,12 +453,15 @@
                          (some-> @!virtua-ref (.scrollToIndex (dec cnt)))))]
 
         (when (and (not @!initialized?) (pos? cnt) @!virtua-ref)
-          (js/setTimeout #(reset! !initialized? true) 0)
           (let [target-idx (if jump-target
                              (let [idx (.findIndex event-array #(= (:id %) jump-target))]
                                (if (not= idx -1) idx (dec cnt)))
                              (dec cnt))]
-            (js/setTimeout #(some-> @!virtua-ref (.scrollToIndex target-idx)) 50)))
+            (some-> @!virtua-ref (.scrollToIndex target-idx))
+            (js/setTimeout #(do
+                              (some-> @!virtua-ref (.scrollToIndex target-idx))
+                              (reset! !initialized? true))
+                           10)))
 
         (when (and @!initialized?
                    @!at-bottom?
@@ -574,7 +476,13 @@
                           (reset! !prev-last-id current-last-id)) 0)
 
         [:div.virtua-timeline-wrapper
-         {:style {:flex 1 :position "relative" :display "flex" :flex-direction "column" :min-height 0}}
+         {:style {:flex 1
+                  :position "relative"
+                  :display "flex"
+                  :flex-direction "column"
+                  :min-height 0
+                  :opacity (if @!initialized? 1 0)
+                  :transition "opacity 0.15s ease-in-out"}}
 
          [:div.timeline-messages
           {:class (when jump-target "jumping-animation")
@@ -605,7 +513,7 @@
                                                   (<= dist-from-bottom 500)
                                                   (not loading-forward?))
                                          (re-frame/dispatch [:sdk/forward-paginate room-id])))
-                                     100)))))}
+                                     10)))))}
 
           (when loading?
             [timeline-loading-overlay])
@@ -650,7 +558,8 @@
      (if-not active-id
        [:div.timeline-empty "Select a room to start chatting."]
        [:<>
-        ^{:key active-id}
+;;        ^{:key active-id}
         [virtualized-timeline active-id]
+        [jump-to-present-banner active-id]
         [message-input]
         [status-indicator active-id]])]))
