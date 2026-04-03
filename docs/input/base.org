@@ -355,9 +355,7 @@ Ideally, we should break this apart more later.
                      .run))
                (reset! !picker-open? false))}])
          (when (and context (= (:mode context) :reply))
-           (let [
-                 sender-name (truncate-name (-> context :target :sender-name) 32)
-                 ]
+           (let [sender-name (truncate-name (-> context :target :sender-name) 32)]
              [:div.input-context-banner
               [:div.context-info
                [:span (tr [:composer/replying-to] [sender-name])]]
