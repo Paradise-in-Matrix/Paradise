@@ -132,7 +132,6 @@ scaffolding.
  :verification/error
  (fn [db _] (:verification/error db)))
 
-
 #+end_src
 
 
@@ -302,6 +301,7 @@ Simple verification tab for now
             (if is-verifying?
               (tr [:settings.verification.status/is-verifying])
               (tr [:settings.verification.status/verify-action]))]]])])))
+
 #+end_src
 
 
@@ -334,6 +334,8 @@ This needs to be organized a bit better (and documented better).
 ***** Helper functions
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+
+
 (defn url-base64->uint8-array [base64-string]
   (let [padding (.repeat "=" (mod (- 4 (mod (.-length base64-string) 4)) 4))
         base64 (-> (.replace base64-string (js/RegExp. "-" "g") "+")
