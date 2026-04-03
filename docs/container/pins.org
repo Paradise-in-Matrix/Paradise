@@ -95,7 +95,6 @@ Doesn't matter how, but we need one of those to render the actual entries.
  (fn [db [_ room-id event-id]]
    (let [pins (get-in db [:rooms/data room-id :pinned-events] [])]
      (first (filter #(= (:id %) event-id) pins)))))
-
 #+end_src
 
 
@@ -118,7 +117,9 @@ Doesn't matter how, but we need one of those to render the actual entries.
        [:div.pins-list
         {:style {:flex 1 :overflow-y "auto"}}
         (for [event pins]
+          ^{:key (:id event)}
           [message-preview-item active-room event])])]))
+
 #+end_src
 
 
