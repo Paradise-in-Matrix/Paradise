@@ -94,6 +94,15 @@ each of these later.
                  (conj processed new-item)
                  (if curr-is-msg? new-item last-msg)))))))
 
+(defn check-timeline-gap [focused-data live-data]
+  (if (or (empty? focused-data) (empty? live-data))
+    false
+    (let [newest-focused (last (filter #(= (:type %) :event) focused-data))
+          oldest-live    (first (filter #(= (:type %) :event) live-data))]
+      (and newest-focused
+           oldest-live
+           (< (+ (:ts newest-focused) 100) (:ts oldest-live))))))
+
 (defn process-timeline [raw-events]
   (if (empty? raw-events)
     []
