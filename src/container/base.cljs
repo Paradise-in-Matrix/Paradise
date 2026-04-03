@@ -15,11 +15,6 @@
    [reagent.core :as r]
    [reagent.dom.client :as rdom]))
 
-#_(defn call-view []
-  [:div.call-view {:style {:padding "20px" :background "#222" :color "#fff" :height "100%"}}
-   [:h2 "Active Call"]
-   [:button {:on-click #(re-frame/dispatch [:ui/set-main-focus :timeline])} "End Call"]])
-
 (defn thread-view []
   [:div.thread-view {:style {:padding "20px" :height "100%"}}
    [:h2 "Thread Context"]
@@ -30,7 +25,6 @@
    [:h3 "Active Threads"]
    [:div "Thread 1..."]
   [:div "Thread 2..."]])
-
 
 (defn container []
   (let [main-focus    @(re-frame/subscribe [:container/main-focus])
