@@ -32,27 +32,21 @@ This works for now though.
 
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
 (defn mxc->url
-  "Converts an mxc:// URI to a full HTTP(S) URL.
-   Options:
-   - :type   :download (default) or :thumbnail
-   - :width  integer
-   - :height integer
-   - :method 'crop' or 'scale'"
   ([mxc-url] (mxc->url mxc-url {}))
   ([mxc-url {:keys [homeserver type width height method] :or {type :download}}]
    (when (and (string? mxc-url) (str/starts-with? mxc-url "mxc://"))
-     (let [db @re-frame.db/app-db
-           server-base (str/replace
-                        (or (:homeserver-url db)
-                            (or js/window.MATRIX_HOMESERVER "https://matrix.org")) #"/+$" "")
-           resource    (str/replace mxc-url #"^mxc://" "")
-           base-path   (str "/_matrix/client/v1/media/" (name type) "/" resource)]
-       (if (= type :thumbnail)
-         (str server-base base-path
-              "?width="  (or width 48)
-              "&height=" (or height 48)
-              "&method=" (or method "crop"))
-         (str server-base base-path))))))
+     (let [db       (try @re-frame.db/app-db (catch :default _ {}))
+           base-url (or homeserver (:homeserver-url db))]
+       (when base-url
+         (let [server-base (str/replace base-url #"/+$" "")
+               resource    (str/replace mxc-url #"^mxc://" "")
+               base-path   (str "/_matrix/client/v1/media/" (name type) "/" resource)]
+           (if (= type :thumbnail)
+             (str server-base base-path
+                  "?width="  (or width 48)
+                  "&height=" (or height 48)
+                  "&method=" (or method "crop"))
+             (str server-base base-path))))))))
 
 
 (defn url->mxc [url]
