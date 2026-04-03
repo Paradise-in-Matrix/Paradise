@@ -68,5 +68,4 @@ it may be worthwhile to check.
          :isFavourite                (oget room-info :isFavourite)
          :isMarkedUnread             is-marked-unread
          }))
-
 #+end_src
