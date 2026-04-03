@@ -257,7 +257,7 @@ here then.
 (re-frame/reg-event-fx
  :room/fetch-power-level-tags
  (fn [_ [_ room-id]]
-   (if-let [pool @login/!engine-pool]
+   (if-let [pool @state/!engine-pool]
      (go
        (let [res (<! (main/do-with-pool! pool {:handler :fetch-power-level-tags
                                                :arguments {:room-id room-id}}))]
