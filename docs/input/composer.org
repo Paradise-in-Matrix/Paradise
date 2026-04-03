@@ -216,6 +216,7 @@ so we stick with what the complex component expects.
         on-files     (.. props -children -onFiles)
         on-change    (.. props -children -onChange)
         loaded-text  (.. props -children -loadedText)
+        cached-html  (.. props -children -cachedHtml)
         placeholder  (.. props -children -placeholder)
         on-ready     (.. props -children -onEditorReady)
         latest-cbs   (react/useRef #js {:onSend on-send :onFiles on-files})
@@ -239,7 +240,7 @@ so we stick with what the complex component expects.
                                       (.configure Link #js {:openOnClick false
                                                             :autolink true
                                                             :linkOnPaste true})]
-                     :content (or loaded-text "")
+                     :content (or cached-html loaded-text "")
                      :editable (boolean active-id)
                      :onUpdate (fn [ctx]
                                  (when on-change
@@ -251,7 +252,14 @@ so we stick with what the complex component expects.
                      :editorProps #js {:attributes #js {:class "tiptap-editor-surface"}}}
                 #js [active-id])]
 
-
+    (react/useEffect
+     (fn []
+       (when (and editor loaded-text)
+         (let [current-html (.getHTML editor)]
+           (when (not= current-html loaded-text)
+             (.commands.setContent editor loaded-text))))
+       js/undefined)
+     #js [editor loaded-text])
 
     (if-not editor
       (react/createElement "div" #js {:className "timeline-input-wrapper"}
@@ -261,7 +269,8 @@ so we stick with what the complex component expects.
                            #js {:key (str "editor-surface-" active-id)
                                 :className "timeline-input-wrapper"
                                 :onClick (fn [] (.commands.focus editor))}
-  (react/createElement EditorContent #js {:editor editor})))))
+                           (react/createElement EditorContent #js {:editor editor})))))
+
 #+end_src
 
 ***** CSS
