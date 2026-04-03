@@ -27,7 +27,7 @@ This grabs the Session constructor from the matrix_sdk namespace within our bund
 
 *** Persistence Helpers
 
-We need standard low-level helpers to read and write raw JSON to the browser's local storage.
+We need standard low-level helpers to read and write raw JSON to the OPFS.
 We keep these as simple JavaScript object operations to avoid unnecessary overhead from
 converting back and forth to Clojure maps constantly.
 #+begin_src clojurescript :tangle ../../src/client/session_store.cljs
