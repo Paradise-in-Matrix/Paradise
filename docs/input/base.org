@@ -143,52 +143,44 @@ buffer of data so we can actually check the data associated and pass it on.
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
 
 
-
-**** Message Submit
-
-
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
 (re-frame/reg-event-fx
  :composer/submit
  (fn [{:keys [db]} [_ room-id text html]]
-   (let [client      (:client db)
-         timeline    (get-in db [:timeline-subs room-id :timeline])
-         room        (when client (.getRoom client room-id))
-         attachments (get-in db [:drafts room-id :attachments])
-         context     (get-in db [:input-context room-id])]
-     (cond
-       (or (not timeline) (not room))
-       (do (log/error "Room or Timeline missing for" room-id) {})
-       (seq attachments)
-       (do
-         (-> (send-attachments! sdk timeline room attachments text html)
-             (.then #(re-frame/dispatch [:composer/clear-after-submit room-id]))
-             (.catch #(log/error "Failed to send attachments:" %)))
-         {})
-:else
-       (try
-         (let [payload (.messageEventContentFromHtml sdk text (or html text))]
-           (if context
-             (let [action     (:mode context)
-                   raw-id-obj (-> context :target :event-or-transaction-id)
-                   target-id  (if (= (.-tag raw-id-obj) "EventId")
-                                (.. raw-id-obj -inner -eventId)
-                                (.. raw-id-obj -inner -transactionId))
-                   id-enum    (if (str/starts-with? target-id "$")
-                                #js {:tag "EventId" :inner #js {:eventId target-id}}
-                                #js {:tag "TransactionId" :inner #js {:transactionId target-id}})]
-               (log/debug "Executing:" action "on" target-id)
-               (cond
-                 (= action :reply)
-                 (.sendReply timeline payload target-id js/undefined)
-                 (= action :edit)
-                 (.edit timeline id-enum payload js/undefined)))
-             (.send timeline payload js/undefined))
-           (.clearComposerDraft room js/undefined)
-           {:db (-> db
-                    (assoc-in [:composer room-id] {:text "" :html "" :loaded-text ""})
-                    (update :input-context dissoc room-id))})
-         (catch :default e (log/error "Send error:" e) {}))))))
+   (let [attachments (get-in db [:drafts room-id :attachments])
+         raw-context (get-in db [:input-context room-id])
+         worker-context (when raw-context
+                          {:mode        (:mode raw-context)
+                           :target      (get-in raw-context [:target :id])
+                           :msg-tag     (get-in raw-context [:target :content :inner :tag])
+                           :ffi-content (get-in raw-context [:target :content :inner :content :ffi-content])})
+         pool        @login/!engine-pool]
+     (if (seq attachments)
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :send-attachments
+                                                 :arguments {:room-id room-id
+                                                             :attachments attachments
+                                                             :text text
+                                                             :html html}}))]
+           (when-not (#{"success" :success} (:status res))
+             (log/error "Failed to send attachments:" (:msg res)))))
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :send-message
+                                                 :arguments {:room-id room-id
+                                                                 :text text
+                                                                 :html html
+                                                                 :context worker-context}}))]
+           (when-not (#{"success" :success} (:status res))
+             (log/error "Failed to send message:" (:msg res))))))
+
+     (doseq [att attachments]
+       (when (:preview-url att)
+         (js/URL.revokeObjectURL (:preview-url att))))
+
+     {:db (-> db
+              (assoc-in [:composer room-id] {:text "" :html "" :loaded-text "" :uploading? false})
+              (assoc-in [:drafts room-id :attachments] [])
+              (update :input-context dissoc room-id))
+      :dispatch [:composer/persist-draft room-id]})))
 #+end_src
 
 
