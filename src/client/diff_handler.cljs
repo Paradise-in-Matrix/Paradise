@@ -1,7 +1,5 @@
 (ns client.diff-handler
   (:require
-   [reagent.core :as r]
-   [reagent.dom.client :as rdom]
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [re-frame.core :as re-frame]))
