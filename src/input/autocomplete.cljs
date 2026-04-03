@@ -1,14 +1,9 @@
 (ns input.autocomplete
   (:require
-   [promesa.core :as p]
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [reagent.core :as r]
-   ["@tiptap/core" :refer [Extension Node mergeAttributes]]
-   [utils.helpers :refer [mxc->url]]
-   ["react" :as react]))
-
+   [utils.helpers :refer [mxc->url]]))
 
 (re-frame/reg-sub
  :mention/filtered-users
@@ -75,7 +70,6 @@
  (fn [db [_ idx]]
    (assoc-in db [:suggestion/menu :index] idx)))
 
-
 (defonce !active-command (atom nil))
 
 (defn handle-suggestion-keydown [^js props type]
@@ -101,6 +95,7 @@
         (.stopPropagation event)
         true)
       false)))
+
 
 (defn emoji-suggestion-options []
   #js {:char ":"
