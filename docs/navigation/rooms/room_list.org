@@ -402,43 +402,7 @@ for now it is an easy and clean way to provide a sorted list to the
 user. We'll have to see how it scales as I suspect it is causing the
 entire room list to reload. Hopefully not.
 
-***** Reframe events and subscriptions
-
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-(re-frame/reg-event-db
- :room-list/set-filter
- (fn [db [_ filter-id]]
-   (assoc db :active-filter-id filter-id)))
-
-(re-frame/reg-sub
- :room-list/active-filter
- (fn [db _]
-   (get db :active-filter-id "people")))
-
-(re-frame/reg-event-fx
- :room-list/apply-filter
- (fn [{:keys [db]} [_ filter-id]]
-   (let [current-filter (:active-filter-id db)
-         controller     (:home-list-controller db)]
-     (cond
-       (= current-filter filter-id)
-       (do (log/debug "Filter already set to:" filter-id)
-           {})
-
-       (not controller)
-       (do (log/warn "Filter swap failed: No room-list-controller found.")
-           {})
-
-       :else
-       (do
-         (log/debug "Swapping filter from" current-filter "to" filter-id)
-         (.setFilter controller (get-rust-filter filter-id))
-         (.addOnePage controller)
-         {:db (assoc db :active-filter-id filter-id)})))))
-
-#+end_src
-
-***** Reagent component
+***** Component
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
 (defn filter-toggle-bar []
