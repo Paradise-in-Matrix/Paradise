@@ -465,14 +465,6 @@ facilitates the iframe and the widget in the rust-sdk.
 #+end_src
 
 
-Here we need to outline how we actually expect to do the interfacing with the
-iframe. For the most part we don't have to touch it, but for a small few
-communications between the widget... we need to make sure the rust-sdk
-doesn't get anything weird. If it does, it'll crash.
-
-So we make sure no nulls or strange structures. The iframe might be a bit
-picky so we also opt to just lie to it and send it data back as
-an acknowledgment.
 #+begin_src clojurescript :tangle ../../src/container/call/core.cljs
 (rf/reg-event-fx
  :call/start-native-message-pump
