@@ -62,7 +62,6 @@ This is just a simple filter method to deduplicate
                        true))))
              coll)))
 
-
 (defn safe-get [obj k-str k-kw]
   (if (map? obj)
     (get obj k-kw)
@@ -71,6 +70,7 @@ This is just a simple filter method to deduplicate
         (aget obj (name k-kw))
         v))))
 
+
 #+end_src
 
 
@@ -78,6 +78,10 @@ This provides a method to take the room map and turn it into a usable structure
 to actually visualize our room lists. I'll come back and add more to this when
 I add the call room previewing.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+
+
+
+
 (defn flatten-tree [rooms-map children-map space-orders closed-drawers parent-id depth]
   (let [sdk-children    (get children-map parent-id [])
         manual-children (->> (vals rooms-map)
