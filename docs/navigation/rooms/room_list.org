@@ -454,6 +454,28 @@ entire room list to reload. Hopefully not.
          :on-click #(re-frame/dispatch [:room-list/apply-filter id])}
         (tr [label-key])])]))
 
+
+
+;; just dropping here for now
+
+(re-frame/reg-event-fx
+ :room-list/apply-filter
+ (fn [{:keys [db]} [_ filter-id]]
+   (let [current-filter (:active-filter-id db)]
+     (if (= current-filter filter-id)
+       {}
+       (do
+         (log/debug "Swapping filter to" filter-id)
+         (go
+           (let [pool @state/!engine-pool
+                 res  (<! (main/do-with-pool! pool {:handler :set-room-filter
+                                                    :arguments {:filter-id filter-id}}))]
+             (if (= (:status res) "success")
+               (log/debug "Worker successfully swapped filter!")
+               (log/error "Worker failed to swap filter:" res))))
+         {:db (assoc db :active-filter-id filter-id)})))))
+
+(re-frame/reg-sub :room-list/active-filter (fn [db _] (get db :active-filter-id "people")))
 #+end_src
 
 ***** CSS
