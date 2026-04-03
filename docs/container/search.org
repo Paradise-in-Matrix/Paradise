@@ -32,17 +32,6 @@ https://spec.matrix.org/v1.17/client-server-api/#post_matrixclientv3search
 #+end_src
 
 
-**** Reframe Subscriptions and Events
-
-
-As mentioned before, there isn't a search method in the rust-sdk.
-So instead we'll need to query the homeserver directly.
-We want to be conservative with how we enable this (like any
-direct request to the server that goes around the sdk).
-
-We'll just follow the form outlined in spec for our request
-and on success we'll use our shaping helper methods to
-get it ready for rendering using the event tile.
 
 #+begin_src clojurescript :tangle ../../src/container/search.cljs
 
