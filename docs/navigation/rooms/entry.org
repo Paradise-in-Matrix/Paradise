@@ -671,24 +671,21 @@ Now this is actually what we provide to the Virtuoso list for rendering the
 individual elements. Effectively just a fancy destructure to grab the values we
 need out.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
-
-
 (defn render-room-item [tr client rooms active-space active-room closed-drawers active-filter]
   (fn [_ raw-room]
-    (let [{:keys [id roomId name is-space? isSpace is-direct? isDirect depth
-                  notification-count unreadNotificationsCount
-                  highlight-count unreadMentionsCount
-                  avatar avatarUrl activeRoomCallParticipants]
-           :or {activeRoomCallParticipants []}
-           :as room} (if (map? raw-room) raw-room (js->clj raw-room :keywordize-keys true))
-          id          (or id roomId)
-          room-name   (or name "Loading...")
-          space?      (or is-space? isSpace)
-          dm?         (or is-direct? isDirect)
-          notif-count (or notification-count unreadNotificationsCount 0)
-          high-count  (or highlight-count unreadMentionsCount 0)
-          url         (or avatar avatarUrl)
-          depth       (or depth 0)
+    (let [r           (if (map? raw-room) raw-room (js->clj raw-room :keywordize-keys true))
+          id          (or (:id r) (:roomId r))
+          room-name   (or (:name r) "Loading...")
+          space?      (or (:is-space? r) (:isSpace r))
+          dm?         (or (:is-direct? r) (:isDirect r) (:is-direct r))
+          notif-count (or (:notification-count r) (:unreadNotificationsCount r) 0)
+          high-count  (or (:highlight-count r) (:unreadMentionsCount r) 0)
+          url         (or (:avatar r) (:avatarUrl r))
+          depth       (or (:depth r) 0)
+          call-parts  (or (:active-room-call-participants r)
+                          (:activeRoomCallParticipants r)
+                          (:active_room_call_participants r)
+                          [])
           open-menu   (fn [e mx my]
                         (when e (.preventDefault e) (.stopPropagation e))
                         (re-frame/dispatch
@@ -703,14 +700,14 @@ need out.
                    :is-space? space?
                    :is-dm? dm?
                    :is-closed? (contains? closed-drawers id)
-                   :has-call? (seq activeRoomCallParticipants)
+                   :has-call? (seq call-parts)
                    :active-room active-room
                    :space-id (:id active-space)
                    :active-filter active-filter
                    :unread? (pos? notif-count)
                    :highlight? (pos? high-count)
                    :notif-count notif-count
-                   :call-participants activeRoomCallParticipants
+                   :call-participants call-parts
                    :avatar-url url
                    :open-menu-fn open-menu}]))))
 
