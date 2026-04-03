@@ -313,64 +313,24 @@ the method we have for all other rooms.
  :<- [:rooms/unfiltered-indexed-map]
  (fn [rooms-map _]
    (->> (vals rooms-map)
-#+end_src
-
-
-Now we need to refresh certain components of the room. We don't inherently want all of this info
-and the rust-sdk mentions that subscribing to these for every room would be expensive. So
-this would be most sensible to only do when the user explicitly clicks on a room.
-
-Small note, but as I wasn't feeling great I wrote this in isolation.
-We do have a map with unfiltered cache, but I didn't want to check if the sync would wipe
-metadata we append in. For now we'll create a separate structure to store the data.
-Later we should more cleanly unify the two (like having a submap in the room-id named respectively
-for each one's contents. So room-sync-data and room-info-data or something like that.
-
-We did test this out and in the current version of the rust-sdk ALWAYS reports
-an empty array back to us for pinnedEvents... which is useless. This code may be
-more useful later when we can update our rust-sdk.
-
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-
-#_(re-frame/reg-sub
- :room/pinned-ids
- (fn [db [_ room-id]]
-   (get-in db [:room-metadata room-id :pinned-ids] #{})))
-
-#_(re-frame/reg-event-db
- :room/save-info-handle
- (fn [db [_ room-id handle]]
-   (assoc-in db [:room-info-handles room-id] handle)))
-
-
-#_(re-frame/reg-event-db
- :room/update-info
- (fn [db [_ room-id info]]
-   (js/console.error info)
-   (assoc-in db [:room-metadata room-id :pinned-ids] (set (:pinned-event-ids info)))))
-
-
-
-
-#_(re-frame/reg-fx
- :sdk/subscribe-room-info
- (fn [{:keys [client room-id]}]
-   (if (and client room-id)
-     (-> (.subscribeToRoomInfo client room-id
-           #js {:call (fn [info]
-                            (re-frame/dispatch [:room/update-info room-id info]))})
-         (.then (fn [handle]
-                  (re-frame/dispatch [:room/save-info-handle room-id handle])))
-         (.catch #(log/error "RoomInfo Sub Error:" %)))
-     (log/error "Cannot subscribe: Missing client or room-id"))))
-
-#_(re-frame/reg-fx
- :sdk/unsubscribe-room-info
- (fn [handle]
-
-   (when (and handle (fn? (.-drop handle)))
-     (log/debug "Dropping RoomInfo handle")
-     (.drop handle))))
+        (keep (fn [raw-room]
+                (let [r           (if (map? raw-room) raw-room (js->clj raw-room :keywordize-keys true))
+                      is-dm?      (or (:is-direct? r) (:isDirect r) (:is-direct r))
+                      msg-count   (or (:unread-messages-count r) (:unreadMessagesCount r) 0)
+                      mentions    (or (:highlight-count r) (:unreadMentionsCount r) 0)
+                      ts          (or (:last_message_ts r) (:lastMessageTs r) 0)]
+                  (when (and is-dm? (pos? msg-count))
+                    {:id          (or (:id r) (:roomId r))
+                     :name        (or (:name r) "Loading...")
+                     :avatar-url  (or (:avatar r) (:avatarUrl r))
+                     :is-dm?      true
+                     :unread?     true
+                     :highlight?  (pos? mentions)
+                     :mentions    mentions
+                     :msg-count   msg-count
+                     :ts          ts}))))
+        (sort-by :ts >)
+        (map #(dissoc % :ts)))))
 
 #+end_src
 
@@ -388,16 +348,21 @@ view state.
 Stopped and just stubbed it in for now while I go back and clean up the CSS
 and file structures.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+(defn- is-call-room? [db room-id]
+  (get-in db [:room-previews room-id :is-call?] false))
+
+
+
 (re-frame/reg-event-fx
  :rooms/select
  (fn [{:keys [db]} [_ room-id opts]]
    (let [current-room-id (:active-room-id db)
-         client          (:client db)
-         old-handle      (get-in db [:room-info-handles current-room-id])
          active-call-id  (get-in db [:call :active-room-id])
          already-loaded? (get-in db [:room-members room-id :data])
          loading?        (get-in db [:room-members room-id :loading?])
-         is-call-room?   (room-type-call? db room-id)
+
+         is-call-room?   (is-call-room? db room-id)
+
          force-lobby?    (:force-lobby? opts)
          focus-override  (:focus-override opts)
          mobile?         (get-in db [:ui :mobile?])
@@ -405,40 +370,27 @@ and file structures.
          wipe-call-state? (not is-call-room?)
          swapping-calls? (and active-call-id (not= active-call-id room-id) is-call-room?)
          current-side-panel (get-in db [:ui :side-panel])
-         _ (log/error current-side-panel)
-         side-panel-update  (if (and (= current-side-panel :timeline)
-                                     (= new-focus :timeline)
-                                     (not focus-override))
-                              nil
-                              current-side-panel)]
+         side-panel-update  (if (and (= current-side-panel :timeline) (not focus-override)) nil current-side-panel)]
 
      (if (= current-room-id room-id)
-       {:db (assoc-in db [:ui :sidebar-open?] false)}
-
-       (let [new-focus ;; (or focus-override
-                            (if is-call-room? :call :timeline)
-                         ;;   )
-             base-db    (-> db
-                            (assoc :active-room-id room-id)
-                            (assoc-in [:ui :sidebar-open?] false)
-                            (assoc-in [:ui :main-focus] new-focus))
-
+       {:db (assoc-in db [:ui :sidebar-open?] false) }
+       (let [new-focus (if is-call-room? :call :timeline)
+             base-db   (-> db
+                           (assoc :active-room-id room-id)
+                           (assoc-in [:ui :sidebar-open?] false)
+                           (assoc-in [:ui :main-focus] new-focus))
              dispatches (remove nil?
-                                [(when current-room-id [:sdk/cleanup-timeline current-room-id])
-                                 (when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
+                                [(when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
                                  [:sdk/boot-timeline room-id]
                                  (when (not (or already-loaded? loading?)) [:room/fetch-members room-id])
                                  [:sdk/fetch-room-emotes :room room-id]
                                  [:composer/load-draft room-id]
                                  [:container/set-main-focus new-focus]
                                  (when focus-override [:container/set-side-panel focus-override])
-                                 (when (and (= current-side-panel :timeline) (nil? side-panel-update))
-                                   [:container/set-side-panel nil])
+                                 (when (and (= current-side-panel :timeline) (nil? side-panel-update)) [:container/set-side-panel nil])
                                  (when is-call-room? [:call/init-widget room-id {:join-directly? join-directly?}])])]
          {:db base-db
-          :dispatch-n dispatches
-          })))))
-
+          :dispatch-n dispatches})))))
 #+end_src
 
 
