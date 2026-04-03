@@ -1,8 +1,8 @@
 #+begin_src clojurescript :tangle ../../src/client/session_store.cljs
 (ns client.session-store
-(:require [promesa.core :as p]
-          [taoensso.timbre :as log]
-          ["ffi-bindings" :as sdk]))
+  (:require [promesa.core :as p]
+            [taoensso.timbre :as log]
+            ["ffi-bindings" :as sdk]))
 #+end_src
 
 *** Constants and Utilities
