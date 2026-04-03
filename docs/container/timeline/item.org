@@ -351,11 +351,22 @@ read receipts. This prevents any sort of spamming to the home server.
                                :max-width "300px"
                                :background "var(--bg-secondary)"})
                !blob-url    (r/atom nil)
-               _            (when (and client media-source)
-                              (p/let [bytes (.getMediaContent client media-source)
-                                      blob  (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
-                                      url   (js/URL.createObjectURL blob)]
-                                (reset! !blob-url url)))]
+
+
+               _            (go
+                              (let [pool @state/!engine-pool
+                                    res  (<! (main/do-with-pool! pool {:handler :get-media
+                                                                       :arguments {:room-id room-id
+                                                                                   :event-id event-id
+                                                                                   :source (or (:source content) (:url content))}}))]
+
+
+                                (when (= (:status res) "success")
+                                  (let [bytes-arr (clj->js (:bytes res))
+                                        bytes     (js/Uint8Array. bytes-arr)
+                                        blob      (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
+                                        url       (js/URL.createObjectURL blob)]
+                                    (reset! !blob-url url)))))]
     (let [url @!blob-url]
       [:div.media-container {:class class :style style}
        (if url
