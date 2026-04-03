@@ -436,7 +436,9 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg]
+
+
+(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
      (when in-reply-to
@@ -450,15 +452,17 @@ read receipts. This prevents any sort of spamming to the home server.
              (get-in reply-msg [:content :inner :content :body]
                      (tr [:container.timeline.status/media-preview]))]]
            [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
+
      (case msg-type-tag
        "Text"    [message-text content-map]
-       "Image"   [image-message content-map]
-       "Video"   [video-message content-map]
-       "Sticker" [sticker-message content-map]
-       "File"    [file-message content-map tr]
+       "Image"   [image-message event content-map]
+       "Video"   [video-message event content-map]
+       "Sticker" [sticker-message event content-map]
+       "File"    [file-message event content-map tr]
        [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
      (when is-edited?
        [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
+
 #+end_src
 
 
