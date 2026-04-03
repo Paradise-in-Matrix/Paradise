@@ -280,10 +280,7 @@ be used.
             raw-html     (:html m-content)
             initial-text (if (seq raw-html)
                            (prepare-html-for-editor raw-html)
-                           (or (:body m-content) ""))
-            _ (log/debug initial-text)
-            _ (log/debug raw-html)
-            ]
+                           (or (:body m-content) ""))]
         [:div.inline-editor-wrapper
          [:div.inline-editor-box
           [:> tiptap-component
