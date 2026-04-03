@@ -12,13 +12,18 @@
                       ]
         :output-dir "build"
         :asset-path "/"
-        :modules {:base {:entries []}
-                  :main {:entries [client.core]
-                         :depends-on #{:base}
-                         :exports {init client.core/init}}
-                  :sw   {:entries [service-worker]
-                         :web-worker true
-                         :depends-on #{:base}}}
+        :modules {:base   {:entries []}
+                  :main   {:entries [client.core]
+                           :depends-on #{:base}
+                           :exports {init client.core/init}
+                           }
+                  :sw     {:entries [service-worker]
+                           :web-worker true
+                           :depends-on #{:base}}
+                  :engine {:entries [worker.core]
+                           :web-worker true
+                           :depends-on #{:base}}}
+
         :js-options
         {:js-provider :import
          :esm-js-shim false
