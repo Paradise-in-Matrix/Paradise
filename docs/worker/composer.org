@@ -1,0 +1,266 @@
+
+** Worker Composer
+
+**** Preface
+
+
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/worker/composer.cljs
+(ns worker.composer
+  (:require [cljs.core.async :refer [go]]
+            [cljs-workers.worker :as worker]
+            [promesa.core :as p]
+            [clojure.string :as str]
+            [worker.state :as state]
+            [worker.timeline :refer [!active-timelines]]
+            ["ffi-bindings" :as sdk :refer [MessageFormat UploadSource UploadParameters]]
+            [cljs.core.async.interop :refer-macros [<p!]]))
+#+end_src
+
+
+
+
+
+
+#+begin_src clojurescript :tangle ../../src/worker/composer.cljs
+(worker/register :upload-media
+  (fn [{:keys [mime buffer]}]
+    (go
+      (try
+        (if-let [client @state/!client]
+          (let [mxc-url (<p! (.uploadMedia client mime buffer js/undefined))]
+            {:status :success :url mxc-url})
+          {:status :error :msg "No active client"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+(worker/register :send-message
+  (fn [{:keys [room-id text html context]}]
+    (go
+      (try
+        (if-let [timeline (get-in @!active-timelines [room-id :live :timeline])]
+          (let [action    (keyword (:mode context "send"))
+                target-id (:target context)
+                msg-tag   (:msg-tag context "Text")
+                ffi-data  (:ffi-content context)
+                formatted (if-not (str/blank? html)
+                            #js {:format (.new (.-Html (.-MessageFormat sdk)))
+                                 :body html}
+                            js/undefined)
+                payload   (if (and (= action :edit) (contains? #{"Image" "Video" "Audio" "File"} msg-tag))
+                            (let [updated-ffi (js/Object.assign #js {} ffi-data
+                                                                #js {:caption text
+                                                                     :formattedCaption formatted})
+                                  msg-type    (.new (aget (.-MessageType sdk) msg-tag) #js {:content updated-ffi})
+                                  global-msg  #js {:msgType msg-type :mentions #js {:userIds #js [] :room false}}]
+                              (.contentWithoutRelationFromMessage sdk global-msg))
+                            (.messageEventContentFromHtml sdk text (or html text)))]
+            (cond
+              (= action :reply)
+              (<p! (.sendReply timeline payload target-id js/undefined))
+
+              (= action :edit)
+              (let [id-enum        (if (str/starts-with? target-id "$")
+                                     #js {:tag "EventId" :inner #js {:eventId target-id}}
+                                     #js {:tag "TransactionId" :inner #js {:transactionId target-id}})
+                    edited-content #js {:tag "RoomMessage" :inner #js {:content payload}}]
+                (<p! (.edit timeline id-enum edited-content js/undefined)))
+
+              :else
+              (<p! (.send timeline payload js/undefined)))
+            {:status :success})
+          {:status :error :msg "Timeline not found in worker"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+(worker/register :send-attachments
+  (fn [{:keys [room-id attachments text html]}]
+    (go
+      (try
+        (if-let [timeline (get-in @!active-timelines [room-id :live :timeline])]
+          (let [total (count attachments)]
+            (loop [idx 0]
+              (when (< idx total)
+                (let [att      (nth attachments idx)
+                      mime     (or (:mime att) "application/octet-stream")
+                      is-last? (= idx (dec total))
+                      source   (.new (.-Data UploadSource) #js {:bytes (:buffer att) :filename (:filename att)})
+                      info     #js {:mimetype mime
+                                    :size (js/BigInt (:size att))
+                                    :thumbnailInfo js/undefined
+                                    :thumbnailSource js/undefined}
+                      caption  (if is-last? (or text js/undefined) (:filename att))
+                      format   (if (and is-last? (not (str/blank? html)))
+                                 #js {:format (.new (.-Html MessageFormat)) :body html}
+                                 js/undefined)
+                      params   (.create UploadParameters
+                                        #js {:source source
+                                             :caption (or caption js/undefined)
+                                             :formattedCaption (or format js/undefined)})]
+                  (<p! (.sendFile timeline params info))
+                  (<p! (p/delay 100))
+                  (recur (inc idx)))))
+            {:status :success})
+          {:status :error :msg "Timeline not found in worker"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+(worker/register :send-raw-sticker
+  (fn [{:keys [room-id mxc alt-text info]}]
+    (go
+      (try
+        (let [client  @state/!client
+              session (.session client)
+              token   (.-accessToken session)
+              hs      (str/replace (.-homeserverUrl session) #"/+$" "")
+              txn-id  (str "stk-" (.getTime (js/Date.)) "-" (rand-int 10000))
+              url     (str hs "/_matrix/client/v3/rooms/" (js/encodeURIComponent room-id) "/send/m.sticker/" txn-id)
+              payload #js {:body (if (keyword? alt-text) (name alt-text) (or alt-text "Sticker"))
+                           :url  mxc
+                           :info (clj->js (merge {:mimetype "image/png"} info))}]
+          (let [resp (<p! (js/fetch url #js {:method "PUT"
+                                             :headers #js {"Authorization" (str "Bearer " token)
+                                                           "Content-Type" "application/json"}
+                                             :body (js/JSON.stringify payload)}))]
+            (if (.-ok resp)
+              {:status :success}
+              {:status :error :msg (.-status resp)})))
+        (catch :default e {:status :error :msg (str e)})))))
+
+(worker/register :persist-draft
+  (fn [{:keys [room-id text html attachments]}]
+    (go
+      (try
+        (if-let [client @state/!client]
+          (if-let [room (.getRoom client room-id)]
+            (let [draft-type (.new (.-NewMessage (.-ComposerDraftType sdk)))
+                  draft-atts (clj->js
+                              (map (fn [att]
+                                     (let [mime (or (:mime att) "application/octet-stream")
+                                           file-info #js {:mime mime
+                                                          :size (js/BigInt (or (:size att) 0))
+                                                          :height (js/BigInt (or (:height att) 0))
+                                                          :width (js/BigInt (or (:width att) 0))
+                                                          :thumbnailInfo js/undefined
+                                                          :thumbnailSource js/undefined}
+                                           source (.new (.-Data (.-UploadSource sdk))
+                                                        #js {:bytes (:buffer att)
+                                                             :filename (:filename att)})]
+                                       (cond
+                                         (str/starts-with? mime "image/")
+                                         (.new (.-Image (.-DraftAttachment sdk))
+                                               #js {:imageInfo file-info :source source :thumbnailSource js/undefined})
+                                         (str/starts-with? mime "video/")
+                                         (.new (.-Video (.-DraftAttachment sdk))
+                                               #js {:videoInfo file-info :source source :thumbnailSource js/undefined})
+                                         (str/starts-with? mime "audio/")
+                                         (.new (.-Audio (.-DraftAttachment sdk))
+                                               #js {:audioInfo file-info :source source})
+                                         :else
+                                         (.new (.-File (.-DraftAttachment sdk))
+                                               #js {:fileInfo file-info :source source}))))
+                                   attachments))
+                  draft (.. (.-ComposerDraft sdk)
+                            (create #js {:plainText text
+                                         :htmlText (or html js/undefined)
+                                         :draftType draft-type
+                                         :attachments draft-atts}))]
+              (<p! (.saveComposerDraft room draft js/undefined))
+              {:status :success})
+            {:status :error :msg "Room not found"})
+          {:status :error :msg "No active client"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+(worker/register :load-draft
+  (fn [{:keys [room-id]}]
+    (go
+      (try
+        (if-let [client @state/!client]
+          (if-let [room (.getRoom client room-id)]
+            (if-let [draft (<p! (.loadComposerDraft room js/undefined))]
+              (let [plain-text (.-plainText draft)
+                    html-text  (.-htmlText draft)
+                    ffi-atts   (or (.-attachments draft) #js [])
+                    restored-atts
+                    (mapv (fn [att]
+                            (try
+                              (let [inner      (.-inner att)
+                                    source     (.-source inner)
+                                    data-inner (.-inner source)
+                                    buffer     (.-bytes data-inner)
+                                    filename   (.-filename data-inner)
+                                    info       (.-info inner)
+                                    ffi-mime   (when info (.-mimetype info))
+                                    mime       (or ffi-mime
+                                                   (let [lower-name (str/lower-case filename)]
+                                                     (cond
+                                                       (str/ends-with? lower-name ".png") "image/png"
+                                                       (str/ends-with? lower-name ".jpg") "image/jpeg"
+                                                       (str/ends-with? lower-name ".jpeg") "image/jpeg"
+                                                       (str/ends-with? lower-name ".gif") "image/gif"
+                                                       (str/ends-with? lower-name ".webp") "image/webp"
+                                                       (str/ends-with? lower-name ".mp4") "video/mp4"
+                                                       (str/ends-with? lower-name ".webm") "video/webm"
+                                                       :else "application/octet-stream")))]
+                                {:buffer buffer
+                                 :mimetype mime
+                                 :filename filename})
+                              (catch :default _ nil)))
+                          ffi-atts)]
+                {:status :success
+                 :draft {:text plain-text
+                         :html html-text
+                         :attachments (vec (remove nil? restored-atts))}})
+              {:status :success :draft nil})
+            {:status :error :msg "Room not found"})
+          {:status :error :msg "No active client"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+(worker/register :fetch-emotes
+  (fn [{:keys [source-type room-id]}]
+    (go
+      (try
+        (if-let [client @state/!client]
+          (let [session (.session client)
+                token   (.-accessToken session)
+                hs      (str/replace (.-homeserverUrl session) #"/+$" "")
+                fetch-state (fn [rid evt-type state-key]
+                              (let [key-path (if (empty? state-key) "" (str "/" state-key))
+                                    url      (str hs "/_matrix/client/v3/rooms/" rid "/state/" evt-type key-path)]
+                                (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})]
+                                  (when (.-ok resp) (.json resp)))))
+                fetch-room-state (fn [rid]
+                                   (let [url (str hs "/_matrix/client/v3/rooms/" rid "/state")]
+                                     (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})]
+                                       (when (.-ok resp)
+                                         (let [json (.json resp)
+                                               data (js->clj json :keywordize-keys true)]
+                                           (->> data
+                                                (filter #(= (:type %) "im.ponies.room_emotes"))
+                                                (map (fn [e] {:pack-id (or (not-empty (:state_key e)) rid)
+                                                              :data (:content e)}))))))))]
+            (if (= source-type "account")
+              (let [raw-json (<p! (.accountData client "im.ponies.emote_rooms"))
+                    data     (js->clj (js/JSON.parse raw-json) :keywordize-keys true)
+                    targets  (for [[rid packs] (:rooms data)
+                                   [pack-name _] packs]
+                               [(name rid) (name pack-name)])
+                    results  (<p! (p/all (map (fn [[r p]]
+                                                (p/then (fetch-state r "im.ponies.room_emotes" p)
+                                                        #(when % {:pack-id p :data %})))
+                                              targets)))]
+                {:status :success :packs (remove nil? results)})
+              (let [packs (<p! (fetch-room-state room-id))]
+                {:status :success :packs packs})))
+          {:status :error :msg "No active client"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+
+
+#+end_src
+
