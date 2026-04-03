@@ -86,8 +86,8 @@ I add the call room previewing.
   (let [sdk-children    (get children-map parent-id [])
         manual-children (->> (vals rooms-map)
                              (filter #(= (safe-get % "first-parent-id" :first-parent-id) parent-id))
-                             (map (fn [r] {:id        (or (safe-get r "id" :id) (safe-get r "roomId" :roomId))
-                                           :is-space? (safe-get r "isSpace" :isSpace)})))
+                             (map (fn [r] {:id         (or (safe-get r "id" :id) (safe-get r "roomId" :roomId))
+                                           :is-space?  (safe-get r "isSpace" :isSpace)})))
 
         orders-for-parent (get space-orders parent-id {})
 
@@ -98,15 +98,14 @@ I add the call room previewing.
     (reduce
      (fn [acc {:keys [id is-space?]}]
        (let [summary       (get rooms-map id)
-             item          {:id                 id
-                            :is-space?          is-space?
-                            :depth              depth
+             item          {:id                         id
+                            :is-space?                  is-space?
+                            :depth                      depth
                             :activeRoomCallParticipants (when summary (safe-get summary "activeRoomCallParticipants" :activeRoomCallParticipants))
-
-                            :name               (if summary (or (safe-get summary "name" :name) "Loading...") "Loading...")
-                            :avatar             (when summary (safe-get summary "avatar" :avatar))
-                            :unreadNotificationsCount (if summary (or (safe-get summary "unreadNotificationsCount" :unreadNotificationsCount) 0) 0)
-                            :unreadMentionsCount    (if summary (or (safe-get summary "unreadMentionsCount" :unreadMentionsCount) 0) 0)}
+                            :name                       (if summary (or (safe-get summary "name" :name) "Loading...") "Loading...")
+                            :avatar                     (when summary (safe-get summary "avatar" :avatar))
+                            :unreadNotificationsCount   (if summary (or (safe-get summary "unreadNotificationsCount" :unreadNotificationsCount) 0) 0)
+                            :unreadMentionsCount        (if summary (or (safe-get summary "unreadMentionsCount" :unreadMentionsCount) 0) 0)}
              acc-with-item (conj acc item)]
 
          (if (and is-space? (not (contains? closed-drawers id)))
@@ -114,6 +113,8 @@ I add the call room previewing.
            acc-with-item)))
      []
      child-refs)))
+
+
 
 
 #+end_src
