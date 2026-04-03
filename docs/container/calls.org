@@ -422,70 +422,46 @@ facilitates the iframe and the widget in the rust-sdk.
 (rf/reg-event-fx
  :call/init-widget
  (fn [{:keys [db]} [_ room-id opts]]
-   (let [client           (:client db)
-         room-obj         (or (get-in db [:rooms :active-room-obj])
-                              (when client (.getRoom client room-id)))
-
-         current-primary? (get-in db [:call :primary-iframe?] true)
+   (let [current-primary? (get-in db [:call :primary-iframe?] true)
          new-primary?     (not current-primary?)
          target-iframe    (if new-primary? @primary-iframe-ref @backup-iframe-ref)
-         join-directly?   (:join-directly? opts true)]
+         join-directly?   (:join-directly? opts true)
+         local-url        (str (.. js/window -location -origin) "/element-call/index.html")
+         pool             @state/!engine-pool]
 
-     (if-not room-obj
-       (do (log/error "Cannot init widget: Room object is null") {})
-       (let [is-encrypted? (if (fn? (.-isEncrypted room-obj))
-                             (.isEncrypted room-obj)
-                             (.-isEncrypted room-obj))
-             encryption-sys (if is-encrypted?
-                              (.-PerParticipantKeys sdk/EncryptionSystem)
-                              (.-Unencrypted sdk/EncryptionSystem))
-             intent-str     (if join-directly? "start_call" "join_existing")
-             skip-lobby-str (if join-directly? "true" "false")
-             local-url      (str (.. js/window -location -origin) "/element-call/index.html")
-             props          #js {:elementCallUrl local-url
-                                 :widgetId       (str "element-call-" room-id)
-                                 :encryption     (new encryption-sys)}
-             config         #js {:intent (if join-directly?
-                                           (.-StartCall sdk/Intent)
-                                           js/undefined)
-                                 :hideHeader true}
-             settings       (sdk/newVirtualElementCallWidget props config)
-             driver-bundle  (sdk/makeWidgetDriver settings)
-             driver         (.-driver driver-bundle)
-             handle         (.-handle driver-bundle)]
+     (if-not pool
+       (do (log/error "Cannot init widget: No worker pool") {})
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :init-call-widget
+                                                 :arguments {:room-id        room-id
+                                                             :join-directly? join-directly?
+                                                             :local-url      local-url}}))]
+           (if (= (:status res) "success")
+             (let [raw-url        (:raw-url res)
+                   is-encrypted?  (:is-encrypted? res)
+                   client-user-id (:user-id res)
+                   device-id      (:device-id res)
+                   hs-url         (get db :homeserver-url)
+                   actual-id      (str "element-call-" room-id)
+                   base           (str/replace raw-url #"\?.*$|\#.*$" "")
+                   intent-str     (if join-directly? "start_call" "join_existing")
+                   skip-lobby-str (if join-directly? "true" "false")
+                   widget-query   (str "?widgetId=" (js/encodeURIComponent actual-id)
+                                       "&parentUrl=" (js/encodeURIComponent (.. js/window -location -origin))
+                                       "&userId=" (js/encodeURIComponent client-user-id)
+                                       "&deviceId=" (js/encodeURIComponent device-id)
+                                       "&baseUrl=" (js/encodeURIComponent hs-url))
+                   app-fragment   (str "#/?intent=" intent-str
+                                       "&skipLobby=" skip-lobby-str
+                                       "&roomId=" (js/encodeURIComponent room-id)
+                                       "&perParticipantE2EE=" (if is-encrypted? "true" "false")
+                                       "&theme=dark&lang=en")
+                   final-url      (str base widget-query app-fragment)]
 
-         (-> (.run driver room-obj capabilities-provider)
-             (.then #(log/info "Widget driver stopped."))
-             (.catch #(log/error "Widget driver crashed:" %)))
-         (let [raw-url        (.-rawUrl settings)
-               client-user-id (.userId client)
-               hs-url         (get-in db [:homeserver-url] nil)
-               device-id      (or (some-> client .session .-deviceId) "paradise-web")
-               actual-id      (str "element-call-" room-id)
-               base           (str/replace raw-url #"\?.*$|\#.*$" "")
-               widget-query   (str "?widgetId=" (js/encodeURIComponent actual-id)
-                                   "&parentUrl=" (js/encodeURIComponent (.. js/window -location -origin))
-                                   "&userId=" (js/encodeURIComponent client-user-id)
-                                   "&deviceId=" (js/encodeURIComponent device-id)
-                                   "&baseUrl=" (js/encodeURIComponent hs-url))
-               app-fragment (str "#/?intent=" intent-str
-                                 "&skipLobby=" skip-lobby-str
-                                 "&roomId=" (js/encodeURIComponent room-id)
-                                 "&perParticipantE2EE=" (if is-encrypted? "true" "false")
-                                 "&theme=dark&lang=en")
-               final-url      (str base widget-query app-fragment)
-               _ (log/debug app-fragment)
-               _ (log/debug final-url)
-               ]
-           (when final-url
-             (set! (.-src target-iframe) final-url))
-           {:db (-> db
-                    (assoc-in [:call :active-room-id] room-id)
-                    (assoc-in [:call :widget-handle] handle)
-                    (assoc-in [:call :widget-url] final-url)
-                    (assoc-in [:call :primary-iframe?] new-primary?)
-                    (assoc-in [:call :encrypted?] is-encrypted?))
-            :dispatch [:call/start-native-message-pump room-id new-primary?]}))))))
+               (set! (.-src target-iframe) final-url)
+               (rf/dispatch [:call/finalize-init room-id new-primary? is-encrypted? final-url]))
+             (log/error "Worker failed to init widget:" (:msg res))))))
+     {:db (assoc-in db [:call :loading?] true)})))
 #+end_src
 
 
