@@ -31,7 +31,6 @@ and the tab completion.
 ****** TODO need to populate mentions on room change
 
 #+begin_src clojurescript :tangle ../../src/input/autocomplete.cljs
-
 (re-frame/reg-sub
  :mention/filtered-users
  :<- [:room/members-map]
@@ -96,7 +95,6 @@ and the tab completion.
  :suggestion/set-index
  (fn [db [_ idx]]
    (assoc-in db [:suggestion/menu :index] idx)))
-
 #+end_src
 
 
@@ -129,6 +127,7 @@ and the tab completion.
         (.stopPropagation event)
         true)
       false)))
+
 #+end_src
 
 
@@ -243,6 +242,7 @@ and the tab completion.
                       [:span.suggestion-name (:display-name item)]
                       [:span.suggestion-id (:user-id item)]]])]))
              items)))]))))
+
 #+end_src
 
 
