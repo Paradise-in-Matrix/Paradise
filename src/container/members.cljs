@@ -2,73 +2,57 @@
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
-   [promesa.core :as p]
    [clojure.string :as str]
-   ["react-virtuoso" :refer [Virtuoso GroupedVirtuoso]]
+   ["react-virtuoso" :refer [GroupedVirtuoso]]
    [reagent.core :as r]
-   [reagent.dom.client :as rdom]
-   [utils.helpers :refer [mxc->url fetch-state-event]]
+   [utils.helpers :refer [mxc->url]]
    [utils.svg :as icons]
    [utils.global-ui :refer [avatar]]
-   ))
+   [cljs.core.async :refer [go <!]]
+   [cljs-workers.core :as main]
+   [client.state :as state]))
 
-(defn drain-members-iterator [iterator]
-  (let [total-len (.len iterator)
-        results (transient [])]
-    (loop []
-      (let [chunk (.nextChunk iterator 100)]
-        (if (and chunk (> (.-length chunk) 0))
-          (do
-            (reduce (fn [acc item] (conj! acc item)) results chunk)
-            (recur))
-          (persistent! results))))))
+
+
 
 (re-frame/reg-event-fx
  :room/fetch-members
  (fn [{:keys [db]} [_ room-id]]
-   (if-let [room (aget (get-in db [:rooms-unfiltered-cache room-id]) "raw-room")
-            ]
-     (do
-       (-> (.members room)
-           (.then (fn [iterator]
-                    (try
-                      (let [all-members (drain-members-iterator iterator)]
-                        (re-frame/dispatch [:room/fetch-members-success room-id all-members]))
-                      (finally
-                        (.uniffiDestroy iterator)))))
-           (.catch (fn [err]
-                     (js/console.error "Failed to fetch members:" err)
-                     (re-frame/dispatch [:room/fetch-members-error room-id err]))))
-       {:db (assoc-in db [:room-members room-id :loading?] true)})
-     {:db db})))
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :fetch-room-members
+                                               :arguments {:room-id room-id}}))]
+         (if (= (:status res) "success")
+           (re-frame/dispatch [:room/fetch-members-success room-id (:members res)])
+           (do
+             (log/error "Failed to fetch members:" (:msg res))
+             (re-frame/dispatch [:room/fetch-members-error room-id (:msg res)])))))
+     (log/error "Cannot fetch members: No engine pool"))
+   {:db (assoc-in db [:room-members room-id :loading?] true)}))
 
 (re-frame/reg-event-db
  :room/fetch-members-success
  (fn [db [_ room-id raw-members]]
-   (let [clean-members (->> raw-members
-                            (keep (fn [m]
-                                    (when m
-                                      (let [user-id (.-userId m)
-                                            membership (.-tag (.-membership m))
-                                            display-name (.-displayName m)
-                                            local-part (or (second (re-find #"^@([^:]+)" user-id)) user-id)
-                                            raw-pl (or (some-> m .-powerLevel .-inner .-value) 0)
-                                            pl (js/Number raw-pl)]
-                                        {:user-id      user-id
-                                         :membership   membership
-                                         :power-level  pl
-                                         :display-name (or display-name user-id)
-                                         :sort-name    (str/lower-case (or display-name local-part))
-                                         :avatar-url   (when (.-avatarUrl m) (mxc->url (.-avatarUrl m)))}))))
-                            (vec))]
+   (let [hs-url (:homeserver-url db)
+         clean-members (mapv (fn [m]
+                               (assoc m :avatar-url (when (:avatar-mxc m)
+                                                      (mxc->url (:avatar-mxc m) {:homeserver hs-url}))))
+                             raw-members)]
      (-> db
          (assoc-in [:room-members room-id :data] clean-members)
          (assoc-in [:room-members room-id :loading?] false)))))
 
 (re-frame/reg-event-db
+ :room/fetch-members-error
+ (fn [db [_ room-id _err]]
+   (assoc-in db [:room-members room-id :loading?] false)))
+
+(re-frame/reg-event-db
  :room/set-member-sort
  (fn [db [_ room-id sort-type]]
    (assoc-in db [:room-members room-id :sort-type] sort-type)))
+
+
 
 (re-frame/reg-sub
  :room/member-sort-type
@@ -89,7 +73,6 @@
  (fn [members _]
    (zipmap (map :user-id members) members)))
 
-
 (re-frame/reg-sub
  :room/filtered-and-sorted-members
  (fn [[_ room-id]]
@@ -107,10 +90,8 @@
                               by-type)))]
      (case s-type
        :alphabetical (sort-by :sort-name filtered)
-;;       :latest       filtered
        :power-level  (sort-by (fn [m] [(- (:power-level m)) (:sort-name m)]) filtered)
        (sort-by (fn [m] [(- (:power-level m)) (:sort-name m)]) filtered)))))
-
 
 (re-frame/reg-event-db
  :room/set-member-filter-type
@@ -165,24 +146,35 @@
         :labels labels
         :flat-members (mapcat #(get grouped %) pls)})
      {:counts [(count members)]
-      :labels [(case sort-type :alphabetical "A-Z" #_:latest #_"Latest" "Members")]
+      :labels [(case sort-type :alphabetical "A-Z" "Members")]
       :flat-members members})))
+
+(re-frame/reg-sub
+ :room/members-loading?
+ (fn [db [_ room-id]]
+   (get-in db [:room-members room-id :loading?] false)))
+
+(re-frame/reg-sub
+ :room/members
+ (fn [db [_ room-id]]
+   (get-in db [:room-members room-id :data] [])))
+
+
+
+
+
 
 (re-frame/reg-event-fx
  :room/fetch-power-level-tags
- (fn [{:keys [db]} [_ room-id]]
-   (let
- [client (:client db)
-           session (when client (.session client))
-token (.-accessToken session)
-homeserver (.-homeserverUrl session)]
-     (-> (fetch-state-event homeserver token room-id "in.cinny.room.power_level_tags" "")
-         (.then (fn [data]
-                  (when data
-                    (re-frame/dispatch [:room/fetch-power-level-tags-success
-                                        room-id
-                                        (js->clj data :keywordize-keys true)])))))
-     {:db db})))
+ (fn [_ [_ room-id]]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :fetch-power-level-tags
+                                               :arguments {:room-id room-id}}))]
+         (when (= (:status res) "success")
+           (re-frame/dispatch [:room/fetch-power-level-tags-success room-id (:tags res)]))))
+     (log/error "Cannot fetch tags: No engine pool"))
+   {}))
 
 (re-frame/reg-event-db
  :room/fetch-power-level-tags-success
@@ -194,15 +186,10 @@ homeserver (.-homeserverUrl session)]
  (fn [db [_ room-id]]
    (get-in db [:room-members room-id :power-level-tags] {})))
 
-(re-frame/reg-sub
- :room/members-loading?
- (fn [db [_ room-id]]
-   (get-in db [:room-members room-id :loading?] false)))
 
-(re-frame/reg-sub
- :room/members
- (fn [db [_ room-id]]
-   (get-in db [:room-members room-id :data] [])))
+
+
+
 
 (defn filter-pill [room-id label type active-type count]
   [:button.filter-pill
@@ -267,7 +254,6 @@ homeserver (.-homeserverUrl session)]
                                     :items (build-member-actions tr member active-room)}]))}]
             children))))
 
-
 (defn member-item [m custom-tags active-room]
   (let [pl         (:power-level m)
         tag-data   (get custom-tags (keyword (str pl)))
@@ -287,20 +273,20 @@ homeserver (.-homeserverUrl session)]
            role-name])]
        [:span.member-item-user-id (:user-id m)]]]]))
 
-
 (defn member-list []
   (let [tr           @(re-frame/subscribe [:i18n/tr])
-        active-room @(re-frame/subscribe [:rooms/active-id])
-        custom-tags @(re-frame/subscribe [:room/power-level-tags active-room])
-        query       @(re-frame/subscribe [:room/member-filter-query active-room])
-        filter-type @(re-frame/subscribe [:room/member-filter-type active-room])
-        sort-type   @(re-frame/subscribe [:room/member-sort-type active-room])
-        counts      @(re-frame/subscribe [:room/member-counts active-room])
-        loading?    @(re-frame/subscribe [:room/members-loading? active-room])
-        groups      @(re-frame/subscribe [:room/member-groups active-room])
+        active-room  @(re-frame/subscribe [:rooms/active-id])
+        custom-tags  @(re-frame/subscribe [:room/power-level-tags active-room])
+        query        @(re-frame/subscribe [:room/member-filter-query active-room])
+        filter-type  @(re-frame/subscribe [:room/member-filter-type active-room])
+        sort-type    @(re-frame/subscribe [:room/member-sort-type active-room])
+        counts       @(re-frame/subscribe [:room/member-counts active-room])
+        loading?     @(re-frame/subscribe [:room/members-loading? active-room])
+        groups       @(re-frame/subscribe [:room/member-groups active-room])
         group-counts (:counts groups)
         group-labels (:labels groups)
         flat-members (:flat-members groups)]
+
     (when (and (not loading?) (empty? @(re-frame/subscribe [:room/members active-room])))
       (re-frame/dispatch [:room/fetch-members active-room])
       (re-frame/dispatch [:room/fetch-power-level-tags active-room]))
@@ -327,16 +313,14 @@ homeserver (.-homeserverUrl session)]
         [:option {:value "Join"}   (tr [:container.members.filter/joined] [(get counts "Join" 0)])]
         [:option {:value "Invite"} (tr [:container.members.filter/invited] [(get counts "Invite" 0)])]
         [:option {:value "Leave"}  (tr [:container.members.filter/left] [(get counts "Leave" 0)])]
-        [:option {:value "Ban"}    (tr [:container.members.filter/banned] [(get counts "Ban" 0)])]
-        ]
+        [:option {:value "Ban"}    (tr [:container.members.filter/banned] [(get counts "Ban" 0)])]]
 
        [:select.member-dropdown
         {:value (name sort-type)
          :on-change #(re-frame/dispatch [:room/set-member-sort active-room (keyword (.. % -target -value))])}
         [:option {:value "power-level"}  (tr [:container.members.sort/role])]
         [:option {:value "alphabetical"} (tr [:container.members.sort/name])]
-        [:option {:value "latest"}       (tr [:container.members.sort/latest])]
-        ]]]
+        [:option {:value "latest"}       (tr [:container.members.sort/latest])]]]]
 
      (if loading?
        [:div.member-list-loading (tr [:container.members/loading])]
@@ -351,5 +335,5 @@ homeserver (.-homeserverUrl session)]
                              [:div.member-list-group-header
                               (nth group-labels index)]))
             :itemContent (fn [index _group-index]
-                           (r/as-element [member-item (nth flat-members index) custom-tags]))}])])]))
+                           (r/as-element [member-item (nth flat-members index) custom-tags active-room]))}])])]))
 
