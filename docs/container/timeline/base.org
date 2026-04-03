@@ -288,12 +288,23 @@ each of these later.
             (update :timeline/jump-target-id dissoc room-id))
     :dispatch-later [{:ms 300
                       :dispatch [:room/execute-return-to-live room-id]}]}))
-
 (re-frame/reg-event-fx
  :room/execute-return-to-live
  (fn [{:keys [db]} [_ room-id]]
    {:dispatch-n [[:sdk/cleanup-timeline room-id]
                  [:sdk/boot-timeline room-id]]}))
+
+(re-frame/reg-event-fx
+ :room/jump-to-present
+ (fn [{:keys [db]} [_ room-id]]
+   (main/do-with-pool! @state/!engine-pool {:handler :cleanup-timeline
+                                            :arguments {:room-id room-id}})
+   {:db (-> db
+            (update-in [:timeline-subs room-id] dissoc :focused-timeline :focused-handle)
+            (assoc-in [:timeline-data room-id :focused] [])
+            (assoc-in [:timeline/ui-state room-id :animating-jump?] true))
+    :dispatch-later [{:ms 50
+                      :dispatch [:room/jump-to-live-bottom room-id]}]}))
 
 (re-frame/reg-sub
  :timeline/ui-state
@@ -324,7 +335,6 @@ each of these later.
  :room/is-focused?
  (fn [db [_ room-id]]
    (some? (get-in db [:timeline/jump-target-id room-id]))))
-
 
 #+end_src
 
@@ -405,7 +415,6 @@ uses the mini-buffer. A nice status indicator.
 ***** Reframe Subscriptions and Events
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-
 (re-frame/reg-event-db
  :sdk/clear-stale-typing
  (fn [db [_ room-id]]
@@ -434,7 +443,6 @@ uses the mini-buffer. A nice status indicator.
               (< (- (js/Date.now) (:last-update data)) 6000))
        (:users data)
        []))))
-
 #+end_src
 
 
@@ -444,6 +452,7 @@ We then just want to filter out the event objects and get the read-by from insid
 We also don't want to list our own name, so we remove that too.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+
 (re-frame/reg-sub
  :timeline/latest-readers
  (fn [[_ room-id _]]
@@ -456,6 +465,7 @@ We also don't want to list our own name, so we remove that too.
          read-by       (or (:read-by latest-event) [])
          others        (remove #(= % my-id) read-by)]
      others)))
+
 #+end_src
 
 
@@ -493,7 +503,6 @@ We also don't want to list our own name, so we remove that too.
         [:span.text (get-status-string tr :reading reader-names)]]
        :else
        [:span.text {:key "empty"} "\u00A0"])]))
-
 #+end_src
 
 
@@ -571,7 +580,6 @@ I wasn't a fan of Virtuoso having a paid license for their message
 list for use cases like this either.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-
 (defn timeline-loading-overlay []
   [:div {:style {:position "absolute"
                  :top "20px"
