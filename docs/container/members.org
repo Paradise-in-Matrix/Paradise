@@ -37,52 +37,52 @@ diffs like Timeline, Spaces, and Rooms.
 #+end_src
 
 
+**** Reframe Events
+
+#+begin_src clojurescript :tangle ../../src/container/members.cljs
 (re-frame/reg-event-fx
  :room/fetch-members
  (fn [{:keys [db]} [_ room-id]]
-   (if-let [room (aget (get-in db [:rooms-unfiltered-cache room-id]) "raw-room")
-            ]
-     (do
-       (-> (.members room)
-           (.then (fn [iterator]
-                    (try
-                      (let [all-members (drain-members-iterator iterator)]
-                        (re-frame/dispatch [:room/fetch-members-success room-id all-members]))
-                      (finally
-                        (.uniffiDestroy iterator)))))
-           (.catch (fn [err]
-                     (js/console.error "Failed to fetch members:" err)
-                     (re-frame/dispatch [:room/fetch-members-error room-id err]))))
-       {:db (assoc-in db [:room-members room-id :loading?] true)})
-     {:db db})))
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :fetch-room-members
+                                               :arguments {:room-id room-id}}))]
+         (if (= (:status res) "success")
+           (re-frame/dispatch [:room/fetch-members-success room-id (:members res)])
+           (do
+             (log/error "Failed to fetch members:" (:msg res))
+             (re-frame/dispatch [:room/fetch-members-error room-id (:msg res)])))))
+     (log/error "Cannot fetch members: No engine pool"))
+   {:db (assoc-in db [:room-members room-id :loading?] true)}))
 
 (re-frame/reg-event-db
  :room/fetch-members-success
  (fn [db [_ room-id raw-members]]
-   (let [clean-members (->> raw-members
-                            (keep (fn [m]
-                                    (when m
-                                      (let [user-id (.-userId m)
-                                            membership (.-tag (.-membership m))
-                                            display-name (.-displayName m)
-                                            local-part (or (second (re-find #"^@([^:]+)" user-id)) user-id)
-                                            raw-pl (or (some-> m .-powerLevel .-inner .-value) 0)
-                                            pl (js/Number raw-pl)]
-                                        {:user-id      user-id
-                                         :membership   membership
-                                         :power-level  pl
-                                         :display-name (or display-name user-id)
-                                         :sort-name    (str/lower-case (or display-name local-part))
-                                         :avatar-url   (when (.-avatarUrl m) (mxc->url (.-avatarUrl m)))}))))
-                            (vec))]
+   (let [hs-url (:homeserver-url db)
+         clean-members (mapv (fn [m]
+                               (assoc m :avatar-url (when (:avatar-mxc m)
+                                                      (mxc->url (:avatar-mxc m) {:homeserver hs-url}))))
+                             raw-members)]
      (-> db
          (assoc-in [:room-members room-id :data] clean-members)
          (assoc-in [:room-members room-id :loading?] false)))))
 
 (re-frame/reg-event-db
+ :room/fetch-members-error
+ (fn [db [_ room-id _err]]
+   (assoc-in db [:room-members room-id :loading?] false)))
+
+(re-frame/reg-event-db
  :room/set-member-sort
  (fn [db [_ room-id sort-type]]
    (assoc-in db [:room-members room-id :sort-type] sort-type)))
+
+#+end_src
+
+
+**** Reframe Subscriptions
+
+#+begin_src clojurescript :tangle ../../src/container/members.cljs
 
 (re-frame/reg-sub
  :room/member-sort-type
@@ -103,17 +103,6 @@ diffs like Timeline, Spaces, and Rooms.
  (fn [members _]
    (zipmap (map :user-id members) members)))
 
-#+end_src
-
-
-**** Filter Events and Subscriptions
-
-
-So now we want to provide the user interface a method to actually filter
-and display different forms of data. Like the list of banned users or
-just everyone in the current room.
-
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
 (re-frame/reg-sub
  :room/filtered-and-sorted-members
  (fn [[_ room-id]]
@@ -131,10 +120,8 @@ just everyone in the current room.
                               by-type)))]
      (case s-type
        :alphabetical (sort-by :sort-name filtered)
-;;       :latest       filtered
        :power-level  (sort-by (fn [m] [(- (:power-level m)) (:sort-name m)]) filtered)
        (sort-by (fn [m] [(- (:power-level m)) (:sort-name m)]) filtered)))))
-
 
 (re-frame/reg-event-db
  :room/set-member-filter-type
@@ -189,8 +176,45 @@ just everyone in the current room.
         :labels labels
         :flat-members (mapcat #(get grouped %) pls)})
      {:counts [(count members)]
-      :labels [(case sort-type :alphabetical "A-Z" #_:latest #_"Latest" "Members")]
+      :labels [(case sort-type :alphabetical "A-Z" "Members")]
       :flat-members members})))
+
+(re-frame/reg-sub
+ :room/members-loading?
+ (fn [db [_ room-id]]
+   (get-in db [:room-members room-id :loading?] false)))
+
+(re-frame/reg-sub
+ :room/members
+ (fn [db [_ room-id]]
+   (get-in db [:room-members room-id :data] [])))
+#+end_src
+
+
+
+**** Fetch Member List
+
+Digging into it, it appear that the rust-sdk doesn't do members with a diff.
+Fair enough. Instead we can just dump the member iterator for the given
+room. We want to also reify the resulting objects so we can sort
+the entries by the local part of the user id or display name or by the
+power level.
+
+#+begin_src clojurescript :tangle ../../src/container/members.cljs
+
+
+#+end_src
+
+
+**** Filter Events and Subscriptions
+
+
+So now we want to provide the user interface a method to actually filter
+and display different forms of data. Like the list of banned users or
+just everyone in the current room.
+
+#+begin_src clojurescript :tangle ../../src/container/members.cljs
+
 #+end_src
 
 
@@ -232,19 +256,15 @@ here then.
 #+begin_src clojurescript :tangle ../../src/container/members.cljs
 (re-frame/reg-event-fx
  :room/fetch-power-level-tags
- (fn [{:keys [db]} [_ room-id]]
-   (let
- [client (:client db)
-           session (when client (.session client))
-token (.-accessToken session)
-homeserver (.-homeserverUrl session)]
-     (-> (fetch-state-event homeserver token room-id "in.cinny.room.power_level_tags" "")
-         (.then (fn [data]
-                  (when data
-                    (re-frame/dispatch [:room/fetch-power-level-tags-success
-                                        room-id
-                                        (js->clj data :keywordize-keys true)])))))
-     {:db db})))
+ (fn [_ [_ room-id]]
+   (if-let [pool @login/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :fetch-power-level-tags
+                                               :arguments {:room-id room-id}}))]
+         (when (= (:status res) "success")
+           (re-frame/dispatch [:room/fetch-power-level-tags-success room-id (:tags res)]))))
+     (log/error "Cannot fetch tags: No engine pool"))
+   {}))
 
 (re-frame/reg-event-db
  :room/fetch-power-level-tags-success
@@ -255,21 +275,16 @@ homeserver (.-homeserverUrl session)]
  :room/power-level-tags
  (fn [db [_ room-id]]
    (get-in db [:room-members room-id :power-level-tags] {})))
+
+
 #+end_src
 
 
 **** Global Member Reframe Subscriptions
 
 #+begin_src clojurescript :tangle ../../src/container/members.cljs
-(re-frame/reg-sub
- :room/members-loading?
- (fn [db [_ room-id]]
-   (get-in db [:room-members room-id :loading?] false)))
 
-(re-frame/reg-sub
- :room/members
- (fn [db [_ room-id]]
-   (get-in db [:room-members room-id :data] [])))
+
 #+end_src
 
 
@@ -389,7 +404,6 @@ We definitely want some color though.
                                     :y (.-clientY e)
                                     :items (build-member-actions tr member active-room)}]))}]
             children))))
-
 #+end_src
 
 
@@ -471,33 +485,26 @@ We definitely want some color though.
 #+end_src
 
 
-
-
-
-**** Global Profile Preview
-
-
-
 **** Member List
 
 
 ***** Component
 
 #+begin_src clojurescript :tangle ../../src/container/members.cljs
-
 (defn member-list []
   (let [tr           @(re-frame/subscribe [:i18n/tr])
-        active-room @(re-frame/subscribe [:rooms/active-id])
-        custom-tags @(re-frame/subscribe [:room/power-level-tags active-room])
-        query       @(re-frame/subscribe [:room/member-filter-query active-room])
-        filter-type @(re-frame/subscribe [:room/member-filter-type active-room])
-        sort-type   @(re-frame/subscribe [:room/member-sort-type active-room])
-        counts      @(re-frame/subscribe [:room/member-counts active-room])
-        loading?    @(re-frame/subscribe [:room/members-loading? active-room])
-        groups      @(re-frame/subscribe [:room/member-groups active-room])
+        active-room  @(re-frame/subscribe [:rooms/active-id])
+        custom-tags  @(re-frame/subscribe [:room/power-level-tags active-room])
+        query        @(re-frame/subscribe [:room/member-filter-query active-room])
+        filter-type  @(re-frame/subscribe [:room/member-filter-type active-room])
+        sort-type    @(re-frame/subscribe [:room/member-sort-type active-room])
+        counts       @(re-frame/subscribe [:room/member-counts active-room])
+        loading?     @(re-frame/subscribe [:room/members-loading? active-room])
+        groups       @(re-frame/subscribe [:room/member-groups active-room])
         group-counts (:counts groups)
         group-labels (:labels groups)
         flat-members (:flat-members groups)]
+
     (when (and (not loading?) (empty? @(re-frame/subscribe [:room/members active-room])))
       (re-frame/dispatch [:room/fetch-members active-room])
       (re-frame/dispatch [:room/fetch-power-level-tags active-room]))
@@ -524,16 +531,14 @@ We definitely want some color though.
         [:option {:value "Join"}   (tr [:container.members.filter/joined] [(get counts "Join" 0)])]
         [:option {:value "Invite"} (tr [:container.members.filter/invited] [(get counts "Invite" 0)])]
         [:option {:value "Leave"}  (tr [:container.members.filter/left] [(get counts "Leave" 0)])]
-        [:option {:value "Ban"}    (tr [:container.members.filter/banned] [(get counts "Ban" 0)])]
-        ]
+        [:option {:value "Ban"}    (tr [:container.members.filter/banned] [(get counts "Ban" 0)])]]
 
        [:select.member-dropdown
         {:value (name sort-type)
          :on-change #(re-frame/dispatch [:room/set-member-sort active-room (keyword (.. % -target -value))])}
         [:option {:value "power-level"}  (tr [:container.members.sort/role])]
         [:option {:value "alphabetical"} (tr [:container.members.sort/name])]
-        [:option {:value "latest"}       (tr [:container.members.sort/latest])]
-        ]]]
+        [:option {:value "latest"}       (tr [:container.members.sort/latest])]]]]
 
      (if loading?
        [:div.member-list-loading (tr [:container.members/loading])]
@@ -548,7 +553,7 @@ We definitely want some color though.
                              [:div.member-list-group-header
                               (nth group-labels index)]))
             :itemContent (fn [index _group-index]
-                           (r/as-element [member-item (nth flat-members index) custom-tags]))}])])]))
+                           (r/as-element [member-item (nth flat-members index) custom-tags active-room]))}])])]))
 
 
 #+end_src
