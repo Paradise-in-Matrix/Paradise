@@ -11,9 +11,9 @@ Probably needs a better name (and logical grouping)
 (ns auth.events
   (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
-            [reagent.dom.client :as rdom]
-            [promesa.core :as p]
-            [client.login :as login]
+            [client.state :as state]
+            [cljs-workers.core :as main]
+            [cljs.core.async :refer [go <!]]
             [utils.svg :as icons]
             [service-worker-handler :refer [register-sw!]]
             [taoensso.timbre :as log]))
