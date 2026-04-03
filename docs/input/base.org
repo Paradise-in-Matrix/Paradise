@@ -325,10 +325,9 @@ Ideally, we should break this apart more later.
             uploading?  @(re-frame/subscribe [:input/uploading?])
             attachments @(re-frame/subscribe [:composer/attachments active-id])
             loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])
+            cached-html @(re-frame/subscribe [:composer/cached-html active-id])
             context     @(re-frame/subscribe [:input/context active-id])
-            tr          @(re-frame/subscribe [:i18n/tr])
-            ]
-
+            tr          @(re-frame/subscribe [:i18n/tr])]
         [:div.timeline-input-outer
          [suggestion-menu
           (fn [item]
