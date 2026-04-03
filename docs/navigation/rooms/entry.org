@@ -683,7 +683,7 @@ need out.
 
 (defn render-room-item [tr client rooms active-space active-room closed-drawers active-filter]
   (fn [_ raw-room]
-    (let [{:keys [id roomId name is-space? isSpace depth
+    (let [{:keys [id roomId name is-space? isSpace is-direct? isDirect depth
                   notification-count unreadNotificationsCount
                   highlight-count unreadMentionsCount
                   avatar avatarUrl activeRoomCallParticipants]
@@ -692,26 +692,25 @@ need out.
           id          (or id roomId)
           room-name   (or name "Loading...")
           space?      (or is-space? isSpace)
+          dm?         (or is-direct? isDirect)
           notif-count (or notification-count unreadNotificationsCount 0)
           high-count  (or highlight-count unreadMentionsCount 0)
           url         (or avatar avatarUrl)
           depth       (or depth 0)
-          is-call?    (room-type-call? @re-frame.db/app-db id)
           open-menu   (fn [e mx my]
                         (when e (.preventDefault e) (.stopPropagation e))
                         (re-frame/dispatch
                          [:context-menu/open
                           {:x mx :y my
-                           :items (build-room-actions tr id room-name space? #_is-call?)}]))]
-;;      (log/error active-space)
+                           :items (build-room-actions tr id room-name space?)}]))]
       (r/as-element
        [room-item {:tr tr
                    :id id
                    :name room-name
                    :indent (* depth 12)
                    :is-space? space?
+                   :is-dm? dm?
                    :is-closed? (contains? closed-drawers id)
-                   :is-call? is-call?
                    :has-call? (seq activeRoomCallParticipants)
                    :active-room active-room
                    :space-id (:id active-space)
