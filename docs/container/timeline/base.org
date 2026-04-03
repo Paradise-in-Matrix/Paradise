@@ -676,12 +676,15 @@ list for use cases like this either.
                          (some-> @!virtua-ref (.scrollToIndex (dec cnt)))))]
 
         (when (and (not @!initialized?) (pos? cnt) @!virtua-ref)
-          (js/setTimeout #(reset! !initialized? true) 0)
           (let [target-idx (if jump-target
                              (let [idx (.findIndex event-array #(= (:id %) jump-target))]
                                (if (not= idx -1) idx (dec cnt)))
                              (dec cnt))]
-            (js/setTimeout #(some-> @!virtua-ref (.scrollToIndex target-idx)) 50)))
+            (some-> @!virtua-ref (.scrollToIndex target-idx))
+            (js/setTimeout #(do
+                              (some-> @!virtua-ref (.scrollToIndex target-idx))
+                              (reset! !initialized? true))
+                           10)))
 
         (when (and @!initialized?
                    @!at-bottom?
