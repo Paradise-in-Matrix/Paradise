@@ -614,6 +614,31 @@ list for use cases like this either.
               (tr [:container.timeline/return-to-live])
               (tr [:container.timeline/jump-to-bottom]))]]))
 
+(defn jump-to-present-banner [room-id]
+  (let [has-gap? @(re-frame/subscribe [:timeline/has-gap? room-id])
+        tr       @(re-frame/subscribe [:i18n/tr])]
+    (when has-gap?
+      [:button.jump-to-present-banner
+       {:style {:position "absolute"
+                :bottom "80px"
+                :left "50%"
+                :transform "translateX(-50%)"
+                :z-index 50
+                :background "var(--accent-color, #5865F2)"
+                :color "white"
+                :padding "8px 16px"
+                :border-radius "16px"
+                :border "none"
+                :box-shadow "0 4px 12px rgba(0,0,0,0.3)"
+                :cursor "pointer"
+                :font-weight "600"
+                :display "flex"
+                :align-items "center"
+                :gap "8px"
+                :transition "transform 0.2s"}
+        :on-click #(re-frame/dispatch [:room/jump-to-present room-id])}
+       [:span (tr [:container.timeline/new-messages-below "New Messages"])]
+       ])))
 
 #+end_src
 
