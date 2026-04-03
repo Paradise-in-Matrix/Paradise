@@ -366,18 +366,16 @@ However, as we don't have access to that currently we instead must
 resolve the preview promise here and memoize it. That way we only
 ever do this once per room.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
-(defn room-type-call? [db room-id]
-  (let [summary (get-in db [:rooms-unfiltered-cache room-id])
-        preview (when summary (aget summary "room-preview"))
-        info    (some-> preview deref .info)
-        type    (some-> info .-roomType)]
-    (and (= "Custom" (some-> type .-tag))
-         (= "org.matrix.msc3417.call" (some-> type .-inner .-value)))))
-
 (re-frame/reg-sub
  :room/is-call?
  (fn [db [_ room-id]]
-   (room-type-call? db room-id)))
+   (let [preview   (get-in db [:room-previews room-id])
+         room-type (:room-type preview)]
+     (if (map? room-type)
+       (and (= "Custom" (:tag room-type))
+            (= "org.matrix.msc3417.call" (get-in room-type [:inner :value])))
+       (and (= "Custom" (some-> room-type .-tag))
+            (= "org.matrix.msc3417.call" (some-> room-type .-inner .-value)))))))
 #+end_src
 
 
