@@ -372,23 +372,21 @@ This needs to be organized a bit better (and documented better).
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
 (re-frame/reg-event-fx
  :push/enable
- (fn [{:keys [db]} _]
-   (let [client (:client db)]
-     (if-not (and client (exists? js/window.PushManager) (exists? js/navigator.serviceWorker))
-       (do (log/error "Push messaging is not supported.") {})
-       (-> (p/let [permission (js/Notification.requestPermission)]
-             (if (= permission "granted")
-               (p/let [reg (.-ready js/navigator.serviceWorker)
-                       existing-sub (.getSubscription (.-pushManager reg))
-                       _ (log/warn (js/JSON.stringify existing-sub))
-                       sub (if existing-sub
-                             existing-sub
-                             (.subscribe (.-pushManager reg)
-                                         #js {:userVisibleOnly true
-                                              :applicationServerKey (url-base64->uint8-array (:vapid-key config))}))]
-                 (re-frame/dispatch [:push/register-pusher sub]))
-               (log/warn "Notification permission denied.")))
-           (p/catch #(log/error "Push setup failed:" %)))))
+ (fn [_ _]
+   (if-not (and (exists? js/window.PushManager) (exists? js/navigator.serviceWorker))
+     (do (log/error "Push messaging is not supported.") {})
+     (-> (p/let [permission (js/Notification.requestPermission)]
+           (if (= permission "granted")
+             (p/let [reg (.-ready js/navigator.serviceWorker)
+                     existing-sub (.getSubscription (.-pushManager reg))
+                     sub (if existing-sub
+                           existing-sub
+                           (.subscribe (.-pushManager reg)
+                                       #js {:userVisibleOnly true
+                                            :applicationServerKey (url-base64->uint8-array (:vapid-key config))}))]
+               (re-frame/dispatch [:push/register-pusher sub]))
+             (log/warn "Notification permission denied.")))
+         (p/catch #(log/error "Push setup failed:" %))))
    {}))
 
 
