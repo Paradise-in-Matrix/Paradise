@@ -400,9 +400,6 @@ facilitates the iframe and the widget in the rust-sdk.
 #+end_src
 
 
-We need to then actually build the capabilities for the widget
-This is quite delicate and can be a source of the wasm crashing
-if not sent correctly.
 #+begin_src clojurescript :tangle ../../src/container/call/core.cljs
 (def capabilities-provider
   #js {:acquireCapabilities
@@ -419,11 +416,7 @@ if not sent correctly.
              #js {:read #js [] :send #js []})))})
 #+end_src
 
-While widget logic could be more... abstract we frankly only care about
-calling currently. Full widget support can be easily added later.
 
-Now after a bit of trial and error we manage to get element-call to be properly
-served from Vite and cooperate with shadow-cljs
 
 From this point we can start staging the actual ElementCallWidget inside the
 rust-sdk and coercing it to communicate with the Element call iframe over
