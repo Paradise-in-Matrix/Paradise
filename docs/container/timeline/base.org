@@ -692,7 +692,7 @@ list for use cases like this either.
                                                   (<= dist-from-bottom 500)
                                                   (not loading-forward?))
                                          (re-frame/dispatch [:sdk/forward-paginate room-id])))
-                                     100)))))}
+                                     10)))))}
 
           (when loading?
             [timeline-loading-overlay])
