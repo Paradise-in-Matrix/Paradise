@@ -29,29 +29,7 @@ we've made interop with the WASM bindings.
             [utils.svg :as icons]
             [container.timeline.item :refer [event-tile connected-event-tile]]
             [container.reusable :refer [room-header]]
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-(defonce !timeline-queues (atom {}))
-
-
-(defn apply-timeline-diffs! [room-id source updates]
-  (let [q-key [room-id source]]
-    (swap! !timeline-queues update q-key #(or % (p/resolved [])))
-    (swap! !timeline-queues
-           (fn [queues]
-             (update queues q-key
-                     (fn [prev-promise]
-                       (-> prev-promise
-                           (p/then (fn [current-events]
-                                     (apply-matrix-diffs current-events updates wrap-item)))
-                           (p/then (fn [next-events]
-                                     (let [tagged-events (mapv #(assoc % :timeline-source source) next-events)]
-                                       (re-frame/dispatch [:sdk/update-timeline room-id source tagged-events])
-                                       tagged-events)))
-                           (p/catch (fn [err]
-                                      (js/console.error "Timeline Diff Panic for room" room-id source ":" err)
-                                      (get-in @re-frame.db/app-db [:timeline-data room-id source] [])))))))))
-  nil)
-
+            [input.base :refer [message-input]]))
 #+end_src
 
 
