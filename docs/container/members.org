@@ -22,16 +22,15 @@ diffs like Timeline, Spaces, and Rooms.
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
-   [promesa.core :as p]
    [clojure.string :as str]
-   ["react-virtuoso" :refer [Virtuoso GroupedVirtuoso]]
+   ["react-virtuoso" :refer [GroupedVirtuoso]]
    [reagent.core :as r]
-   [reagent.dom.client :as rdom]
-   [utils.helpers :refer [mxc->url fetch-state-event]]
+   [utils.helpers :refer [mxc->url]]
    [utils.svg :as icons]
    [utils.global-ui :refer [avatar]]
-   ))
-#+end_src
+   [cljs.core.async :refer [go <!]]
+   [cljs-workers.core :as main]
+   [client.state :as state]))
 
 
 **** Fetch Member List
