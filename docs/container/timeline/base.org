@@ -205,50 +205,6 @@ each of these later.
        (assoc-in [:timeline/loading-more? room-id] false)
        (assoc-in [:timeline/ui-metadata room-id :pending-anchor] nil))))
 
-
-(re-frame/reg-event-fx
- :sdk/back-paginate
- (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])
-         timeline         (or (get-in db [:timeline-subs room-id :timeline])
-                              (get-in db [:timeline-subs room-id :focused-timeline]))
-         raw-events       (get-in db [:timeline-data room-id :live] (get-in db [:timeline-data room-id :focused] []))
-         processed        (process-timeline raw-events)
-         anchor-id        (:id (first (filter #(= (:type %) :event) processed)))]
-     (if (and room-id (not loading-back?) (not loading-forward?) timeline)
-       (do
-         (log/info "Triggering SDK Back Paginate for" room-id)
-         (-> (.paginateBackwards timeline 50 js/undefined)
-             (p/then #(re-frame/dispatch [:sdk/pagination-complete room-id]))
-             (p/catch (fn [err]
-                        (log/error "Back Pagination failed:" err)
-                        (re-frame/dispatch [:sdk/pagination-complete room-id]))))
-         {:db (-> db
-                  (assoc-in [:timeline/loading-more? room-id] true)
-                  (assoc-in [:timeline/ui-metadata room-id :pending-anchor] anchor-id))})
-       {}))))
-
-(re-frame/reg-event-fx
- :sdk/forward-paginate
- (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])
-         dead?            (get-in db [:timeline/forward-dead? room-id])
-         timeline         (or (get-in db [:timeline-subs room-id :timeline])
-                              (get-in db [:timeline-subs room-id :focused-timeline]))]
-     (if (and timeline (not loading-back?) (not loading-forward?) (not dead?))
-       (do
-         (log/info "Triggering SDK Forward Paginate for" room-id)
-         (-> (.paginateForwards timeline 50 js/undefined)
-             (p/then #(re-frame/dispatch [:sdk/forward-pagination-complete room-id]))
-             (p/catch (fn [err]
-                        (log/error "Forward Pagination panicked/dead:" err)
-                        (re-frame/dispatch [:sdk/forward-pagination-dead room-id]))))
-         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
-       {}))))
-
-
 (re-frame/reg-event-db
  :sdk/forward-pagination-complete
  (fn [db [_ room-id]]
