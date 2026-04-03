@@ -1,0 +1,144 @@
+
+** Worker Call
+
+**** Preface
+
+
+
+**** Imports
+
+
+#+begin_src clojurescript :tangle ../../src/worker/call.cljs
+(ns worker.call
+  (:require [cljs-workers.worker :as worker]
+            [taoensso.timbre :as log]
+            [worker.state :as state]
+            ["ffi-bindings" :as sdk])
+  (:require-macros [cljs.core.async.macros :refer [go]]
+                   [cljs.core.async.interop :refer [<p!]]))
+#+end_src
+
+
+**** Sauce
+
+**** Atoms
+
+#+begin_src clojurescript :tangle ../../src/worker/call.cljs
+(defonce !widget-handle (atom nil))
+#+end_src
+
+
+We need to then actually build the capabilities for the widget
+This is quite delicate and can be a source of the wasm crashing
+if not sent correctly.
+#+begin_src clojurescript :tangle ../../src/worker/call.cljs
+(def capabilities-provider
+  #js {:acquireCapabilities
+       (fn [_requested-caps]
+         (try
+           (let [client    @state/!client
+                 user-id   (.userId client)
+                 device-id (or (some-> client .session .-deviceId) "paradise-web")]
+             (log/debug "Worker: Acquiring capabilities for widget...")
+             (sdk/getElementCallRequiredPermissions user-id device-id))
+           (catch :default e
+             (log/error "Capabilities provider crashed!" e)
+             #js {:read #js [] :send #js []})))})
+
+#+end_src
+
+
+While widget logic could be more... abstract we frankly only care about
+calling currently. Full widget support can be easily added later.
+
+Now after a bit of trial and error we manage to get element-call to be properly
+served from Vite and cooperate with shadow-cljs
+
+From this point we can start staging the actual ElementCallWidget inside the
+rust-sdk and coercing it to communicate with the Element call iframe over
+the post message transport mechanism.
+
+Now the iframe itself expects a raw-url for embedding, so we need to make
+sure the shape is what element-call expects to see.
+
+Beyond that, there isn't too much on our end to do. Seems the rust-sdk is
+already written to handle the interfacing for us. So no gross widget driver
+in Paradise!
+(At least not directly in the code haha).
+#+begin_src clojurescript :tangle ../../src/worker/call.cljs
+(worker/register :init-call-widget
+  (fn [{:keys [room-id join-directly? local-url]}]
+    (go
+      (try
+        (if-let [room (.getRoom @state/!client room-id)]
+          (let [is-encrypted?  (if (fn? (.-isEncrypted room))
+                                 (<p! (.isEncrypted room))
+                                 (.-isEncrypted room))
+                encryption-sys (if is-encrypted?
+                                 (.-PerParticipantKeys sdk/EncryptionSystem)
+                                 (.-Unencrypted sdk/EncryptionSystem))
+                props          #js {:elementCallUrl local-url
+                                    :widgetId       (str "element-call-" room-id)
+                                    :encryption     (new encryption-sys)}
+                config         #js {:intent     (if join-directly? (.-StartCall sdk/Intent) js/undefined)
+                                    :hideHeader true}
+                settings       (sdk/newVirtualElementCallWidget props config)
+                driver-bundle  (sdk/makeWidgetDriver settings)
+                driver         (.-driver driver-bundle)
+                handle         (.-handle driver-bundle)
+                recv-loop      (fn loop-fn []
+                                 (when @!widget-handle
+                                   (-> (.recv handle)
+                                       (.then (fn [msg-string]
+                                                (when (and msg-string (not= msg-string "null"))
+                                                  (worker/stream! {:type "widget-message" :data msg-string}))
+                                                (js/setTimeout loop-fn 10)))
+                                       (.catch #(log/error "Recv loop crashed:" %)))))]
+
+            (-> (.run driver room capabilities-provider)
+                (.then #(log/info "Worker: Widget driver stopped."))
+                (.catch #(log/error "Worker: Widget driver crashed:" %)))
+
+            (reset! !widget-handle handle)
+            (recv-loop)
+
+            {:status        :success
+             :raw-url       (.-rawUrl settings)
+             :is-encrypted? is-encrypted?
+             :user-id       (.userId @state/!client)
+             :device-id     (or (some-> @state/!client .session .-deviceId) "paradise-web")})
+          {:status :error :msg "Room not found for call"})
+        (catch :default e
+          {:status :error :msg (str e)})))))
+#+end_src
+
+Here we need to outline how we actually expect to do the interfacing with the
+iframe. For the most part we don't have to touch it, but for a small few
+communications between the widget... we need to make sure the rust-sdk
+doesn't get anything weird. If it does, it'll crash.
+
+So we make sure no nulls or strange structures. The iframe might be a bit
+picky so we also opt to just lie to it and send it data back as
+an acknowledgment.
+
+#+begin_src clojurescript :tangle ../../src/worker/call.cljs
+(worker/register :send-widget-message
+  (fn [{:keys [msg-string]}]
+    (go
+      (if-let [handle @!widget-handle]
+        (try
+          (<p! (.send handle msg-string))
+          {:status :success}
+          (catch :default e
+            {:status :error :msg (str e)}))
+        {:status :error :msg "No widget handle active in worker"}))))
+#+end_src
+
+#+begin_src clojurescript :tangle ../../src/worker/call.cljs
+(worker/register :teardown-widget
+  (fn [_]
+    (reset! !widget-handle nil)
+    {:status :success}))
+#+end_src
+
+
