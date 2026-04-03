@@ -1,12 +1,18 @@
 (ns auth.events
   (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
-            [reagent.dom.client :as rdom]
-            [promesa.core :as p]
-            [client.login :as login]
+            [client.state :as state]
+            [cljs-workers.core :as main]
+            [cljs.core.async :refer [go <!]]
             [utils.svg :as icons]
             [service-worker-handler :refer [register-sw!]]
             [taoensso.timbre :as log]))
+
+
+(re-frame/reg-event-db
+ :auth/set-status
+ (fn [db [_ status]]
+   (assoc db :auth-status status)))
 
 (re-frame/reg-sub
  :auth/status
@@ -20,86 +26,64 @@
  :auth/start-login-flow
  (fn [{:keys [db]} _]
    {:db (assoc db :auth-status :logged-out
-                  :settings/open? false
-                  :login-error nil)
-    :fx [[:dispatch [:settings/close]]]}))
-
-(re-frame/reg-event-fx
- :app/bootstrap
- (fn [{:keys [db]} [_ target-user-id]]
-   (log/debug "Bootstrapping account:" (or target-user-id "Default"))
-   (login/bootstrap!
-    target-user-id
-    (fn [client session-data]
-      (if client
-        (do
-          (re-frame/dispatch [:auth/login-success client session-data])
-          (re-frame/dispatch [:sdk/fetch-all-emotes])
-          (re-frame/dispatch [:sdk/fetch-own-profile]))
-        (re-frame/dispatch [:auth/login-failure nil]))))
-   {:db (assoc db :auth-status :checking)
-    :fx [[:dispatch [:settings/load-accounts]]]}))
-
+               :settings/open? false
+               :login-error nil)
+    :fx [[:dispatch [:settings/close]]
+         [:dispatch [:settings/load-accounts]]]}))
 
 (re-frame/reg-event-fx
  :auth/login
  (fn [{:keys [db]} [_ hs user pass]]
-   (-> (login/login! hs user pass)
-       (p/then (fn [client]
-                 (re-frame/dispatch [:auth/login-success client nil])))
-       (p/catch (fn [e]
-                  (log/error "Login Failed" e)
-                  (re-frame/dispatch [:auth/login-failure (.-message e)]))))
+   (if-let [pool @state/!engine-pool]
+     (go
+       (try
+         (let [res (<! (main/do-with-pool! pool {:handler :login
+                                                 :arguments {:hs hs
+                                                             :user user
+                                                             :pass pass}}))]
+           (if (= (:status res) "success")
+             (re-frame/dispatch [:auth/login-success res])
+             (re-frame/dispatch [:auth/login-failure (:msg res)])))
+         (catch :default e
+           (re-frame/dispatch [:auth/login-failure (str e)]))))
+     (log/error "Cannot login: Engine pool not initialized"))
+
    {:db (assoc db :auth-status :authenticating
-                  :login-error nil)}))
+               :login-error nil)}))
 
 (re-frame/reg-event-fx
  :auth/login-success
- (fn [{:keys [db]} [_ client session-data]]
-   (let [session (if session-data
-                   (.-session session-data)
-                   (.session client))
-         hs-url  (.-homeserverUrl session)]
-     (when session
-       (register-sw! (js->clj session :keywordize-keys true))
-       (login/start-sync! client)
-       (re-frame/dispatch [:sdk/fetch-own-profile])
-       (log/info "Session registered and sync started for:" (.userId client)))
-     {:db (cond-> (assoc db :auth-status :logged-in
-                            :client client
-                            :rooms/data {}
-                            :timeline/current-events [])
-            hs-url (assoc :homeserver-url hs-url))})))
+ (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data]}]]
+   (when session-data
+     (register-sw!))
+   (log/error session-data)
+   (log/info "Login successful for:" user-id)
+   {:db (cond-> (assoc db :auth-status :logged-in
+                          :active-user-id user-id
+                          :rooms/data {}
+                          :timeline/current-events [])
+          hs-url (assoc :homeserver-url hs-url))
+
+    :fx [[:dispatch [:sdk/start-sync]]
+         [:dispatch [:sdk/fetch-all-emotes]]
+         [:dispatch [:sdk/fetch-own-profile]]]}))
 
 (re-frame/reg-event-fx
  :auth/switch-account
  (fn [{:keys [db]} [_ target-user-id]]
    {:db (assoc db :auth-status :checking
                   :settings/open? false
-                  :client nil
+                  :active-user-id nil
                   :rooms/data {}
                   :timeline/current-events [])
     :fx [[:dispatch [:app/bootstrap target-user-id]]]}))
-
-#_(re-frame/reg-event-fx
- :auth/login-success
- (fn [{:keys [db]} [_ client session-data]]
-   (let [session (some-> session-data .-session)
-         hs-url  (some-> session .-homeserverUrl)]
-     (if session-data
-       (do
-         (register-sw! (js->clj session :keywordize-keys true))
-         (login/start-sync! client)
-         (log/debug "Session restored and sync started!"))
-       (re-frame/dispatch [:app/bootstrap]))
-     {:db (cond-> (assoc db :auth-status :logged-in :client client)
-            hs-url (assoc :homeserver-url hs-url))})))
 
 (re-frame/reg-event-db
  :auth/login-failure
  (fn [db [_ error-msg]]
    (assoc db :auth-status :logged-out
              :login-error error-msg)))
+
 
 
 (re-frame/reg-fx
@@ -118,32 +102,23 @@
 (re-frame/reg-event-fx
  :session/nuke-single-account
  (fn [{:keys [db]} [_ target-user-id]]
-   (let [active-user-id (some-> (:client db) .userId)
-         is-active?     (= target-user-id active-user-id)]
+   (let [is-active? (= target-user-id (:active-user-id db))]
      (merge
       {:idb/delete-session target-user-id
        :fx [[:dispatch [:settings/load-accounts]]]}
       (when is-active?
         {:db (assoc db :auth-status :logged-out
-                       :client nil
+                       :active-user-id nil
                        :rooms/data {}
                        :timeline/current-events [])})))))
-
-(re-frame/reg-fx
- :matrix/logout-client
- (fn [client]
-   (-> (.logout client)
-       (.then #(log/info "Successfully invalidated token on the homeserver."))
-       (.catch #(log/error "Homeserver logout failed. Nuking local state anyway." %))
-       (.finally #(re-frame/dispatch [:session/nuke-local-state!])))))
 
 (re-frame/reg-event-fx
  :sdk/logout
  (fn [{:keys [db]} _]
-   (let [client (:client db)]
-     (if client
-       {:matrix/logout-client client}
-       {:dispatch [:session/nuke-single-account (.userId client)]}))))
+   (let [user-id (:active-user-id db)]
+     (if user-id
+       {:dispatch [:sdk/send-to-engine {:handler :logout-client}]}
+       {:dispatch [:session/nuke-single-account user-id]}))))
 
 (re-frame/reg-event-fx
  :session/nuke-local-state!
@@ -151,6 +126,7 @@
    (let [store-id (get-in db [:session/meta :store-id])]
      {:db {}
       :browser/hard-wipe store-id})))
+
 
 (re-frame/reg-fx
  :browser/hard-wipe
@@ -170,7 +146,6 @@
      :value value
      :on-change on-change
      :disabled disabled}]])
-
 
 (defn login-screen []
   (let [fields (r/atom {:hs (or js/process.env.MATRIX_HOMESERVER "https://matrix.org")
@@ -235,6 +210,3 @@
            [:div.auth-footer
             (tr [:auth/footer-text])
             [:a.link {:href "#"} (tr [:auth.actions/register])]]]]]))))
-
-
-
