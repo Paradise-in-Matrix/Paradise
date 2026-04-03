@@ -507,6 +507,17 @@ implementation an easy way to inform updates to the service worker.
 We may wish to break this apart a bit for re-usability, but for now this will do.
 #+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
 (re-frame/reg-event-fx
+ :auth/sync-sw-with-worker
+ (fn [{:keys [db]} _]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :get-client-context}))]
+         (when (= (:status res) "success")
+           (re-frame/dispatch [:auth/sync-sw-only (:session res)]))))
+     (log/warn "Engine pool not ready for SW sync"))
+   {}))
+
+(re-frame/reg-event-fx
  :auth/sync-sw-only
  (fn [_ [_ session]]
    {:sync-sw-auth session}))
