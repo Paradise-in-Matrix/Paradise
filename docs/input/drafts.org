@@ -14,14 +14,14 @@ away.
 
 #+begin_src clojurescript :tangle ../../src/input/drafts.cljs
 (ns input.drafts
-  (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
+  (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [reagent.core :as r]
-            ["react" :as react]
             [utils.svg :as icons]
-            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
+            [cljs.core.async :refer [go <!]]
+            [cljs-workers.core :as main]
+            [client.state :as state]
+            ))
 #+end_src
 
 
