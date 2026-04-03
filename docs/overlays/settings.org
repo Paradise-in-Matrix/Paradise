@@ -91,18 +91,6 @@ scaffolding.
  (fn [db _]
    (:settings/active-tab db :my-account)))
 
-(re-frame/reg-fx
- :matrix/recover-session
- (fn [{:keys [client recovery-key]}]
-   (let [encryption-module (.encryption client)]
-     (-> (.recover encryption-module recovery-key)
-         (p/then (fn [_]
-                   (log/info "Session successfully verified and recovered!")
-                   (re-frame/dispatch [:sdk/verification-success])))
-         (p/catch (fn [e]
-                    (log/error "Verification failed:" e)
-                    (re-frame/dispatch [:sdk/verification-error (.-message e)])))))))
-
 (re-frame/reg-event-fx
  :sdk/submit-verification
  (fn [{:keys [db]} [_ recovery-key]]
