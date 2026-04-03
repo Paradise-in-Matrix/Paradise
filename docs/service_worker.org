@@ -327,7 +327,9 @@ this functional first.
     (let [media-id (clojure.string/replace mxc-uri "mxc://" "")
           thumb-url (str hs-url "/_matrix/media/v3/thumbnail/" media-id
                          "?width=96&height=96&method=crop")]
-      (-> (js/fetch thumb-url #js {:headers #js {:Authorization (str "Bearer " token)}})
+      (-> (js/fetch thumb-url #js {:headers #js {:Authorization (str "Bearer " token)}
+                                   :mode "cors"
+                                   :credentials "omit"})
           (p/then (fn [resp]
                     (if (.-ok resp)
                       (p/let [blob (.blob resp)]
