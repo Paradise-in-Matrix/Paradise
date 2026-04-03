@@ -168,21 +168,40 @@ the DMs list or All rooms list as these are best served fresh first.
 For the space rooms themselves we want to flatten as we have described
 above.
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+
+(re-frame/reg-sub :rooms/unfiltered-indexed-map (fn [db _] (get db :rooms-unfiltered-cache {})))
+
+
+
+(re-frame/reg-sub :rooms/ordered-list (fn [db _] (get db :rooms [])))
+
+
+(re-frame/reg-sub :rooms/space-orders (fn [db _] (get db :space-orders {})))
+
 (re-frame/reg-sub
  :rooms/indexed-map
  :<- [:rooms/all]
  (fn [rooms-list _]
    (reduce (fn [acc room]
-             (let [id (or (aget room "id") (aget room "roomId"))]
-               (assoc acc id room)))
-           {}
-           rooms-list)))
+             (let [id (or (:id room) (:roomId room))]
+               (if id
+                 (assoc acc id room)
+                 acc)))
+           {} rooms-list)))
 
-
-(re-frame/reg-sub
- :rooms/ordered-list
- (fn [db _]
-   (get db :rooms [])))
+(re-frame/reg-event-db
+ :rooms/apply-parent-resolution
+ (fn [db [_ room-id first-parent-id]]
+   (-> db
+       (assoc-in [:rooms-unfiltered-cache room-id :first-parent-id] first-parent-id)
+       (update :rooms (fn [rooms]
+                        (if (sequential? rooms)
+                          (mapv (fn [r]
+                                  (if (= (:id r) room-id)
+                                    (assoc r :first-parent-id first-parent-id)
+                                    r))
+                                rooms)
+                          rooms))))))
 
 (re-frame/reg-sub
  :rooms/current-view
@@ -197,37 +216,8 @@ above.
      ordered-list
      (flatten-tree indexed-map children-map space-orders closed-drawers active-id 0))))
 
-(re-frame/reg-sub
- :rooms/unfiltered-indexed-map
- (fn [db _]
-   (get db :rooms-unfiltered-cache {})))
 
-#_(re-frame/reg-sub
- :rooms/active-room-members
- :<- [:rooms/active-id]
- (fn [active-id db]
-   (get-in db [:rooms/members active-id] [])))
 
-#_(re-frame/reg-event-fx
- :rooms/fetch-members
- (fn [{:keys [db]} [_ room-id]]
-   (let [client (:client db)]
-     (when (and client room-id)
-       (if-let [room (.getRoom client room-id)]
-         (p/let [members (.membersNoSync room)
-                 parsed  (map (fn [m]
-                                {:user-id      (.userId m)
-                                 :display-name (or (.displayName m) (.userId m))
-                                 :avatar-url   (.avatarUrl m)})
-                              members)]
-           (re-frame/dispatch [:rooms/save-members room-id parsed]))
-         (log/warn "Could not find room in client for members fetch:" room-id))))
-   {}))
-
-#_(re-frame/reg-event-db
- :rooms/save-members
- (fn [db [_ room-id members]]
-   (assoc-in db [:rooms/members room-id] members)))
 #+end_src
 
 
@@ -275,22 +265,14 @@ above.
 ***** Reframe components
 
 #+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-
 (re-frame/reg-event-db
  :rooms/toggle-drawer
  (fn [db [_ drawer-id]]
    (update-in db [:ui :closed-drawers]
               (fn [closed]
-                (if (contains? closed drawer-id)
-                  (disj closed drawer-id)
-                  (conj (or closed #{}) drawer-id))))))
+                (if (contains? closed drawer-id) (disj closed drawer-id) (conj (or closed #{}) drawer-id))))))
 
-(re-frame/reg-sub
- :rooms/closed-drawers
- (fn [db _]
-   (get-in db [:ui :closed-drawers] #{})))
-
-
+(re-frame/reg-sub :rooms/closed-drawers (fn [db _] (get-in db [:ui :closed-drawers] #{})))
 #+end_src
 
 
@@ -314,42 +296,23 @@ the method we have for all other rooms.
  :<- [:space-children/map]
  :<- [:rooms/space-orders]
  (fn [[rooms-map children-map space-orders] [_ space-id]]
-  ;; (log/error space-id)
    (let [rooms-in-space (flatten-tree rooms-map children-map space-orders #{} space-id 0)
-    ;;     _ (log/error rooms-in-space)
          stats (reduce (fn [acc room]
-                         (let [notifs (get room :unreadNotificationsCount 0)
-                               mentions (get room :unreadMentionsCount 0)]
-                           (-> acc
-                               (update :notifs + notifs)
-                               (update :mentions + mentions))))
-                       {:notifs 0 :mentions 0}
-                       rooms-in-space)
-  ;;       _ (log/error stats)
-          ]
+                         (-> acc
+                             (update :notifs + (get room :unreadNotificationsCount 0))
+                             (update :mentions + (get room :unreadMentionsCount 0))))
+                       {:notifs 0 :mentions 0} rooms-in-space)]
      {:unread? (pos? (:notifs stats))
       :notif-count (:notifs stats)
       :mentions (:mentions stats)
       :highlight? (pos? (:mentions stats))})))
+
 
 (re-frame/reg-sub
  :rooms/active-dm-pops
  :<- [:rooms/unfiltered-indexed-map]
  (fn [rooms-map _]
    (->> (vals rooms-map)
-        (filter #(aget % "isDirect"))
-        (filter #(pos? (or (aget % "unreadMessagesCount") 0)))
-        (sort-by #(or (aget % "last_message_ts") 0) >)
-        (map (fn [r]
-               (let [msg-count (or (aget r "unreadMessagesCount") 0)
-                     mentions  (or (aget r "unreadMentionsCount") 0)]
-                 {:id         (aget r "id")
-                  :name       (aget r "name")
-                  :avatar-url (aget r "avatar")
-                  :is-dm?     true
-                  :unread?    (pos? msg-count)
-                  :highlight? (pos? mentions)
-                  :mentions   msg-count}))))))
 #+end_src
 
 
