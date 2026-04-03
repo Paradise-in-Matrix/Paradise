@@ -13,11 +13,8 @@ just keep this to defining the look and feel itself.
 
 #+begin_src clojurescript :tangle ../../src/input/composer.cljs
 (ns input.composer
-    (:require [promesa.core :as p]
-            [re-frame.core :as re-frame]
-            [taoensso.timbre :as log]
-            [clojure.string :as str]
-            [reagent.core :as r]
+    (:require
+     [clojure.string :as str]
             [utils.helpers :refer [mxc->url url->mxc]]
             [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
             ["react" :as react]
@@ -27,8 +24,7 @@ just keep this to defining the look and feel itself.
             ["@tiptap/extension-mention" :default Mention]
             ["@tiptap/extension-link" :default Link]
             ["@tiptap/core" :refer [Extension Node mergeAttributes]]
-            ["prosemirror-state" :refer [Plugin PluginKey]]
-            ["ffi-bindings" :as sdk :refer [MessageType MessageFormat MediaSource UploadSource UploadParameters]]))
+            ["prosemirror-state" :refer [Plugin PluginKey]]))
 #+end_src
 
 
@@ -178,7 +174,6 @@ https://tiptap.dev/docs/editor/core-concepts/extensions
                                                               (on-files files))
                                                             true)
                                                           false)))}}})]))}))
-
 #+end_src
 
 
