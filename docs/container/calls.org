@@ -415,17 +415,9 @@ facilitates the iframe and the widget in the rust-sdk.
             (assoc-in [:call :loading?] false))
     :dispatch [:call/attach-window-listener]}))
 
-From this point we can start staging the actual ElementCallWidget inside the
-rust-sdk and coercing it to communicate with the Element call iframe over
-the post message transport mechanism.
 
-Now the iframe itself expects a raw-url for embedding, so we need to make
-sure the shape is what element-call expects to see.
+#+end_src
 
-Beyond that, there isn't too much on our end to do. Seems the rust-sdk is
-already written to handle the interfacing for us. So no gross widget driver
-in Paradise!
-(At least not directly in the code haha).
 #+begin_src clojurescript :tangle ../../src/container/call/core.cljs
 (rf/reg-event-fx
  :call/init-widget
