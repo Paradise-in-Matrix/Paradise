@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import wasm from "vite-plugin-wasm";
-import topLevelAwait from "vite-plugin-top-level-await";
+// import topLevelAwait from "vite-plugin-top-level-await";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
@@ -14,6 +14,7 @@ const copyFiles = {
             ),
             dest: "element-call",
         },
+
         {
             src: path.resolve(
                 __dirname,
@@ -44,7 +45,7 @@ export default defineConfig(({ mode }) => {
         root: "./build",
         plugins: [
             wasm(),
-            topLevelAwait(),
+            // topLevelAwait(),
             viteStaticCopy(copyFiles),
             VitePWA({
                 strategies: "injectManifest",
@@ -110,10 +111,20 @@ export default defineConfig(({ mode }) => {
                 keep_classnames: true,
                 keep_fnames: true,
             },
-            //            minify: false,
+            minify: false,
             minifyHtml: false,
             rollupOptions: {
+                input: {
+                    main: path.resolve(__dirname, "build/index.html"),
+                    engine: path.resolve(__dirname, "build/engine.js"),
+                },
                 output: {
+                    entryFileNames: (chunkInfo) => {
+                        if (chunkInfo.name === "engine") {
+                            return "engine.js";
+                        }
+                        return "assets/[name]-[hash].js";
+                    },
                     assetFileNames: "assets/[name].[ext]",
                 },
             },

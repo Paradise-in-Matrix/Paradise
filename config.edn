@@ -2,6 +2,6 @@
  :push-url "https://cinny.cc/_matrix/push/v1/notify"
  :vapid-key "BHLwykXs79AbKNiblEtZZRAgnt7o5_ieImhVJD8QZ01MVwAHnXwZzNgQEJJEU3E5CVsihoKtb7yaNe5x3vmkWkI"
  :app-name "Paradise"
- :version "0.11.6"
+ :version "0.19.3"
  }
 
