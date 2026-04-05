@@ -69,7 +69,7 @@
   (p/let [space-service (.spaceService client)
           _             (reset! !space-service space-service)
           listener      #js {:onUpdate #(apply-global-spaces-diffs! %)}
-          sub           (.subscribeToJoinedSpaces space-service listener)]
+          sub           (.subscribeToTopLevelJoinedSpaces space-service listener)]
     (reset! !global-space-sub sub)
     (process-parent-queue! client space-service)))
 
