@@ -204,42 +204,46 @@
           {:status :error :msg (str e)})))))
 
 (worker/register :fetch-emotes
-  (fn [{:keys [source-type room-id]}]
-    (go
-      (try
-        (if-let [client @state/!client]
-          (let [session (.session client)
-                token   (.-accessToken session)
-                hs      (str/replace (.-homeserverUrl session) #"/+$" "")
-                fetch-state (fn [rid evt-type state-key]
-                              (let [key-path (if (empty? state-key) "" (str "/" state-key))
-                                    url      (str hs "/_matrix/client/v3/rooms/" rid "/state/" evt-type key-path)]
-                                (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})]
-                                  (when (.-ok resp) (.json resp)))))
-                fetch-room-state (fn [rid]
-                                   (let [url (str hs "/_matrix/client/v3/rooms/" rid "/state")]
-                                     (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})]
-                                       (when (.-ok resp)
-                                         (let [json (.json resp)
-                                               data (js->clj json :keywordize-keys true)]
-                                           (->> data
-                                                (filter #(= (:type %) "im.ponies.room_emotes"))
-                                                (map (fn [e] {:pack-id (or (not-empty (:state_key e)) rid)
-                                                              :data (:content e)}))))))))]
-            (if (= source-type "account")
-              (let [raw-json (<p! (.accountData client "im.ponies.emote_rooms"))
-                    data     (js->clj (js/JSON.parse raw-json) :keywordize-keys true)
-                    targets  (for [[rid packs] (:rooms data)
-                                   [pack-name _] packs]
-                               [(name rid) (name pack-name)])
-                    results  (<p! (p/all (map (fn [[r p]]
-                                                (p/then (fetch-state r "im.ponies.room_emotes" p)
-                                                        #(when % {:pack-id p :data %})))
-                                              targets)))]
-                {:status :success :packs (remove nil? results)})
-              (let [packs (<p! (fetch-room-state room-id))]
-                {:status :success :packs packs})))
-          {:status :error :msg "No active client"})
-        (catch :default e
-          {:status :error :msg (str e)})))))
+                 (fn [{:keys [source-type room-id]}]
+                   (go
+                     (try
+                       (if-let [client @state/!client]
+                         (let [session (.session client)
+                               token   (.-accessToken session)
+                               hs      (str/replace (.-homeserverUrl session) #"/+$" "")
+                               fetch-state (fn [rid evt-type state-key]
+                                             (let [key-path (if (empty? state-key) "" (str "/" state-key))
+                                                   url      (str hs "/_matrix/client/v3/rooms/" rid "/state/" evt-type key-path)]
+                                               (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})
+                                                       json (when (.-ok resp) (.json resp))]
+                                                 (when json
+                                                   (js->clj json :keywordize-keys true)))))
+                               fetch-room-state (fn [rid]
+                                                  (let [url (str hs "/_matrix/client/v3/rooms/" rid "/state")]
+                                                    (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})
+                                                            json (when (.-ok resp) (.json resp))]
+                                                      (when json
+                                                        (let [data (js->clj json :keywordize-keys true)]
+                                                          (->> data
+                                                               (filter #(= (:type %) "im.ponies.room_emotes"))
+                                                               (map (fn [e] {:pack-id (or (not-empty (:state_key e)) rid)
+                                                                             :data    (:content e)}))))))))]
+                           (if (= source-type "account")
+                             (let [raw-json (<p! (.accountData client "im.ponies.emote_rooms"))]
+                               (if-not raw-json
+                                 {:status :success :packs []}
+                                 (let [data     (js->clj (js/JSON.parse raw-json) :keywordize-keys true)
+                                       targets  (for [[rid packs] (:rooms data)
+                                                      [pack-name _] packs]
+                                                  [(name rid) (name pack-name)])
+                                       results  (<p! (p/all (map (fn [[r p]]
+                                                                   (p/then (fetch-state r "im.ponies.room_emotes" p)
+                                                                           #(when % {:pack-id p :data %})))
+                                                                 targets)))]
+                                   {:status :success :packs (remove nil? results)})))
+                             (let [packs (<p! (fetch-room-state room-id))]
+                               {:status :success :packs packs})))
+                         {:status :error :msg "No active client"})
+                       (catch :default e
+                         {:status :error :msg (str e)})))))
 
