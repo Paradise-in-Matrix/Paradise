@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import wasm from "vite-plugin-wasm";
-// import topLevelAwait from "vite-plugin-top-level-await";
+import topLevelAwait from "vite-plugin-top-level-await";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
@@ -45,7 +45,6 @@ export default defineConfig(({ mode }) => {
         root: "./build",
         plugins: [
             wasm(),
-            // topLevelAwait(),
             viteStaticCopy(copyFiles),
             VitePWA({
                 strategies: "injectManifest",
