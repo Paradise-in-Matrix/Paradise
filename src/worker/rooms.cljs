@@ -192,12 +192,11 @@
                                    (process-parent-queue! client space-service)))
                          (p/catch (fn [err] (log/error "Global Diff Panic:" err)))))))))
 
-
 (defn start-room-list-sync! [client room-list space-service]
-  (p/let [ui-result (.entriesWithDynamicAdaptersWith room-list 200 true
+  (p/let [ui-result (.entriesWithDynamicAdapters room-list 200
                                                      #js {:onUpdate #(apply-home-diffs-async! client space-service %)})
           ui-controller (.controller ui-result)
-          bg-result (.entriesWithDynamicAdaptersWith room-list 200 true
+          bg-result (.entriesWithDynamicAdapters room-list 200
                                                      #js {:onUpdate #(apply-bg-rooms-diffs! client space-service %)})
           bg-controller (.controller bg-result)]
     (reset! !ui-controller ui-controller)
