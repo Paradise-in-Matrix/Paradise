@@ -36,7 +36,7 @@
         "@tiptap/starter-kit": "^3.20.0",
         "capacitor-set-version": "^2.2.0",
         "emojibase-data": "^17.0.0",
-        "ffi-bindings": "^1.0.1",
+        "ffi-bindings": "^1.0.6",
         "matrix-widget-api": "^1.17.0",
         "nbb": "^1.4.206",
         "react": "^19",
@@ -45,7 +45,6 @@
         "shadow-cljs": "^3.3.6",
         "typescript": "^5.9.3",
         "unicode-emoji-json": "^0.8.0",
-        "uniffi-bindgen-react-native": "git+https://github.com/jhugman/uniffi-bindgen-react-native#5c01f3f7025d069aac1dd1fd51ca72bb76fdb243",
         "virtua": "^0.48.8",
         "workbox-precaching": "^7.4.0"
     },
