@@ -34,152 +34,7 @@
 #+end_src
 
 
-
-**** Timeline Queue
-
-This is our diff trigger method. On a diff returned from the Rust SDK
-It then takes the diff and tells reframe what to update the timeline
-to now display. This could be just *adding* a single message or swapping
-rooms.
-
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
-(defn apply-timeline-diffs-async! [room-id source updates]
-  (let [q-key [room-id source]]
-    (swap! !timeline-mutexes update q-key #(or % (p/resolved [])))
-    (swap! !timeline-mutexes
-           (fn [mutexes]
-             (update mutexes q-key
-                     (fn [prev-promise]
-                       (-> prev-promise
-                           (p/then (fn []
-                                     (let [current-events (get @!timeline-arrays q-key #js [])]
-                                       (apply-matrix-diffs current-events updates wrap-item))))
-                           (p/then (fn [next-events]
-                                     (swap! !timeline-arrays assoc q-key next-events)
-                                     (worker/stream! {:type "timeline-diff"
-                                                      :room-id room-id
-                                                      :source source
-                                                      :events next-events})))
-                           (p/catch (fn [err] (log/error "Timeline Diff Panic:" err))))))))))
-#+end_src
-
-
-
-
-Something important to note is that for arbitrarily large rooms we should instead
-not load the read receipts. It will cause non-negligible performance issues.
-****** TODO Check room size before loading timeline and flip read receipts based on member count
-
-#+begin_src javascript
-export enum TimelineFilter_Tags {
-    All = "All",
-    OnlyMessage = "OnlyMessage",
-    EventTypeFilter = "EventTypeFilter"
-}
-
-
-export enum TimelineFocus_Tags {
-    Live = "Live",
-    Event = "Event",
-    Thread = "Thread",
-    PinnedEvents = "PinnedEvents"
-}
-
-export enum DateDividerMode {
-    Daily,
-    Monthly
-}
-
-#+end_src
-
-
-
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
-(defmulti focus (fn [{:keys [type]}] type))
-(defmethod focus :event [{:keys [id count]}] (new (.. sdk -TimelineFocus -Event) #js {:eventId id :numEventsToLoad count}))
-(defmethod focus :live [{:keys [threaded?]}] (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents threaded?}))
-
-(defn create-timeline-config [focus-obj track-receipts]
-  (.create TimelineConfiguration
-           #js {:focus focus-obj
-                :filter (new (.. sdk -TimelineFilter -All))
-                :dateDividerMode (.-Daily sdk/DateDividerMode)
-                :trackReadReceipts track-receipts
-                :reportUtds false
-                :internalIdPrefix js/undefined}))
-
-(defn boot-timeline! [{:keys [source room room-id focus-obj track-receipts paginate-amount]}]
-  (worker/stream! {:type "timeline-loading" :room-id room-id :loading? true})
-  (-> (p/let [config (create-timeline-config focus-obj track-receipts)
-              tl     (.timelineWithConfiguration room config)]
-        (let [is-live? (= source :live)
-              handle   (.addListener tl #js {:onUpdate #(apply-timeline-diffs-async! room-id source %)})
-              t-handle (when is-live?
-                         (.subscribeToTypingNotifications room #js {:call #(worker/stream! {:type "typing-update" :room-id room-id :users (js->clj %)})}))
-              p-handle (when is-live?
-                         (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))]
-          (swap! !active-timelines assoc-in [room-id source]
-                 {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
-          (when (:forward paginate-amount) (.paginateForwards tl (:forward paginate-amount)))
-          (-> (.paginateBackwards tl (:back paginate-amount))
-              (p/then #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))
-              (p/catch #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false})))))
-      (p/catch #(log/error source "boot failed:" %))))
-
-(worker/register :boot-timeline
-  (fn [{:keys [room-id]}]
-    (go
-      (if-let [room (.getRoom @state/!client room-id)]
-        (try
-          (let [latest-event (<p! (.latestEvent room))
-                event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))]
-            (if event-id
-              (do
-                (boot-timeline! {:source :focused :room room :room-id room-id
-                                 :focus-obj (focus {:type :event :id event-id :count 40})
-                                 :track-receipts false :paginate-amount {:back 25}})
-                (boot-timeline! {:source :live :room room :room-id room-id
-                                 :focus-obj (focus {:type :live :threaded? false})
-                                 :track-receipts true :paginate-amount {:back 50}})
-                {:status :success})
-              (do
-                (boot-timeline! {:source :live :room room :room-id room-id
-                                 :focus-obj (focus {:type :live :threaded? false})
-                                 :track-receipts true :paginate-amount {:back 25}})
-                {:status :success})))
-          (catch :default e
-            {:status :error :msg (str e)}))
-        {:status :error :msg "Room not found"}))))
-
-(worker/register :cleanup-timeline
-  (fn [{:keys [room-id]}]
-    (when-let [room-subs (get @!active-timelines room-id)]
-      (doseq [source (keys room-subs)]
-        (let [{:keys [handle t-handle p-handle]} (get room-subs source)]
-          (some-> handle .cancel)
-          (some-> t-handle .cancel)
-          (some-> p-handle .cancel))))
-    (swap! !active-timelines dissoc room-id)
-    (swap! !timeline-arrays dissoc [room-id :live] [room-id :focused])
-    {:status :success}))
-
-(worker/register :paginate-timeline
-                 (fn [{:keys [room-id direction amount]}]
-                   (go
-                     (if-let [tl (or (get-in @!active-timelines [room-id :live :timeline])
-                                     (get-in @!active-timelines [room-id :focused :timeline]))]
-                       (try
-                         (if (= direction "back")
-                           (<p! (.paginateBackwards tl amount js/undefined))
-                           (<p! (.paginateForwards tl amount js/undefined)))
-                         {:status :success}
-                         (catch :default e
-                           {:status :error :msg (str e)}))
-                       {:status :error :msg "Timeline not found"}))))
-#+end_src
-
-
-**** Reifying a Rust Timeline Item object
+**** Wrap Rust for ClojureScript Map
 
 So this isn't dissimilar to room-summary... Effectively we're pulling
 the Rust object a part and creating a Clojure map from it.
@@ -325,19 +180,174 @@ help anyone later who wants to make changes to aspects of the timeline.
 #+end_src
 
 
+
+
+**** Timeline Queue
+
+This is our diff trigger method. On a diff returned from the Rust SDK
+It then takes the diff and tells reframe what to update the timeline
+to now display. This could be just *adding* a single message or swapping
+rooms.
+
+#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+(defn apply-timeline-diffs-async! [room-id source updates]
+  (let [q-key [room-id source]]
+    (swap! !timeline-mutexes update q-key #(or % (p/resolved [])))
+    (swap! !timeline-mutexes
+           (fn [mutexes]
+             (update mutexes q-key
+                     (fn [prev-promise]
+                       (-> prev-promise
+                           (p/then (fn []
+                                     (let [current-events (get @!timeline-arrays q-key #js [])]
+                                       (apply-matrix-diffs current-events updates wrap-item))))
+                           (p/then (fn [next-events]
+                                     (swap! !timeline-arrays assoc q-key next-events)
+                                     (worker/stream! {:type "timeline-diff"
+                                                      :room-id room-id
+                                                      :source source
+                                                      :events next-events})))
+                           (p/catch (fn [err] (log/error "Timeline Diff Panic:" err))))))))))
+#+end_src
+
+
+
+
+Something important to note is that for arbitrarily large rooms we should instead
+not load the read receipts. It will cause non-negligible performance issues.
+****** TODO Check room size before loading timeline and flip read receipts based on member count
+
+#+begin_src javascript
+export enum TimelineFilter_Tags {
+    All = "All",
+    OnlyMessage = "OnlyMessage",
+    EventTypeFilter = "EventTypeFilter"
+}
+
+
+export enum TimelineFocus_Tags {
+    Live = "Live",
+    Event = "Event",
+    Thread = "Thread",
+    PinnedEvents = "PinnedEvents"
+}
+
+export enum DateDividerMode {
+    Daily,
+    Monthly
+}
+
+#+end_src
+
+
+
+#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+(defmulti focus (fn [{:keys [type]}] type))
+(defmethod focus :event [{:keys [id count]}] (new (.. sdk -TimelineFocus -Event) #js {:eventId id :numEventsToLoad count}))
+(defmethod focus :live [{:keys [threaded?]}] (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents threaded?}))
+
+(defn create-timeline-config [focus-obj track-receipts]
+  (.create TimelineConfiguration
+           #js {:focus focus-obj
+                :filter (new (.. sdk -TimelineFilter -All))
+                :dateDividerMode (.-Daily sdk/DateDividerMode)
+                :trackReadReceipts track-receipts
+                :reportUtds false
+                :internalIdPrefix js/undefined}))
+
+(defn boot-timeline! [{:keys [source room room-id focus-obj track-receipts paginate-amount]}]
+  (worker/stream! {:type "timeline-loading" :room-id room-id :loading? true})
+  (-> (p/let [config (create-timeline-config focus-obj track-receipts)
+              tl     (.timelineWithConfiguration room config)]
+        (let [is-live? (= source :live)
+              handle   (.addListener tl #js {:onUpdate #(apply-timeline-diffs-async! room-id source %)})
+              t-handle (when is-live?
+                         (.subscribeToTypingNotifications room #js {:call #(worker/stream! {:type "typing-update" :room-id room-id :users (js->clj %)})}))
+              p-handle (when is-live?
+                         (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))]
+          (swap! !active-timelines assoc-in [room-id source]
+                 {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
+          (when (:forward paginate-amount) (.paginateForwards tl (:forward paginate-amount)))
+          (-> (.paginateBackwards tl (:back paginate-amount))
+              (p/then #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))
+              (p/catch #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false})))))
+      (p/catch #(log/error source "boot failed:" %))))
+
+(worker/register :boot-timeline
+  (fn [{:keys [room-id]}]
+    (go
+      (if-let [room (.getRoom @state/!client room-id)]
+        (try
+          (let [
+                ;;latest-event (<p! (.latestEvent room))
+                ;;event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))
+                ]
+;;            (if event-id
+              (do
+  #_              (boot-timeline! {:source :focused :room room :room-id room-id
+                                 :focus-obj (focus {:type :event :id event-id :count 40})
+                                 :track-receipts false :paginate-amount {:back 25}})
+                (boot-timeline! {:source :live :room room :room-id room-id
+                                 :focus-obj (focus {:type :live :threaded? false})
+                                 :track-receipts 0 :paginate-amount {:back 25}})
+                {:status :success})
+#_              (do
+                (boot-timeline! {:source :live :room room :room-id room-id
+                                 :focus-obj (focus {:type :live :threaded? false})
+                                 :track-receipts true :paginate-amount {:back 25}})
+                {:status :success}))
+          ;;)
+          (catch :default e
+            {:status :error :msg (str e)}))
+        {:status :error :msg "Room not found"}))))
+
+(worker/register :cleanup-timeline
+  (fn [{:keys [room-id]}]
+    (when-let [room-subs (get @!active-timelines room-id)]
+      (doseq [source (keys room-subs)]
+        (let [{:keys [handle t-handle p-handle]} (get room-subs source)]
+          (some-> handle .cancel)
+          (some-> t-handle .cancel)
+          (some-> p-handle .cancel))))
+    (swap! !active-timelines dissoc room-id)
+    (swap! !timeline-arrays dissoc [room-id :live] [room-id :focused])
+    {:status :success}))
+
+(worker/register :paginate-timeline
+                 (fn [{:keys [room-id direction amount]}]
+                   (go
+                     (if-let [tl (or (get-in @!active-timelines [room-id :live :timeline])
+                                     (get-in @!active-timelines [room-id :focused :timeline]))]
+                       (try
+                         (if (= direction "back")
+                           (<p! (.paginateBackwards tl amount js/undefined))
+                           (<p! (.paginateForwards tl amount js/undefined)))
+                         {:status :success}
+                         (catch :default e
+                           {:status :error :msg (str e)}))
+                       {:status :error :msg "Timeline not found"}))))
+#+end_src
+
+
+
 **** Reactions
 
 #+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
 
+
+;; we should probably check why event-id is coming as a clojure map...
 (worker/register :toggle-reaction
-  (fn [{:keys [room-id event-id emoji]}]
-    (go
-      (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
-        (try
-          (<p! (.toggleReaction tl event-id emoji))
-          {:status :success}
-          (catch :default e {:status :error :msg (str e)}))
-        {:status :error :msg "Timeline not found"}))))
+                 (fn [{:keys [room-id event-id emoji]}]
+                   (go
+                     (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
+                       (try
+                         (log/error event-id)
+                         (log/error (.toggleReaction tl (clj->js event-id) emoji))
+                         (<p! (.toggleReaction tl event-id emoji))
+                         {:status :success}
+                         (catch :default e {:status :error :msg (str e)}))
+                       {:status :error :msg "Timeline not found"}))))
+
 
 (worker/register :toggle-pin
   (fn [{:keys [room-id msg-id]}]
