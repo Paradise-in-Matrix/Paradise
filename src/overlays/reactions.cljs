@@ -4,6 +4,8 @@
  [utils.global-ui :refer [avatar]]
  [utils.helpers :refer [mxc->url]]
  [re-frame.core :as re-frame]
+ [clojure.string :as str]
+ [taoensso.timbre :as log]
  [input.emotes :refer [emoji-sticker-board]]
  [overlays.base :refer [modal-component popover-component]]))
 
@@ -23,7 +25,7 @@
        ^{:key emoji}
        [:div.reaction-detail-row
         [:div.reaction-detail-icon
-         (if (clojure.string/starts-with? emoji "mxc://")
+         (if (str/starts-with? emoji "mxc://")
            [:img.reaction-detail-img
             {:src (mxc->url emoji {:width 40 :height 40 :method "crop"})}]
            [:span emoji])]
