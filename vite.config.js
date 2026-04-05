@@ -116,13 +116,14 @@ export default defineConfig(({ mode }) => {
 
         optimizeDeps: {
             include: ["react", "react-dom"],
-            esbuildOptions: {
-                target: "es2022",
-            },
+            exclude: ["ffi-bindings", "uniffi-bindgen-react-native"],
         },
         build: {
             target: "es2022",
             outDir: "../dist",
+            commonjsOptions: {
+                transformMixedEsModules: true,
+            },
             terserOptions: {
                 keep_classnames: true,
                 keep_fnames: true,
