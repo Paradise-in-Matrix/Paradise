@@ -48,6 +48,20 @@ export default defineConfig(({ mode }) => {
         root: "./build",
         plugins: [
             wasm(),
+
+            commonjs({
+                filter(id) {
+                    if (
+                        id.includes("uniffi-bindgen-react-native") ||
+                        id.includes("ffi-bindings")
+                    ) {
+                        return true;
+                    }
+                    return false;
+                },
+            }),
+            //  topLevelAwait(),
+
             viteStaticCopy(copyFiles),
             VitePWA({
                 strategies: "injectManifest",
