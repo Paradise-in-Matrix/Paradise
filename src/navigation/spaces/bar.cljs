@@ -81,7 +81,7 @@
                       [[:sdk/paginate-space space-id]
                        [:sdk/fetch-room-emotes :space space-id]
                        [:sdk/fetch-space-hierarchy space-id]
-                       [:room-list/apply-filter "all"]]
+                       ]
                       [[:room-list/apply-filter "people"]])}))))
 
 
