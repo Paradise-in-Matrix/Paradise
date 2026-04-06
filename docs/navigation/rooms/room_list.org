@@ -450,7 +450,7 @@ Now the CSS for the filter is relatively simple
 .filter-bar {
     display: flex;
     gap: 8px;
-    padding: 10px 16px;
+    padding: 10px;
     background-color: #2b2d31;
     border-bottom: 1px solid #1e1f22;
     overflow-x: auto;
