@@ -48,7 +48,6 @@ hand we have the home-server and the token used too.
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
 (defonce active-sessions (atom {}))
 (defonce session-resolvers (atom []))
-(def MAX_CACHE_ITEMS 50)
 (def MAX_CACHE_ITEMS 300)
 (def cache-name "matrix-media-v1")
 (cleanupOutdatedCaches)
