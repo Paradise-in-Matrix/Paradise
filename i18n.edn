@@ -13,7 +13,8 @@
     :search  "Search"
     :pins    "Pins"}
    :timeline
-   {:item
+   {
+    :item
     {:react "Add Reaction"
      :reply "Reply"
      :edit-message "Edit Message"
@@ -24,6 +25,7 @@
      :source    "View Event"
      :delete    "Delete"
      :more      "More"}
+    :no-room "Select a room to start chatting."
     :loading "Loading..."
     :return-to-live "Return to Live"
     :jump-to-bottom "Jump to Bottom"
@@ -212,6 +214,7 @@
      :source    "Ut labore"
      :delete    "Et dolore"
      :more      "Magna"}
+    :no-room "Quis nostrud exercitation."
     :loading "Aliqua..."
     :return-to-live "Ut enim ad"
     :jump-to-bottom "Minim veniam"
