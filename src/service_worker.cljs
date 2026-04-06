@@ -118,9 +118,9 @@
 
 
 
-#_(js/self.addEventListener "install"
+(js/self.addEventListener "install"
   (fn [event]
-    (.skipWaiting js/self)))
+    #_(.skipWaiting js/self)))
 
 (js/self.addEventListener "activate"
   (fn [event]
@@ -224,7 +224,7 @@
         (when (= unread-count 0)
           (.clearAppBadge js/navigator))))
 
-    (p/let [;icon-url (fetch-avatar-url hs-url token avatar-mxc)
+    (p/let [icon-url (fetch-avatar-url hs-url token avatar-mxc)
             ]
       (.showNotification js/self.registration title
         #js {:body   body
