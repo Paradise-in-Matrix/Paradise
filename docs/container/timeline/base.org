@@ -541,7 +541,7 @@ list for use cases like this either.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defn virtualized-timeline [initial-room-id]
-  (r/with-let [!virtua-ref    (atom nil)
+  (r/with-let [!virtua-ref    (r/atom nil)
                set-virtua-ref #(reset! !virtua-ref %)
 
                !at-bottom?    (r/atom true)
