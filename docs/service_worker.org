@@ -465,7 +465,7 @@ logic that is to be used from the main application itself.
 
 ***** Deleting Old Caches
 
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
 (re-frame/reg-event-fx
  :app/clear-cache-for-update
  (fn [_ _]
