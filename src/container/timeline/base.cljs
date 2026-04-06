@@ -364,7 +364,7 @@
 (defn virtualized-timeline [initial-room-id]
   (r/with-let [!virtua-ref    (r/atom nil)
                set-virtua-ref #(reset! !virtua-ref %)
-
+               !current-room  (r/atom initial-room-id)
                !at-bottom?    (r/atom true)
                !show-jump?    (r/atom false)
                !prev-first-id (atom nil)
@@ -372,8 +372,15 @@
                !initialized?  (r/atom false)
                !scroll-timer  (atom nil)]
 
-
     (fn [room-id]
+      (when (not= room-id @!current-room)
+        (reset! !current-room room-id)
+        (reset! !initialized? false)
+        (reset! !prev-first-id nil)
+        (reset! !prev-last-id nil)
+        (reset! !at-bottom? true)
+        (reset! !show-jump? false))
+
       (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
             event-array      (to-array events)
             cnt              (count event-array)
@@ -394,10 +401,10 @@
                                            (not= current-last-id @!prev-last-id)
                                            (not did-prepend?)))
 
-            do-jump! (fn []
-                       (if focus-mode?
-                         (re-frame/dispatch [:room/jump-to-live-bottom room-id])
-                         (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))))]
+            do-jump!         (fn []
+                               (if focus-mode?
+                                 (re-frame/dispatch [:room/jump-to-live-bottom room-id])
+                                 (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))))]
 
         (reset! !prev-first-id current-first-id)
         (reset! !prev-last-id current-last-id)
@@ -412,7 +419,8 @@
             (js/setTimeout #(do
                               (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
                               (reset! !initialized? true))
-                           10)))
+                           300)))
+
         (when (and @!initialized?
                    @!at-bottom?
                    new-msg-arrived?
