@@ -10,15 +10,33 @@
    [cljs.core.async :refer [go <!]]))
 
 (re-frame/reg-event-fx
+ :app/apply-update
+ (fn [_ _]
+   (if (exists? js/navigator.serviceWorker)
+     (-> (.getRegistration js/navigator.serviceWorker)
+         (.then (fn [reg]
+                  (let [waiting-sw (.-waiting reg)]
+                    (if waiting-sw
+                      (do
+                        (log/info "Telling new SW to activate...")
+                        (.postMessage waiting-sw #js {:type "SKIP_WAITING"}))
+                      (do
+                        (log/info "No waiting SW found, hard reloading...")
+                        (.reload js/window.location true)))))))
+     (.reload js/window.location true))
+   {}))
+
+(re-frame/reg-event-fx
  :app/clear-cache-for-update
  (fn [_ _]
    (log/warn "Purging all caches and service workers...")
-   (p/let [cache-keys (js/caches.keys)
-           _ (p/all (map #(js/caches.delete %) cache-keys))
+   (p/let [cache-keys (.keys js/caches)
+           _ (p/all (map #(.delete js/caches %) cache-keys))
            regs (.getRegistrations js/navigator.serviceWorker)
            _ (p/all (map #(.unregister %) regs))]
-          (.reload js/window.location true))
+     (.reload js/window.location true))
    {}))
+
 
 (defn register-sw! []
   (when (exists? js/navigator.serviceWorker)
