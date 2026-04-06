@@ -185,7 +185,196 @@
     :enable-btn "Enable Push Notifications"}
    :profile
    {:title "My Account"
-    :unknown-user "Unknown User"}}}}
+    :unknown-user "Unknown User"}}}
+ :lorem
+ {:container
+  {:jump-to-message "Lorem ad ipsum"
+   :search
+   {:loading "Ipsum dolor..."
+    :no-results "Lorem ipsum sit amet."
+    :initial "Consectetur adipiscing elit"
+    :placeholder "Sed do eiusmod..."}
+
+   :panels
+   {:members "Lorem"
+    :threads "Ipsum"
+    :search  "Dolor"
+    :pins    "Amet"}
+   :timeline
+   {:item
+    {:react "Lorem ipsum"
+     :reply "Dolor"
+     :edit-message "Sit amet"
+     :start-thread "Consectetur adipiscing"
+     :copy-text "Elit sed"
+     :copy-link "Do eiusmod"
+     :pin       "Tempor incididunt"
+     :source    "Ut labore"
+     :delete    "Et dolore"
+     :more      "Magna"}
+    :loading "Aliqua..."
+    :return-to-live "Ut enim ad"
+    :jump-to-bottom "Minim veniam"
+    :status
+    {:redacted "Quis nostrud exercitation."
+     :decryption-error "Ullamco laboris nisi ut."
+     :unknown-kind "Aliquip ex ea commodo: %1"
+     :unknown-event "Consequat duis aute: %1"
+     :edited "(lorem)"
+     :unsupported "Irure dolor in: %1"
+     :membership "%1 reprehenderit in."
+     :profile "%1 voluptate velit."
+     :reply-loading "Esse cillum dolore..."
+     :media-preview "Eu fugiat nulla"
+     :timeline-separator "Pariatur excepteur"
+     :file-download "Sint occaecat"
+     :typing
+     {:one "%1 cupidatat non..."
+      :two "%1 et %2 proident..."
+      :three "%1, %2, et %3 sunt in..."
+      :many "%1, %2, et %3 culpa qui..."}
+     :reading
+     {:one "%1 officia deserunt mollit"
+      :two "%1 et %2 anim id"
+      :three "%1, %2, et %3 est laborum"
+      :many "%1, %2, et %3 dolor fuga"}}}
+
+   :calls
+   {:main-iframe "Perspiciatis unde omnis iste"
+    :backup-iframe "Natus error sit voluptatem"}
+   :members
+   {:search-placeholder "Akusantium doloremque..."
+    :loading "Laudantium totam..."
+    :no-results "Rem aperiam eaque"
+    :filter {:joined "Ipsa (%1)"
+             :invited "Quae (%1)"
+             :left "Ab illo (%1)"
+             :banned "Inventore (%1)"}
+    :sort {:role "Veritatis: Et"
+           :name "Quasi: Architecto"
+           :latest "Beatae: Vitae"}}
+   :member-actions
+   {:view-profile "Dicta sunt"
+    :mention "Explicabo @%1"
+    :message "Nemo enim"
+    :kick "Ipsam voluptatem"}
+   :header
+   {:join-call "Quia voluptas"
+    :start-call "Sit aspernatur"
+    :room-chat "Aut odit"
+    :search "Aut fugit"
+    :pinned-messages "Sed quia"
+    :member-list "Consequuntur magni"
+    :more-options "Dolores eos"}}
+  :auth
+  {:welcome "Qui ratione voluptatem."
+   :subtitle "Sequi nesciunt neque."
+   :continue-as "Porro quisquam:"
+   :divider "— est qui dolorem —"
+   :labels {:homeserver "Ipsum"
+            :username "Quia"
+            :password "Dolor"}
+   :actions {:login "Sit"
+             :logging-in "Amet..."
+             :register "Consectetur"}
+   :footer-text "Adipisci velit? "}
+  :composer
+  {:replying-to "Sed quia non %1"
+   :uploading "Numquam eius..."
+   :upload-tooltip "Modi tempora incidunt"
+   :placeholder "Ut labore et..."
+   :emotes
+   {:no-emotes "Dolore magnam aliquam quaerat."
+    :default-title "Voluptatem"
+    :mode-inline "Ut enim"
+    :mode-sticker "Ad minima"}
+   :suggestions
+   {:no-results "Veniam quis nostrum"}}
+  :navigation
+  {:actions
+   {:mark-read "Exercitationem ullam"
+    :leave-space "Corporis suscipit"
+    :leave-room   "Laboriosam nisi"
+    :copy-link   "Ut aliquid"
+    :invite      "Ex ea"}
+   :room-list
+   {:room-settings "Commodi consequatur"
+    :view-chat "Quis autem vel"
+    :filters {:all "Eum"
+              :unread "Iure"
+              :people "Reprehenderit"}
+    :empty-states {:no-rooms "Qui in ea..."
+                   :no-results "Voluptate velit esse"}
+    :headers {:home "Quam nihil"}}
+   :spaces
+   {:bars {:home "Molestiae"}}}
+
+  :lightbox
+  {:open-original "Consequatur illum"
+   :download "Qui dolorem"
+   :close "Eum fugiat"}
+  :boot
+  {:loading-text "Quo voluptas nulla"
+   :preparing "Pariatur at vero..."
+   :fetching "Eos et accusamus..."}
+  :settings
+  {:tabs {:my-account "Iusto odio"
+          :verification "Dignissimos"
+          :accounts "Ducimus"
+          :notifications "Blanditiis"
+          :language-time "Praesentium"
+          :about "Voluptatum"}
+   :groups {:user-settings "Deleniti atque"
+            :app "Corrupti"}
+   :modal {:esc "QWE"
+           :tab-not-found "Quos dolores et"}
+   :context-menu
+   {:set-status "Quas molestias"
+    :copy-id "Excepturi sint"
+    :logout "Occaecati"}
+   :verification
+   {:title "Cupiditate non"
+    :description "Provident similique sunt in culpa qui officia deserunt mollitia animi id est laborum et dolorum."
+    :status {:success-title "Fuga et harum"
+             :success-subtitle "Quidem rerum facilis est et expedita distinctio nam."
+             :is-verifying "Libero tempore..."
+             :verify-action "Cum soluta"}
+    :form {:label "Nobis est eligendi"
+           :placeholder "Optio cumque nihil..."
+           :error-prefix "Impedit: "}}
+   :language-time
+   {:today "Facere"
+    :yesterday "Possimus"
+    :title "Omnis voluptas"
+    :description "Assumenda est omnis dolor repellendus temporibus autem."
+    :system-label "Quibusdam et"
+    :time-label "Aut officiis"
+    :time-24 "Debitis aut (13:00)"
+    :time-12 "Rerum necessitatibus (1:00 PM)"}
+   :about
+   {:title "Saepe eveniet"
+    :description "%1 voluptates repudiandae sint et molestiae non recusandae itaque earum rerum."
+    :updates-title "Hic tenetur"
+    :updates-desc "A sapiente delectus ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis."
+    :check-updates "Doloribus asperiores repellat"}
+   :accounts
+   {:title "Ipsam voluptatem"
+    :description "Quia voluptas sit aspernatur aut odit aut fugit sed quia."
+    :empty-state "Consequuntur magni dolores eos."
+    :add-account "Qui ratione"}
+   :account-item
+   {:active-status "● Nesciunt"
+    :switch-button "Neque"}
+   :notifications
+   {:title "Porro quisquam"
+    :description "Est qui dolorem ipsum quia dolor sit amet consectetur adipisci velit sed quia non."
+    :status {:active-title "Numquam eius modi"
+             :active-subtitle "Tempora incidunt ut labore et dolore magnam aliquam quaerat."}
+    :enable-btn "Voluptatem ut enim ad"}
+   :profile
+   {:title "Minima veniam"
+    :unknown-user "Quis nostrum"}}}}
+ }
 
 
 
