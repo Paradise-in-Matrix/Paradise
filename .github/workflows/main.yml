@@ -29,10 +29,6 @@ jobs:
             exit 1
           fi
 
-      - name: Update config.edn
-        run: |
-          sed -i -E 's/:version "[^"]+"/:version "${{ env.PKG_VERSION }}"/' config.edn
-
       - name: Create Git Tag
         run: |
           git config user.name "github-actions[bot]"
