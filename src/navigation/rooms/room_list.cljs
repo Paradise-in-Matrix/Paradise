@@ -257,6 +257,7 @@
                            (assoc-in [:ui :main-focus] new-focus))
              dispatches (remove nil?
                                 [(when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
+                                 [:sdk/cleanup-timeline current-room-id]
                                  [:sdk/boot-timeline room-id]
                                  (when (not (or already-loaded? loading?)) [:room/fetch-members room-id])
                                  [:sdk/fetch-room-emotes :room room-id]
