@@ -182,19 +182,27 @@
                parts))))))
 
 
-(defn format-divider-date [tr ts]
-  (let [date (js/Date. ts)
-        today (js/Date.)
-        is-today (= (.toDateString date) (.toDateString today))
-        yesterday (doto (js/Date.) (.setDate (- (.getDate today) 1)))
+(defn format-divider-date [ts]
+  (let [date         (js/Date. ts)
+        today        (js/Date.)
+        is-today     (= (.toDateString date) (.toDateString today))
+
+        yesterday    (doto (js/Date.) (.setDate (- (.getDate today) 1)))
         is-yesterday (= (.toDateString date) (.toDateString yesterday))]
+
     (cond
-      is-today (tr [:settings.language-time/today])
-      is-yesterday (tr [:settings.language-time/yesterday])
-      :else (.toLocaleDateString date js/undefined
-                                 #js {:month "long"
-                                      :day "numeric"
-                                      :year "numeric"}))))
+      is-today
+      (.format (js/Intl.RelativeTimeFormat. js/undefined #js {:numeric "auto"}) 0 "day")
+
+      is-yesterday
+      (.format (js/Intl.RelativeTimeFormat. js/undefined #js {:numeric "auto"}) -1 "day")
+
+      :else
+      (.toLocaleDateString date js/undefined
+                           #js {:month "long"
+                                :day "numeric"
+                                :year "numeric"}))))
+
 
 (defn format-time [ts]
   (when ts
