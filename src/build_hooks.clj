@@ -1,5 +1,6 @@
 (ns build-hooks
   (:require [clojure.java.io :as io]
+            [clojure.edn :as edn]
             [clojure.string :as str]))
 
 (defn copy-wasm
@@ -104,4 +105,17 @@
                 (clojure.java.io/copy f dest-file)))))
         (println "--- Element Call Bridge (Full Dist) copied to build/element-call ---"))
       (println "!!! Warning: Element Call source not found in node_modules !!!"))
+    build-state))
+
+(defn stamp-version
+  {:shadow.build/stage :configure}
+  [build-state & _]
+  (let [pkg-json    (slurp "package.json")
+        version     (second (re-find #"\"version\"\s*:\s*\"([^\"]+)\"" pkg-json))
+        config-path "config.edn"
+        config      (try (edn/read-string (slurp config-path))
+                         (catch Exception _ {}))
+        updated     (assoc config :version version)]
+    (spit config-path (pr-str updated))
+    (println (str "Stamped config.edn with version " version))
     build-state))
