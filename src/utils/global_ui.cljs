@@ -127,12 +127,10 @@
   (r/with-let [handle-keyup (fn [e] (when (= (.-key e) "Escape") (on-close)))
                _ (.addEventListener js/window "keyup" handle-keyup)]
     [:div.modal-backdrop
-     (merge {:class "settings-backdrop"
-             :on-click on-close}
+     (merge {:on-click on-close}
             backdrop-props)
      (into [:div.modal-window
-            (merge {:class "settings-window"
-                    :on-click #(.stopPropagation %)}
+            (merge {:on-click #(.stopPropagation %)}
                    window-props)]
            children)]
     (finally
@@ -143,7 +141,7 @@
   (when is-open?
     [modal-inner props children]))
 
-  (defn modal-root []
+(defn modal-root []
   (let [active-modal @(re-frame/subscribe [:ui/active-modal])]
     (when active-modal
       (let [{:keys [id props]} active-modal
