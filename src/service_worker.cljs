@@ -7,6 +7,7 @@
 (defonce session-resolvers (atom []))
 (def MAX_CACHE_ITEMS 50)
 (def cache-name "matrix-media-v1")
+(cleanupOutdatedCaches)
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
   (precacheAndRoute manifest))
 
@@ -234,7 +235,6 @@
 
 (js/self.addEventListener "push"
   (fn [event]
-    (log/error "Fake error")
     (let [data (try (.. event -data json) (catch :default _ nil))]
       (when data
         (let [user-id (.-user_id data)]
@@ -259,11 +259,3 @@
               (.postMessage tab #js {:type "NAVIGATE_TO_ROOM"
                                      :room_id room-id}))
             (.openWindow js/self.clients "/")))))))
-
-
-
-
-;; Bloop
-
-
-
