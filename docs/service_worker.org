@@ -237,9 +237,9 @@ For any other browser fetch we want to simply return it back to the browser to h
 The install event is the first event in the lifecycle of a service worker.
 Once this goes off the service worker starts to come alive.
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
-#_(js/self.addEventListener "install"
+(js/self.addEventListener "install"
   (fn [event]
-    (.skipWaiting js/self)))
+    #_(.skipWaiting js/self)))
 #+end_src
 
 
@@ -382,7 +382,7 @@ this functional first.
         (when (= unread-count 0)
           (.clearAppBadge js/navigator))))
 
-    (p/let [;icon-url (fetch-avatar-url hs-url token avatar-mxc)
+    (p/let [icon-url (fetch-avatar-url hs-url token avatar-mxc)
             ]
       (.showNotification js/self.registration title
         #js {:body   body
