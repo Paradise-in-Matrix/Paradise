@@ -84,19 +84,13 @@ each of these later.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (re-frame/reg-sub
- :timeline/has-gap?
- (fn [db [_ room-id]]
-   (let [focused-data (get-in db [:timeline-data room-id :focused] [])
-         live-data    (get-in db [:timeline-data room-id :live] [])]
-     (check-timeline-gap focused-data live-data))))
-
-(re-frame/reg-sub
  :timeline/raw-events
  (fn [db [_ room-id]]
    (let [focused-data (get-in db [:timeline-data room-id :focused] [])
          live-data    (get-in db [:timeline-data room-id :live] [])
-         has-gap?     (check-timeline-gap focused-data live-data)]
-     (if has-gap?
+         has-gap?     live-data]
+     live-data
+     #_(if has-gap?
        focused-data
        (concat focused-data live-data)))))
 
@@ -105,19 +99,23 @@ each of these later.
  (fn [db [_ room-id source new-raw-events]]
    (assoc-in db [:timeline-data room-id source] new-raw-events)))
 
+
+
 (re-frame/reg-sub
  :timeline/sorted-events
  (fn [[_ active-room]]
    (re-frame/subscribe [:timeline/raw-events active-room]))
  (fn [raw-events _]
-   (deduplicate-events raw-events)))
+   raw-events
+   ))
 
 (re-frame/reg-sub
  :timeline/current-events
  (fn [[_ active-room]]
    (re-frame/subscribe [:timeline/sorted-events active-room]))
  (fn [sorted-events]
-   (enrich-timeline-items sorted-events)))
+   (enrich-timeline-items sorted-events)
+   ))
 
 (re-frame/reg-sub
  :timeline/events-map
