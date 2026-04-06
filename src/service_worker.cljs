@@ -234,6 +234,7 @@
 
 (js/self.addEventListener "push"
   (fn [event]
+    (log/error "Fake error")
     (let [data (try (.. event -data json) (catch :default _ nil))]
       (when data
         (let [user-id (.-user_id data)]
@@ -258,3 +259,11 @@
               (.postMessage tab #js {:type "NAVIGATE_TO_ROOM"
                                      :room_id room-id}))
             (.openWindow js/self.clients "/")))))))
+
+
+
+
+;; Bloop
+
+
+
