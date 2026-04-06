@@ -1,7 +1,6 @@
 (ns utils.macros
   (:require [clojure.java.io :as io]
-            [clojure.edn :as edn
-            ]))
+            [clojure.edn :as edn]))
 
 (defmacro ocall
   [obj method & args]
