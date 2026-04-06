@@ -70,6 +70,7 @@ hand we have the home-server and the token used too.
                          (= msg-type "SKIP_WAITING")
                          (do
                            (js/console.log "SW: Received SKIP_WAITING, taking control...")
+                           (js/console.log config)
                            (.skipWaiting js/self))
 
                          (= msg-type "SET_SESSION")
