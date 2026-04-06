@@ -493,7 +493,7 @@
             [timeline-loading-overlay])
 
           (if (zero? cnt)
-            [timeline-empty-state]
+            [timeline-empty-state room-id]
             (into [:> Virtualizer
                    {:ref set-virtua-ref
                     :shift did-prepend?}]
