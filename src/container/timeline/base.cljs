@@ -513,7 +513,6 @@
          (when (and @!show-jump? (not @!at-bottom?))
            [timeline-jump-button do-jump! focus-mode?])]))))
 
-
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
         room-meta    @(re-frame/subscribe [:rooms/active-metadata])
