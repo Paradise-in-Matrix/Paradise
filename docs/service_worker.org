@@ -59,17 +59,24 @@ hand we have the home-server and the token used too.
 
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
 (.addEventListener js/self "message"
-  (fn [event]
-    (let [data (.-data event)
-          source-id (.. event -source -id)]
-      (when (= (.-type data) "SET_SESSION")
-        (let [session-data (:session (js->clj data :keywordize-keys true))
-              full-session (assoc session-data :client-id source-id)]
-          (swap! active-sessions assoc source-id full-session)
-          (js/console.log "SW: Session synced for" source-id)
-          (doseq [resolve-fn @session-resolvers]
-            (resolve-fn true))
-          (reset! session-resolvers []))))))
+                   (fn [event]
+                     (let [data      (.-data event)
+                           msg-type  (.-type data)
+                           source-id (.. event -source -id)]
+                       (cond
+                         (= msg-type "SKIP_WAITING")
+                         (do
+                           (js/console.log "SW: Received SKIP_WAITING, taking control...")
+                           (.skipWaiting js/self))
+
+                         (= msg-type "SET_SESSION")
+                         (let [session-data (:session (js->clj data :keywordize-keys true))
+                               full-session (assoc session-data :client-id source-id)]
+                           (swap! active-sessions assoc source-id full-session)
+                           (js/console.log "SW: Session synced for" source-id)
+                           (doseq [resolve-fn @session-resolvers]
+                             (resolve-fn true))
+                           (reset! session-resolvers []))))))
 #+end_src
 
 
@@ -227,7 +234,7 @@ For any other browser fetch we want to simply return it back to the browser to h
 The install event is the first event in the lifecycle of a service worker.
 Once this goes off the service worker starts to come alive.
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
-(js/self.addEventListener "install"
+#_(js/self.addEventListener "install"
   (fn [event]
     (.skipWaiting js/self)))
 #+end_src
@@ -456,6 +463,22 @@ logic that is to be used from the main application itself.
 #+end_src
 
 
+***** Deleting Old Caches
+
+#+begin_src clojurescript :tangle ../src/service_worker.cljs
+(re-frame/reg-event-fx
+ :app/clear-cache-for-update
+ (fn [_ _]
+   (log/warn "Purging all caches and service workers...")
+   (p/let [cache-keys (js/caches.keys)
+           _ (p/all (map #(js/caches.delete %) cache-keys))
+           regs (.getRegistrations js/navigator.serviceWorker)
+           _ (p/all (map #(.unregister %) regs))]
+          (.reload js/window.location true))
+   {}))
+#+end_src
+
+
 ***** Registering the Service Worker
 
 The major functionality we need is to register the service worker itself.
@@ -486,7 +509,7 @@ may immediately begin to render our images.
                                                       (not= (str remote-v) (str current-v))
                                                       (not= (str current-v) "0.0.0"))
                                              (log/info "SW Update: Version mismatch detected" remote-v "vs" current-v)
-                                             (re-frame/dispatch [:app/update-detected])))))
+                                             (re-frame/dispatch [:app/clear-cache-for-update])))))
                                (p/catch (fn [err]
                                           (log/error "SW Update: Failed to check version" err))))))
       (.addEventListener sw-container "message"
