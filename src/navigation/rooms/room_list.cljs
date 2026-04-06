@@ -273,9 +273,9 @@
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         active-filter @(re-frame/subscribe [:room-list/active-filter])]
     [:div.filter-bar
-     (for [[id label-key] [["all"    :navigation.room-list.filters/all]
+     (for [[id label-key] [["people" :navigation.room-list.filters/people]
                            ["unread" :navigation.room-list.filters/unread]
-                           ["people" :navigation.room-list.filters/people]]]
+                           ["other"    :navigation.room-list.filters/all] ]]
        ^{:key id}
        [:button.filter-btn
         {:class    (when (= active-filter id) "active")
