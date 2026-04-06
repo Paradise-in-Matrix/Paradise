@@ -298,15 +298,16 @@
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
       [:img {:src url :alt alt-text :loading "eager"
-             :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox {:url url}])
+             :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox
+                                            {:url url
+                                             :backdrop-props {:class "lightbox-backdrop"}
+                                             :window-props   {:style {:background "transparent"
+                                                                      :box-shadow "none"}}}
+                                            ])
              :style {:width "100%" :height "100%" :display "block" :object-fit "contain" :cursor "zoom-in"}}])]
    (when (seq (:caption content))
      [:div.media-caption
       [message-text content]])])
-
-
-
-
 
 (defn video-message [event content]
   [:div.video-attachment-container
