@@ -222,7 +222,6 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-
 (defn build-message-actions [tr item active-room current-user-id x y]
   (let [msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)
@@ -436,8 +435,6 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-
-
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
