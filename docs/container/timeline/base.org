@@ -558,40 +558,45 @@ list for use cases like this either.
             jump-target      @(re-frame/subscribe [:timeline/jump-target-id room-id])
             focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])
 
-            current-first-id (when (pos? cnt) (:id (aget event-array 0)))
-            current-last-id  (when (pos? cnt) (:id (aget event-array (dec cnt))))
+            real-events      (filter #(not= (:type %) :virtual) events)
+            current-first-id (:id (first real-events))
+            current-last-id  (:id (last real-events))
 
             did-prepend?     (boolean (and @!prev-first-id
                                            (not= current-first-id @!prev-first-id)
                                            (= current-last-id @!prev-last-id)))
 
+            new-msg-arrived? (boolean (and @!prev-last-id
+                                           (not= current-last-id @!prev-last-id)
+                                           (not did-prepend?)))
+
             do-jump! (fn []
                        (if focus-mode?
                          (re-frame/dispatch [:room/jump-to-live-bottom room-id])
-                         (some-> @!virtua-ref (.scrollToIndex (dec cnt)))))]
+                         (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))))]
+
+        (reset! !prev-first-id current-first-id)
+        (reset! !prev-last-id current-last-id)
 
         (when (and (not @!initialized?) (pos? cnt) @!virtua-ref)
           (let [target-idx (if jump-target
                              (let [idx (.findIndex event-array #(= (:id %) jump-target))]
                                (if (not= idx -1) idx (dec cnt)))
-                             (dec cnt))]
-            (some-> @!virtua-ref (.scrollToIndex target-idx))
+                             (dec cnt))
+                align-opt  (if jump-target #js {:align "center"} #js {:align "end"})]
+            (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
             (js/setTimeout #(do
-                              (some-> @!virtua-ref (.scrollToIndex target-idx))
+                              (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
                               (reset! !initialized? true))
                            10)))
-
         (when (and @!initialized?
                    @!at-bottom?
-                   (not= current-last-id @!prev-last-id)
-                   (not focus-mode?)
-                   (not did-prepend?))
+                   new-msg-arrived?
+                   (not focus-mode?))
           (js/requestAnimationFrame
-           (fn [] (some-> @!virtua-ref (.scrollToIndex (dec cnt))))))
-
-        (js/setTimeout #(do
-                          (reset! !prev-first-id current-first-id)
-                          (reset! !prev-last-id current-last-id)) 0)
+           (fn []
+             (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))
+             (js/setTimeout #(some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"})) 200))))
 
         [:div.virtua-timeline-wrapper
          {:style {:flex 1
@@ -614,8 +619,7 @@ list for use cases like this either.
                         (let [target           (.-currentTarget e)
                               scroll-top       (.-scrollTop target)
                               max-scroll       (- (.-scrollHeight target) (.-clientHeight target))
-                              dist-from-bottom (- max-scroll scroll-top)
-                              v-ref            @!virtua-ref]
+                              dist-from-bottom (- max-scroll scroll-top)]
                           (when-not @!scroll-timer
                             (reset! !scroll-timer
                                     (js/setTimeout
@@ -624,7 +628,10 @@ list for use cases like this either.
                                        (reset! !show-jump? (> dist-from-bottom 600))
                                        (reset! !at-bottom? (<= dist-from-bottom 10))
 
-                                       (when (and (<= scroll-top 500) (not loading?))
+                                       (when (and @!initialized?
+                                                  (> max-scroll 0)
+                                                  (<= scroll-top 500)
+                                                  (not loading?))
                                          (re-frame/dispatch [:sdk/back-paginate room-id]))
 
                                        (when (and focus-mode?
@@ -638,15 +645,14 @@ list for use cases like this either.
 
           (if (zero? cnt)
             [timeline-empty-state]
-
             (into [:> Virtualizer
-                   {:ref #(reset! !virtua-ref %)
+                   {:ref set-virtua-ref
                     :shift did-prepend?}]
                   (for [item event-array]
                     ^{:key (:id item)}
                     [:div.virtua-item-wrapper
                      {:style {:margin "0"
-                              :min-height "40px"
+                              :min-height "32px"
                               :width "100%"}}
                      [:div.timeline-item
                       {:class (when (= (:id item) jump-target) "is-jump-target")
@@ -689,7 +695,6 @@ received an update.
        [:<>
 ;;        ^{:key active-id}
         [virtualized-timeline active-id]
-        [jump-to-present-banner active-id]
         [message-input]
         [status-indicator active-id]])]))
 #+end_src
