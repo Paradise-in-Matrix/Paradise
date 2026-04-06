@@ -7,7 +7,8 @@
 (defonce active-sessions (atom {}))
 (defonce session-resolvers (atom []))
 (def MAX_CACHE_ITEMS 300)
-(def config (load-static-config "config.edn"))
+(def version "0.20.20")
+#_(def config (load-static-config "config.edn"))
 (def cache-name "matrix-media-v1")
 (cleanupOutdatedCaches)
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
@@ -22,7 +23,6 @@
                          (= msg-type "SKIP_WAITING")
                          (do
                            (js/console.log "SW: Received SKIP_WAITING, taking control...")
-                           (js/console.log config)
                            (.skipWaiting js/self))
 
                          (= msg-type "SET_SESSION")
