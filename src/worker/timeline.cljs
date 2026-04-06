@@ -227,14 +227,25 @@
             {:status :error :msg (str e)}))
         {:status :error :msg "Room not found"}))))
 
+
+(defn safe-cancel! [handle]
+  (when handle
+    (cond
+      (fn? (.-disconnect handle)) (.disconnect handle)
+      (fn? (.-cancel handle))     (.cancel handle)
+      (fn? (.-abort handle))      (.abort handle)
+      (fn? (.-drop handle))       (.drop handle)
+      (fn? (.-free handle))       (.free handle)
+      :else (log/warn "Could not find a cleanup method for handle:" handle))))
+
 (worker/register :cleanup-timeline
   (fn [{:keys [room-id]}]
     (when-let [room-subs (get @!active-timelines room-id)]
       (doseq [source (keys room-subs)]
         (let [{:keys [handle t-handle p-handle]} (get room-subs source)]
-          (some-> handle .cancel)
-          (some-> t-handle .cancel)
-          (some-> p-handle .cancel))))
+          (safe-cancel! handle)
+          (safe-cancel! t-handle)
+          (safe-cancel! p-handle))))
     (swap! !active-timelines dissoc room-id)
     (swap! !timeline-arrays dissoc [room-id :live] [room-id :focused])
     {:status :success}))
