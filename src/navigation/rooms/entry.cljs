@@ -127,7 +127,7 @@
                                      call-participants)]
 
       [:div.room-container
-       (if (and is-space? active-space)
+       (if is-space?
          [:div.room-drawer-header
           (merge {:style {:padding-left (str indent "px")}
                   :class (when is-closed? "collapsed")
