@@ -11,17 +11,24 @@
   (precacheAndRoute manifest))
 
 (.addEventListener js/self "message"
-  (fn [event]
-    (let [data (.-data event)
-          source-id (.. event -source -id)]
-      (when (= (.-type data) "SET_SESSION")
-        (let [session-data (:session (js->clj data :keywordize-keys true))
-              full-session (assoc session-data :client-id source-id)]
-          (swap! active-sessions assoc source-id full-session)
-          (js/console.log "SW: Session synced for" source-id)
-          (doseq [resolve-fn @session-resolvers]
-            (resolve-fn true))
-          (reset! session-resolvers []))))))
+                   (fn [event]
+                     (let [data      (.-data event)
+                           msg-type  (.-type data)
+                           source-id (.. event -source -id)]
+                       (cond
+                         (= msg-type "SKIP_WAITING")
+                         (do
+                           (js/console.log "SW: Received SKIP_WAITING, taking control...")
+                           (.skipWaiting js/self))
+
+                         (= msg-type "SET_SESSION")
+                         (let [session-data (:session (js->clj data :keywordize-keys true))
+                               full-session (assoc session-data :client-id source-id)]
+                           (swap! active-sessions assoc source-id full-session)
+                           (js/console.log "SW: Session synced for" source-id)
+                           (doseq [resolve-fn @session-resolvers]
+                             (resolve-fn true))
+                           (reset! session-resolvers []))))))
 
 (defn wait-for-session! []
   (if (not-empty @active-sessions)
@@ -108,7 +115,7 @@
 
 
 
-(js/self.addEventListener "install"
+#_(js/self.addEventListener "install"
   (fn [event]
     (.skipWaiting js/self)))
 
@@ -251,3 +258,14 @@
               (.postMessage tab #js {:type "NAVIGATE_TO_ROOM"
                                      :room_id room-id}))
             (.openWindow js/self.clients "/")))))))
+
+(re-frame/reg-event-fx
+ :app/clear-cache-for-update
+ (fn [_ _]
+   (log/warn "Purging all caches and service workers...")
+   (p/let [cache-keys (js/caches.keys)
+           _ (p/all (map #(js/caches.delete %) cache-keys))
+           regs (.getRegistrations js/navigator.serviceWorker)
+           _ (p/all (map #(.unregister %) regs))]
+          (.reload js/window.location true))
+   {}))
