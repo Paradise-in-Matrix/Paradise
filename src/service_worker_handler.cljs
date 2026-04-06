@@ -9,6 +9,17 @@
    [client.state :as state]
    [cljs.core.async :refer [go <!]]))
 
+(re-frame/reg-event-fx
+ :app/clear-cache-for-update
+ (fn [_ _]
+   (log/warn "Purging all caches and service workers...")
+   (p/let [cache-keys (js/caches.keys)
+           _ (p/all (map #(js/caches.delete %) cache-keys))
+           regs (.getRegistrations js/navigator.serviceWorker)
+           _ (p/all (map #(.unregister %) regs))]
+          (.reload js/window.location true))
+   {}))
+
 (defn register-sw! []
   (when (exists? js/navigator.serviceWorker)
     (let [sw-container js/navigator.serviceWorker
