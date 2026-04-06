@@ -152,8 +152,10 @@
                          (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
 
     (RoomListEntriesDynamicFilterKind.All.
-      #js {:filters #js [(RoomListEntriesDynamicFilterKind.NonLeft.)
+      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.Group})
+                         (RoomListEntriesDynamicFilterKind.NonLeft.)
                          (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})))
+
 
 (worker/register :set-room-filter
   (fn [{:keys [filter-id]}]
