@@ -395,7 +395,7 @@
       [:h3.settings-subheading (tr [:settings.language/system-label])]
       [:div.language-list
        (for [[id label native] [[:en "English" "English"]
-                                [:eo "Esperanto" "Esperanto"]]]
+                                [:lorem "Lorem Ipsum" "Lorem Ipsum"]]]
          ^{:key id}
          [:div.language-item
           {:class (when (= locale id) "is-active")
