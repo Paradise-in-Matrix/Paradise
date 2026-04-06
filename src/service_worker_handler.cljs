@@ -33,7 +33,7 @@
                                                       (not= (str remote-v) (str current-v))
                                                       (not= (str current-v) "0.0.0"))
                                              (log/info "SW Update: Version mismatch detected" remote-v "vs" current-v)
-                                             (re-frame/dispatch [:app/update-detected])))))
+                                             (re-frame/dispatch [:app/clear-cache-for-update])))))
                                (p/catch (fn [err]
                                           (log/error "SW Update: Failed to check version" err))))))
       (.addEventListener sw-container "message"
