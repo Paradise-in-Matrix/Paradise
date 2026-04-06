@@ -96,11 +96,12 @@
 ;; for DMs because of this issue. Otherwise that piece can be removed as well.
 (defn room-item [{:keys [id name indent is-space? is-closed? is-dm? has-call?
                          active-room unread? highlight? notif-count
-                         call-participants avatar-url space-id active-filter open-menu-fn]}]
+                         call-participants avatar-url space-id active-filter active-space open-menu-fn]}]
   (let [active?  (= id active-room)
         tr       @(re-frame/subscribe [:i18n/tr])
         is-call? @(re-frame/subscribe [:room/is-call? id])
         profile  @(re-frame/subscribe [:sdk/profile])
+        filter   @(re-frame/subscribe [:room-list/active-filter])
         my-id    (:user-id profile)
         needs-members?  (or (and is-dm? (not avatar-url)) has-call?)
         members-map     @(re-frame/subscribe [:room/members-map id])
@@ -127,7 +128,7 @@
                                      call-participants)]
 
       [:div.room-container
-       (if is-space?
+       (if (and is-space? active-space)
          [:div.room-drawer-header
           (merge {:style {:padding-left (str indent "px")}
                   :class (when is-closed? "collapsed")
@@ -149,7 +150,7 @@
           (cond
             is-call?
             [icons/speaker {:has-call? has-call? :style {:margin-right "8px"}}]
-            (or is-dm? (and (= active-filter "people") (not space-id)))
+            (and (= active-filter "people") (or is-dm? (not space-id)))
             [avatar {:id id :name final-name :url final-avatar :size 24 :status :online}]
             :else
             [icons/hash])
