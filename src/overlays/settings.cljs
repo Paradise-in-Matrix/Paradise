@@ -42,7 +42,9 @@
 (re-frame/reg-event-fx
  :settings/open
  (fn [{:keys [db]} _]
-   {:fx [[:dispatch [:ui/open-modal :settings {}]]
+   {:fx [[:dispatch [:ui/open-modal :settings
+                     {:backdrop-props {:class "settings-backdrop"}
+                      :window-props   {:class "settings-window"}}]]
          [:dispatch [:settings/load-accounts]]]}))
 
 (re-frame/reg-event-db
