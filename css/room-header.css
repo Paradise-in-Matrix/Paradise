@@ -137,9 +137,6 @@
 }
 
 
-
-
-
 .message-preview-card {
     padding: 12px;
     margin-bottom: 16px;
@@ -196,5 +193,3 @@
 .timeline-item.jump-target {
     animation: highlight-pulse 2s ease-out;
 }
-
-
