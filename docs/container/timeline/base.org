@@ -539,6 +539,8 @@ list for use cases like this either.
 
 
 
+****** TODO Need to check if we can paginate and recur until a scrollbar (unless it is a short room thus paginate check)
+
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defn virtualized-timeline [initial-room-id]
   (r/with-let [!virtua-ref    (r/atom nil)
@@ -691,7 +693,6 @@ list for use cases like this either.
              [:div.spinner]])]
          (when (and @!show-jump? (not @!at-bottom?))
            [timeline-jump-button do-jump! focus-mode?])]))))
-
 #+end_src
 
 
