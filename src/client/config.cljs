@@ -9,7 +9,6 @@
       (p/then #(.text %))
       (p/then #(read-string %))))
 
-
 (defn load-i18n []
   (-> (js/fetch "./i18n.edn" #js {:cache "no-store"})
       (p/then #(.text %))
