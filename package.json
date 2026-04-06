@@ -16,6 +16,8 @@
         "ubrn:checkout": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn checkout --config ubrn.config.yaml",
         "ubrn:clean": "rm -Rf cpp/ src/generated/ src/index.web.ts*",
         "cap:generate": "npx capacitor-assets generate",
+        "ad:add": "npx cap add android",
+        "ios:add": "npx cap add ios",
         "ios:sync": "npx cap sync ios",
         "ad:sync": "npx cap sync android",
         "electron:make": "npm run electron:make --prefix electron",
