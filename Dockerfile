@@ -12,8 +12,7 @@ WORKDIR /app
 
 COPY . .
 RUN npm i
-RUN npx shadow-cljs release app
-RUN npx vite build
+RUN npm run release
 
 FROM nginx:stable-alpine
 COPY --from=0 /app/dist /usr/share/nginx/html
