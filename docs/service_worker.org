@@ -397,6 +397,7 @@ this functional first.
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
 (js/self.addEventListener "push"
   (fn [event]
+    (log/error "Fake error")
     (let [data (try (.. event -data json) (catch :default _ nil))]
       (when data
         (let [user-id (.-user_id data)]
@@ -426,6 +427,15 @@ this functional first.
               (.postMessage tab #js {:type "NAVIGATE_TO_ROOM"
                                      :room_id room-id}))
             (.openWindow js/self.clients "/")))))))
+
+
+
+
+;; Bloop
+
+
+
+
 #+end_src
 
 
