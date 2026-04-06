@@ -364,6 +364,8 @@
 (defn virtualized-timeline [initial-room-id]
   (r/with-let [!virtua-ref    (r/atom nil)
                set-virtua-ref #(reset! !virtua-ref %)
+               !scroll-ref    (atom nil)
+               set-scroll-ref #(reset! !scroll-ref %)
                !current-room  (r/atom initial-room-id)
                !at-bottom?    (r/atom true)
                !show-jump?    (r/atom false)
@@ -401,6 +403,12 @@
                                            (not= current-last-id @!prev-last-id)
                                            (not did-prepend?)))
 
+            check-fill-viewport! (fn []
+                                   (when-let [target @!scroll-ref]
+                                     (let [max-scroll (- (.-scrollHeight target) (.-clientHeight target))]
+                                       (when (and (<= max-scroll 0) (not loading?))
+                                         (re-frame/dispatch [:sdk/back-paginate room-id])))))
+
             do-jump!         (fn []
                                (if focus-mode?
                                  (re-frame/dispatch [:room/jump-to-live-bottom room-id])
@@ -418,8 +426,12 @@
             (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
             (js/setTimeout #(do
                               (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
-                              (reset! !initialized? true))
+                              (reset! !initialized? true)
+                              (check-fill-viewport!))
                            300)))
+
+        (when (and @!initialized? did-prepend?)
+          (js/setTimeout check-fill-viewport! 100))
 
         (when (and @!initialized?
                    @!at-bottom?
@@ -440,7 +452,8 @@
                   :transition "opacity 0.15s ease-in-out"}}
 
          [:div.timeline-messages
-          {:class (when jump-target "jumping-animation")
+          {:ref set-scroll-ref
+           :class (when jump-target "jumping-animation")
            :style {:display "flex"
                    :flex-direction "column"
                    :flex 1
