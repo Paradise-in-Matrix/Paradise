@@ -24,7 +24,8 @@ We do not want the user to download the WASM ever again unless we change it.
 (ns service-worker
   (:require [clojure.string :as str]
             [promesa.core :as p]
-            ["workbox-precaching" :refer [precacheAndRoute cleanupOutdatedCaches]]))
+            ["workbox-precaching" :refer [precacheAndRoute cleanupOutdatedCaches]])
+  (:require-macros [utils.macros :refer [load-static-config]]))
 #+end_src
 
 
