@@ -104,24 +104,6 @@
  (fn [db _]
    (assoc db :update-available? true)))
 
-(re-frame/reg-event-fx
- :app/apply-update
- (fn [_ _]
-   (if (exists? js/navigator.serviceWorker)
-     (-> (.getRegistration js/navigator.serviceWorker)
-         (.then (fn [reg]
-                  (let [waiting-sw (.-waiting reg)]
-                    (if waiting-sw
-                      (do
-                        (log/info "Telling new SW to activate...")
-                        (.postMessage waiting-sw #js {:type "SKIP_WAITING"})
-                        (js/setTimeout #(.reload js/location true) 300))
-                      (do
-                        (log/info "No waiting SW found, hard reloading...")
-                        (.reload js/location true)))))))
-     (.reload js/location true))
-   {}))
-
 (re-frame/reg-sub
  :app/update-available?
  (fn [db _]
