@@ -541,13 +541,16 @@ list for use cases like this either.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defn virtualized-timeline [initial-room-id]
-  (r/with-let [!virtua-ref    (r/atom nil)
+  (r/with-let [!virtua-ref    (atom nil)
+               set-virtua-ref #(reset! !virtua-ref %)
+
                !at-bottom?    (r/atom true)
                !show-jump?    (r/atom false)
-               !prev-first-id (r/atom nil)
-               !prev-last-id  (r/atom nil)
+               !prev-first-id (atom nil)
+               !prev-last-id  (atom nil)
                !initialized?  (r/atom false)
                !scroll-timer  (atom nil)]
+
 
     (fn [room-id]
       (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
