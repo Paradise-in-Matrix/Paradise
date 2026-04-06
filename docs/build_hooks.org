@@ -11,6 +11,7 @@ of the program itself.
 #+begin_src clojurescript :tangle ../src/build_hooks.clj
 (ns build-hooks
   (:require [clojure.java.io :as io]
+            [clojure.edn :as edn]
             [clojure.string :as str]))
 #+end_src
 
@@ -159,3 +160,29 @@ sure our translation files are present in time.
       (println "!!! Warning: Element Call source not found in node_modules !!!"))
     build-state))
 #+end_src
+
+
+
+
+***** Version stamping config.edn
+
+#+begin_src clojurescript :tangle ../src/build_hooks.clj
+(defn stamp-version
+  {:shadow.build/stage :configure}
+  [build-state & _]
+  (let [pkg-json    (slurp "package.json")
+        version     (second (re-find #"\"version\"\s*:\s*\"([^\"]+)\"" pkg-json))
+        config-path "config.edn"
+        config      (try (edn/read-string (slurp config-path))
+                         (catch Exception _ {}))
+        updated     (assoc config :version version)]
+    (spit config-path (pr-str updated))
+    (println (str "Stamped config.edn with version " version))
+    build-state))
+#+end_src
+
+
+
+
+
+
