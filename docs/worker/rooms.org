@@ -236,8 +236,10 @@ we rely on the list for our room list view behaviors (even if the space loads a
                          (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
 
     (RoomListEntriesDynamicFilterKind.All.
-      #js {:filters #js [(RoomListEntriesDynamicFilterKind.NonLeft.)
+      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.Group})
+                         (RoomListEntriesDynamicFilterKind.NonLeft.)
                          (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})))
+
 #+end_src
 
 #+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
