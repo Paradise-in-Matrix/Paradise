@@ -5,7 +5,8 @@
 
 (defonce active-sessions (atom {}))
 (defonce session-resolvers (atom []))
-(def MAX_CACHE_ITEMS 50)
+(def MAX_CACHE_ITEMS 300)
+(def config (load-static-config "config.edn"))
 (def cache-name "matrix-media-v1")
 (cleanupOutdatedCaches)
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
