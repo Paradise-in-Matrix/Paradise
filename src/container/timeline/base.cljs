@@ -341,10 +341,14 @@
                   :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
     [:div.spinner]]])
 
-(defn timeline-empty-state []
+(defn timeline-empty-state [room-id]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.timeline-empty {:style {:padding "40px" :text-align "center"}}
-     (tr [:container.timeline/loading])]))
+     (if room-id
+         (tr [:container.timeline/loading])
+         (tr [:container.timeline/no-room])
+         )]))
+
 
 (defn timeline-jump-button [do-jump! focus-mode?]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
@@ -524,7 +528,7 @@
                      :active-id    active-id}])
 
      (if-not active-id
-       [:div.timeline-empty "Select a room to start chatting."]
+       [timeline-empty-state active-id]
        [:<>
 ;;        ^{:key active-id}
         [virtualized-timeline active-id]
