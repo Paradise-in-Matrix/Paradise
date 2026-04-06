@@ -139,23 +139,26 @@
   (case filter-id
     "unread"
     (RoomListEntriesDynamicFilterKind.All.
-      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Unread.)
-                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Unread.)
+                        (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
     "people"
     (RoomListEntriesDynamicFilterKind.All.
-      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.People})
-                         (RoomListEntriesDynamicFilterKind.Joined.)
-                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.People})
+                        (RoomListEntriesDynamicFilterKind.Joined.)
+                        (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
     "favourite"
     (RoomListEntriesDynamicFilterKind.All.
-      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Favourite.)
-                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Favourite.)
+                        (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+    "other"
+    (RoomListEntriesDynamicFilterKind.All.
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.Group})
+                        (RoomListEntriesDynamicFilterKind.NonLeft.)
+                        (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
 
     (RoomListEntriesDynamicFilterKind.All.
-      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.Group})
-                         (RoomListEntriesDynamicFilterKind.NonLeft.)
-                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})))
-
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.NonLeft.)
+                        (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})))
 
 (worker/register :set-room-filter
   (fn [{:keys [filter-id]}]
