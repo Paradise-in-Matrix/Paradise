@@ -152,7 +152,6 @@
                )))))
      #js {:threshold 0.5})))
 
-
 (defn build-message-actions [tr item active-room current-user-id x y]
   (let [msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)
@@ -337,8 +336,6 @@
        [:div.media-caption
         [message-text content]])]))
 
-
-
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
@@ -402,10 +399,10 @@
    [:span.system-icon icon]
    [:span.system-text text]])
 
-(defn date-divider [tr ts]
+(defn date-divider [ts]
   [:div.timeline-date-separator
    [:div.separator-line]
-   [:span.separator-text (format-divider-date tr ts)]
+   [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
 (defn event-tile-render [item]
@@ -436,7 +433,7 @@
       [:div.timeline-item-virtual-wrapper
        {:style {:display "block" :width "100%" :min-height "40px"}}
        (case (:tag item)
-         "DateDivider" [date-divider tr (:ts item)]
+         "DateDivider" [date-divider (:ts item)]
          [system-event-view "-" (tr [:container.timeline.status/timeline-separator])])]
 
       [swipe-to-action-wrapper
