@@ -112,9 +112,9 @@
    :room-list
    {:room-settings "Room Settings"
     :view-chat "View Chat & Lobby"
-    :filters {:all "All"
+    :filters {:all "Other"
               :unread "Unread"
-              :people "People"}
+              :people "DMs"}
     :empty-states {:no-rooms "No rooms here..."
                    :no-results "No results found"}
     :headers {:home "Home"}}
