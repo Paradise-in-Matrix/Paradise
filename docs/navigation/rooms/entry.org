@@ -410,7 +410,6 @@ important.
         tr       @(re-frame/subscribe [:i18n/tr])
         is-call? @(re-frame/subscribe [:room/is-call? id])
         profile  @(re-frame/subscribe [:sdk/profile])
-        filter   @(re-frame/subscribe [:room-list/active-filter])
         my-id    (:user-id profile)
         needs-members?  (or (and is-dm? (not avatar-url)) has-call?)
         members-map     @(re-frame/subscribe [:room/members-map id])
