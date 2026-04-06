@@ -21,6 +21,7 @@
                        (cond
                          (= msg-type "SKIP_WAITING")
                          (do
+                           (js/console.log config)
                            (js/console.log "SW: Received SKIP_WAITING, taking control...")
                            (.skipWaiting js/self))
 
@@ -118,9 +119,9 @@
 
 
 
-(js/self.addEventListener "install"
-  (fn [event]
-    #_(.skipWaiting js/self)))
+(.addEventListener js/self "install"
+                   (fn [event]
+                     #_(.skipWaiting js/self)))
 
 (js/self.addEventListener "activate"
   (fn [event]
