@@ -30,22 +30,6 @@
     :else
     (:internal-id e)))
 
-(defn deduplicate-events [raw-events]
-  (->> raw-events
-       (reduce (fn [acc e]
-                 (let [id-key   (get-event-id e)
-                       existing (get acc id-key)]
-                   (if (and existing
-                            (not (:is-edited? e))
-                            (<= (:ts e) (:ts existing))
-                            (not (and (= (:timeline-source e) :live)
-                                      (= (:timeline-source existing) :focused))))
-                     acc
-                     (assoc acc id-key e))))
-               {})
-       (vals)
-       (sort-by (fn [e] [(:ts e) (if (= (:type e) :virtual) 0 1)]))))
-
 (defn enrich-timeline-items [items]
   (let [clean-items (remove #(and (= (:type %) :virtual)
                                   (= (:tag %) "ReadMarker"))
@@ -67,39 +51,17 @@
                                   :merge-with-prev? can-merge?)]
           (recur (rest remaining)
                  (conj processed new-item)
-                 (if curr-is-msg? new-item last-msg)))))))
+                 (if curr-is-msg? new-item nil)))))))
 
-(defn check-timeline-gap [focused-data live-data]
-  (if (or (empty? focused-data) (empty? live-data))
-    false
-    (let [newest-focused (last (filter #(= (:type %) :event) focused-data))
-          oldest-live    (first (filter #(= (:type %) :event) live-data))]
-      (and newest-focused
-           oldest-live
-           (< (+ (:ts newest-focused) 100) (:ts oldest-live))))))
-
-(defn process-timeline [raw-events]
-  (if (empty? raw-events)
-    []
-    (->> raw-events
-         deduplicate-events
-         enrich-timeline-items)))
-
-
-(re-frame/reg-sub
- :timeline/has-gap?
- (fn [db [_ room-id]]
-   (let [focused-data (get-in db [:timeline-data room-id :focused] [])
-         live-data    (get-in db [:timeline-data room-id :live] [])]
-     (check-timeline-gap focused-data live-data))))
 
 (re-frame/reg-sub
  :timeline/raw-events
  (fn [db [_ room-id]]
    (let [focused-data (get-in db [:timeline-data room-id :focused] [])
          live-data    (get-in db [:timeline-data room-id :live] [])
-         has-gap?     (check-timeline-gap focused-data live-data)]
-     (if has-gap?
+         has-gap?     live-data]
+     live-data
+     #_(if has-gap?
        focused-data
        (concat focused-data live-data)))))
 
@@ -108,19 +70,23 @@
  (fn [db [_ room-id source new-raw-events]]
    (assoc-in db [:timeline-data room-id source] new-raw-events)))
 
+
+
 (re-frame/reg-sub
  :timeline/sorted-events
  (fn [[_ active-room]]
    (re-frame/subscribe [:timeline/raw-events active-room]))
  (fn [raw-events _]
-   (deduplicate-events raw-events)))
+   raw-events
+   ))
 
 (re-frame/reg-sub
  :timeline/current-events
  (fn [[_ active-room]]
    (re-frame/subscribe [:timeline/sorted-events active-room]))
  (fn [sorted-events]
-   (enrich-timeline-items sorted-events)))
+   (enrich-timeline-items sorted-events)
+   ))
 
 (re-frame/reg-sub
  :timeline/events-map
@@ -395,41 +361,17 @@
               (tr [:container.timeline/return-to-live])
               (tr [:container.timeline/jump-to-bottom]))]]))
 
-(defn jump-to-present-banner [room-id]
-  (let [has-gap? @(re-frame/subscribe [:timeline/has-gap? room-id])
-        tr       @(re-frame/subscribe [:i18n/tr])]
-    (when has-gap?
-      [:button.jump-to-present-banner
-       {:style {:position "absolute"
-                :bottom "80px"
-                :left "50%"
-                :transform "translateX(-50%)"
-                :z-index 50
-                :background "var(--accent-color, #5865F2)"
-                :color "white"
-                :padding "8px 16px"
-                :border-radius "16px"
-                :border "none"
-                :box-shadow "0 4px 12px rgba(0,0,0,0.3)"
-                :cursor "pointer"
-                :font-weight "600"
-                :display "flex"
-                :align-items "center"
-                :gap "8px"
-                :transition "transform 0.2s"}
-        :on-click #(re-frame/dispatch [:room/jump-to-present room-id])}
-       [:span (tr [:container.timeline/new-messages-below "New Messages"])]
-       ])))
-
-
 (defn virtualized-timeline [initial-room-id]
   (r/with-let [!virtua-ref    (r/atom nil)
+               set-virtua-ref #(reset! !virtua-ref %)
+
                !at-bottom?    (r/atom true)
                !show-jump?    (r/atom false)
-               !prev-first-id (r/atom nil)
-               !prev-last-id  (r/atom nil)
+               !prev-first-id (atom nil)
+               !prev-last-id  (atom nil)
                !initialized?  (r/atom false)
                !scroll-timer  (atom nil)]
+
 
     (fn [room-id]
       (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
@@ -440,40 +382,45 @@
             jump-target      @(re-frame/subscribe [:timeline/jump-target-id room-id])
             focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])
 
-            current-first-id (when (pos? cnt) (:id (aget event-array 0)))
-            current-last-id  (when (pos? cnt) (:id (aget event-array (dec cnt))))
+            real-events      (filter #(not= (:type %) :virtual) events)
+            current-first-id (:id (first real-events))
+            current-last-id  (:id (last real-events))
 
             did-prepend?     (boolean (and @!prev-first-id
                                            (not= current-first-id @!prev-first-id)
                                            (= current-last-id @!prev-last-id)))
 
+            new-msg-arrived? (boolean (and @!prev-last-id
+                                           (not= current-last-id @!prev-last-id)
+                                           (not did-prepend?)))
+
             do-jump! (fn []
                        (if focus-mode?
                          (re-frame/dispatch [:room/jump-to-live-bottom room-id])
-                         (some-> @!virtua-ref (.scrollToIndex (dec cnt)))))]
+                         (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))))]
+
+        (reset! !prev-first-id current-first-id)
+        (reset! !prev-last-id current-last-id)
 
         (when (and (not @!initialized?) (pos? cnt) @!virtua-ref)
           (let [target-idx (if jump-target
                              (let [idx (.findIndex event-array #(= (:id %) jump-target))]
                                (if (not= idx -1) idx (dec cnt)))
-                             (dec cnt))]
-            (some-> @!virtua-ref (.scrollToIndex target-idx))
+                             (dec cnt))
+                align-opt  (if jump-target #js {:align "center"} #js {:align "end"})]
+            (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
             (js/setTimeout #(do
-                              (some-> @!virtua-ref (.scrollToIndex target-idx))
+                              (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
                               (reset! !initialized? true))
                            10)))
-
         (when (and @!initialized?
                    @!at-bottom?
-                   (not= current-last-id @!prev-last-id)
-                   (not focus-mode?)
-                   (not did-prepend?))
+                   new-msg-arrived?
+                   (not focus-mode?))
           (js/requestAnimationFrame
-           (fn [] (some-> @!virtua-ref (.scrollToIndex (dec cnt))))))
-
-        (js/setTimeout #(do
-                          (reset! !prev-first-id current-first-id)
-                          (reset! !prev-last-id current-last-id)) 0)
+           (fn []
+             (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))
+             (js/setTimeout #(some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"})) 200))))
 
         [:div.virtua-timeline-wrapper
          {:style {:flex 1
@@ -496,8 +443,7 @@
                         (let [target           (.-currentTarget e)
                               scroll-top       (.-scrollTop target)
                               max-scroll       (- (.-scrollHeight target) (.-clientHeight target))
-                              dist-from-bottom (- max-scroll scroll-top)
-                              v-ref            @!virtua-ref]
+                              dist-from-bottom (- max-scroll scroll-top)]
                           (when-not @!scroll-timer
                             (reset! !scroll-timer
                                     (js/setTimeout
@@ -506,7 +452,10 @@
                                        (reset! !show-jump? (> dist-from-bottom 600))
                                        (reset! !at-bottom? (<= dist-from-bottom 10))
 
-                                       (when (and (<= scroll-top 500) (not loading?))
+                                       (when (and @!initialized?
+                                                  (> max-scroll 0)
+                                                  (<= scroll-top 500)
+                                                  (not loading?))
                                          (re-frame/dispatch [:sdk/back-paginate room-id]))
 
                                        (when (and focus-mode?
@@ -520,15 +469,14 @@
 
           (if (zero? cnt)
             [timeline-empty-state]
-
             (into [:> Virtualizer
-                   {:ref #(reset! !virtua-ref %)
+                   {:ref set-virtua-ref
                     :shift did-prepend?}]
                   (for [item event-array]
                     ^{:key (:id item)}
                     [:div.virtua-item-wrapper
                      {:style {:margin "0"
-                              :min-height "40px"
+                              :min-height "32px"
                               :width "100%"}}
                      [:div.timeline-item
                       {:class (when (= (:id item) jump-target) "is-jump-target")
@@ -560,6 +508,5 @@
        [:<>
 ;;        ^{:key active-id}
         [virtualized-timeline active-id]
-        [jump-to-present-banner active-id]
         [message-input]
         [status-indicator active-id]])]))
