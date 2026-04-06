@@ -258,14 +258,3 @@
               (.postMessage tab #js {:type "NAVIGATE_TO_ROOM"
                                      :room_id room-id}))
             (.openWindow js/self.clients "/")))))))
-
-(re-frame/reg-event-fx
- :app/clear-cache-for-update
- (fn [_ _]
-   (log/warn "Purging all caches and service workers...")
-   (p/let [cache-keys (js/caches.keys)
-           _ (p/all (map #(js/caches.delete %) cache-keys))
-           regs (.getRegistrations js/navigator.serviceWorker)
-           _ (p/all (map #(.unregister %) regs))]
-          (.reload js/window.location true))
-   {}))
