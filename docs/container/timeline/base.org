@@ -1040,9 +1040,9 @@ I will segment these another time
       padding: 12px 0;
       width: 100%;
   }
-  
+
   .timeline-row.is-message.is-merged {
-      margin-top: -8px;
+      padding-top: -8px;
   }
 
 
@@ -1095,12 +1095,6 @@ Testing to see if this solves the final calc issue
       will-change: transform;
   }
 
-
-  .timeline-message {
-      padding-top: 4px;
-      padding-bottom: 8px;
-  }
-
   .timeline-message.is-merged {
 
       padding-top: 0px;
@@ -1109,24 +1103,26 @@ Testing to see if this solves the final calc issue
 
   }
 
-  .timeline-message:hover .message-hover-toolbar {
-      display: flex;
-  }
-
 
   .message-hover-toolbar {
       position: absolute;
-  /*
       top: -4px;
-  ,*/
       right: 16px;
-      display: none;
+      display: flex;
+      opacity: 0;
+      pointer-events: none;
       background: #2b2d31;
       border: 1px solid #1e1f22;
       border-radius: 4px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
       z-index: 10;
       overflow: hidden;
+  }
+
+
+  .timeline-message:hover .message-hover-toolbar {
+      opacity: 1;
+      pointer-events: auto;
   }
 
   .toolbar-btn {
