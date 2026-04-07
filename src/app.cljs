@@ -156,13 +156,14 @@
 (re-frame/reg-fx
  :ui/hotswap-css
  (fn [new-filename]
-   (let [link (.getElementById js/document "style")]
-     (if (and link (= (.-rel link) "stylesheet"))
+   (let [links (.querySelectorAll js/document "link[rel='stylesheet']")
+         ;; Assuming the main app style is the first one
+         link (aget links 0)]
+     (if link
        (do
          (set! (.-href link) new-filename)
          (log/info "Swapped CSS to:" new-filename))
-       (log/error "Could not find stylesheet link with ID 'style'")))))
-
+       (log/error "No stylesheet links found in document")))))
 
 (re-frame/reg-event-fx
  :ui/switch-theme
