@@ -1,8 +1,13 @@
 (ns service-worker
   (:require [clojure.string :as str]
             [promesa.core :as p]
-            ["workbox-precaching" :refer [precacheAndRoute cleanupOutdatedCaches]])
+            ["workbox-precaching" :refer [precacheAndRoute cleanupOutdatedCaches]]
+            ["workbox-routing" :refer [registerRoute]]
+            ["workbox-strategies" :refer [CacheFirst]]
+            ["workbox-range-requests" :refer [RangeRequestsPlugin]]
+            ["workbox-expiration" :refer [ExpirationPlugin]])
   (:require-macros [utils.macros :refer [load-static-config]]))
+
 
 (defonce active-sessions (atom {}))
 (defonce session-resolvers (atom []))
