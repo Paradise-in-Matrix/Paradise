@@ -169,9 +169,16 @@
                            (p/catch (fn [err] (log/error "Timeline Diff Panic:" err))))))))))
 
 (defmulti focus (fn [{:keys [type]}] type))
-(defmethod focus :event [{:keys [id count]}] (new (.. sdk -TimelineFocus -Event) #js {:eventId id :numEventsToLoad count}))
+(defmethod focus :event [{:keys [id count]}]
+  (let [auto-factory (.. sdk -TimelineEventFocusThreadMode -Automatic)
+        thread-mode  (.new auto-factory #js {:hideThreadedEvents false})
+        event-factory (.. sdk -TimelineFocus -Event)]
+    (.new event-factory
+          #js {:eventId id
+               :numContextEvents count
+               :threadMode thread-mode})))
 (defmethod focus :live [{:keys [threaded?]}] (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents threaded?}))
-(defmethod focus :pins [] (new (.. sdk -TimelineFocus -PinnedEvents)))
+(defmethod focus :pins [_] (.new (.. sdk -TimelineFocus -PinnedEvents)))
 
 (defn create-timeline-config [focus-obj track-receipts]
   (.create TimelineConfiguration
@@ -184,9 +191,9 @@
 
 (defn boot-timeline! [{:keys [source room room-id focus-obj track-receipts paginate-amount]}]
   (worker/stream! {:type "timeline-loading" :room-id room-id :loading? true})
-  (-> (p/let [config   (create-timeline-config focus-obj track-receipts)
+  (-> (p/let [is-live? (= source :live)
+              config   (create-timeline-config focus-obj track-receipts)
               tl       (.timelineWithConfiguration room config)
-              is-live? (= source :live)
               handle   (.addListener tl #js {:onUpdate #(apply-timeline-diffs-async! room-id source %)})
               t-handle (when is-live?
                          (.subscribeToTypingNotifications room #js {:call #(worker/stream! {:type "typing-update" :room-id room-id :users (js->clj %)})}))
@@ -201,32 +208,46 @@
       (p/catch #(log/error source "boot failed:" %)))
 
 (worker/register :boot-timeline
-  (fn [{:keys [room-id]}]
+  (fn [{:keys [room-id mode event-id] :or {mode :live}}]
     (go
       (if-let [room (.getRoom @state/!client room-id)]
         (try
-          (let [
-                ;;latest-event (<p! (.latestEvent room))
-                ;;event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))
-                ]
-;;            (if event-id
-              (do
-  #_              (boot-timeline! {:source :focused :room room :room-id room-id
-                                 :focus-obj (focus {:type :event :id event-id :count 40})
-                                 :track-receipts false :paginate-amount {:back 25}})
-                (boot-timeline! {:source :live :room room :room-id room-id
-                                 :focus-obj (focus {:type :live :threaded? false})
-                                 :track-receipts 0 :paginate-amount {:back 25}})
-                {:status :success})
-#_              (do
-                (boot-timeline! {:source :live :room room :room-id room-id
-                                 :focus-obj (focus {:type :live :threaded? false})
-                                 :track-receipts true :paginate-amount {:back 25}})
-                {:status :success}))
-          ;;)
+          (case (keyword mode)
+            :live
+            (boot-timeline! {:source :live
+                             :room room
+                             :room-id room-id
+                             :focus-obj (focus {:type :live :threaded? false})
+                             :track-receipts 0
+                             :paginate-amount {:back 25}})
+
+            :focused
+            (if event-id
+              (boot-timeline! {:source :focused
+                               :room room
+                               :room-id room-id
+                               :focus-obj (focus {:type :event :id event-id :count 40})
+                               :track-receipts 0
+                               :paginate-amount {:back 20 :forward 20}})
+              (throw (js/Error. "event-id is strictly required for focused timelines")))
+
+;;            :pins
+  #_          (boot-timeline! {:source :pins
+                             :room room
+                             :room-id room-id
+                             :focus-obj (focus {:type :pins})
+                             :track-receipts 0
+                             :paginate-amount {:back 25}}))
+
+          {:status :success}
           (catch :default e
+            (log/error "Timeline Boot Panic:" e)
             {:status :error :msg (str e)}))
         {:status :error :msg "Room not found"}))))
+
+
+
+()
 
 
 (defn safe-cancel! [handle]
