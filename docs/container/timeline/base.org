@@ -180,7 +180,7 @@ each of these later.
          (go
            (let [res (<! (main/do-with-pool! @state/!engine-pool
                                              {:handler :paginate-timeline
-                                              :arguments {:room-id room-id :direction :back :amount 50}}))]
+                                              :arguments {:room-id room-id :direction :back :amount 25}}))]
              (re-frame/dispatch [:sdk/pagination-complete room-id])))
          {:db (assoc-in db [:timeline/loading-more? room-id] true)})
        {}))))
