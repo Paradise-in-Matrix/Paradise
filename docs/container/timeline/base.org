@@ -164,6 +164,11 @@ each of these later.
             (update :timeline-subs dissoc room-id)
             (update :timeline-data dissoc room-id))}))
 
+(re-frame/reg-sub
+ :timeline/pinned-events
+ (fn [db [_ room-id]]
+   (get-in db [:timeline-data room-id :pins] [])))
+
 (re-frame/reg-event-fx
  :sdk/back-paginate
  (fn [{:keys [db]} [_ room-id]]
