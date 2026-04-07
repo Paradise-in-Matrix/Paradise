@@ -73,7 +73,7 @@ export default defineConfig(({ mode }) => {
                     minify: false,
                     swSrc: "./sw.js",
                     swDest: "./dist/sw.js",
-                    maximumFileSizeToCacheInBytes: 5242880,
+                    maximumFileSizeToCacheInBytes: 15728640,
                 },
                 devOptions: {
                     enabled: false,
