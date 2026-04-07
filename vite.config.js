@@ -73,7 +73,8 @@ export default defineConfig(({ mode }) => {
                     minify: false,
                     swSrc: "./sw.js",
                     swDest: "./dist/sw.js",
-                    maximumFileSizeToCacheInBytes: 15728640,
+                    globIgnores: ["**/*.wasm", "**/element-call/assets/*"],
+                    maximumFileSizeToCacheInBytes: 7340032,
                 },
                 devOptions: {
                     enabled: false,
