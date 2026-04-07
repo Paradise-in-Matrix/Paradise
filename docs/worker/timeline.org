@@ -297,28 +297,42 @@ export enum TimelineEventFocusThreadMode_Tags {
     (go
       (if-let [room (.getRoom @state/!client room-id)]
         (try
-          (let [
-                ;;latest-event (<p! (.latestEvent room))
-                ;;event-id     (when latest-event (.. latest-event -eventOrTransactionId -inner -eventId))
-                ]
-;;            (if event-id
-              (do
-  #_              (boot-timeline! {:source :focused :room room :room-id room-id
-                                 :focus-obj (focus {:type :event :id event-id :count 40})
-                                 :track-receipts false :paginate-amount {:back 25}})
-                (boot-timeline! {:source :live :room room :room-id room-id
-                                 :focus-obj (focus {:type :live :threaded? false})
-                                 :track-receipts 0 :paginate-amount {:back 25}})
-                {:status :success})
-#_              (do
-                (boot-timeline! {:source :live :room room :room-id room-id
-                                 :focus-obj (focus {:type :live :threaded? false})
-                                 :track-receipts true :paginate-amount {:back 25}})
-                {:status :success}))
-          ;;)
+          (case (keyword mode)
+            :live
+            (boot-timeline! {:source :live
+                             :room room
+                             :room-id room-id
+                             :focus-obj (focus {:type :live :threaded? false})
+                             :track-receipts 0
+                             :paginate-amount {:back 25}})
+
+            :focused
+            (if event-id
+              (boot-timeline! {:source :focused
+                               :room room
+                               :room-id room-id
+                               :focus-obj (focus {:type :event :id event-id :count 40})
+                               :track-receipts 0
+                               :paginate-amount {:back 20 :forward 20}})
+              (throw (js/Error. "event-id is strictly required for focused timelines")))
+
+;;            :pins
+  #_          (boot-timeline! {:source :pins
+                             :room room
+                             :room-id room-id
+                             :focus-obj (focus {:type :pins})
+                             :track-receipts 0
+                             :paginate-amount {:back 25}}))
+
+          {:status :success}
           (catch :default e
+            (log/error "Timeline Boot Panic:" e)
             {:status :error :msg (str e)}))
         {:status :error :msg "Room not found"}))))
+
+
+
+()
 
 #+end_src
 
