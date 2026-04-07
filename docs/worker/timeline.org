@@ -245,6 +245,7 @@ export enum DateDividerMode {
 (defmulti focus (fn [{:keys [type]}] type))
 (defmethod focus :event [{:keys [id count]}] (new (.. sdk -TimelineFocus -Event) #js {:eventId id :numEventsToLoad count}))
 (defmethod focus :live [{:keys [threaded?]}] (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents threaded?}))
+(defmethod focus :pins [] (new (.. sdk -TimelineFocus -PinnedEvents)))
 
 (defn create-timeline-config [focus-obj track-receipts]
   (.create TimelineConfiguration
