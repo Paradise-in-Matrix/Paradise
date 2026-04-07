@@ -58,12 +58,15 @@
  :timeline/raw-events
  (fn [db [_ room-id]]
    (let [focused-data (get-in db [:timeline-data room-id :focused] [])
-         live-data    (get-in db [:timeline-data room-id :live] [])
-         has-gap?     live-data]
-     live-data
-     #_(if has-gap?
-       focused-data
-       (concat focused-data live-data)))))
+         live-data    (get-in db [:timeline-data room-id :live] [])]
+;;     live-data
+(if (and (vector? focused-data) (empty? focused-data))
+  live-data
+  focused-data
+
+ ;;    (if (empty? focused-data) focused-data live-data)
+     ))))
+
 
 (re-frame/reg-event-db
  :sdk/update-timeline
@@ -101,9 +104,27 @@
    (if (get-in db [:timeline-subs room-id])
      (do (log/warn "Prevented duplicate timeline boot for:" room-id) {})
      (do
-       (main/do-with-pool! @state/!engine-pool {:handler :boot-timeline
-                                                :arguments {:room-id room-id}})
+       (main/do-with-pool! @state/!engine-pool
+                           {:handler :boot-timeline
+                            :arguments {:room-id room-id :mode :live}})
        {:db (assoc-in db [:timeline-subs room-id] true)}))))
+
+(re-frame/reg-event-fx
+ :room/boot-focused-timeline
+ (fn [{:keys [db]} [_ room-id event-id]]
+   (main/do-with-pool! @state/!engine-pool
+                       {:handler :boot-timeline
+                        :arguments {:room-id room-id :mode :focused :event-id event-id}})
+   {:db (assoc-in db [:timeline-subs room-id :focused] true)}))
+
+
+(re-frame/reg-event-fx
+ :room/boot-pinned-timeline
+ (fn [{:keys [db]} [_ room-id]]
+   (main/do-with-pool! @state/!engine-pool
+                       {:handler :boot-timeline
+                        :arguments {:room-id room-id :mode :pins}})
+   {:db (assoc-in db [:timeline-subs room-id :pins] true)}))
 
 (re-frame/reg-event-fx
  :sdk/cleanup-timeline
@@ -113,6 +134,11 @@
    {:db (-> db
             (update :timeline-subs dissoc room-id)
             (update :timeline-data dissoc room-id))}))
+
+(re-frame/reg-sub
+ :timeline/pinned-events
+ (fn [db [_ room-id]]
+   (get-in db [:timeline-data room-id :pins] [])))
 
 (re-frame/reg-event-fx
  :sdk/back-paginate
@@ -125,10 +151,27 @@
          (go
            (let [res (<! (main/do-with-pool! @state/!engine-pool
                                              {:handler :paginate-timeline
-                                              :arguments {:room-id room-id :direction :back :amount 50}}))]
+                                              :arguments {:room-id room-id :direction :back :amount 25}}))]
              (re-frame/dispatch [:sdk/pagination-complete room-id])))
          {:db (assoc-in db [:timeline/loading-more? room-id] true)})
        {}))))
+
+(re-frame/reg-event-fx
+ :sdk/forward-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
+         loading-forward? (get-in db [:timeline/loading-forward? room-id])]
+     (if (and room-id (not loading-back?) (not loading-forward?))
+       (do
+         (log/info "Triggering Worker Forward Paginate for" room-id)
+         (go
+           (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                             {:handler :paginate-timeline
+                                              :arguments {:room-id room-id :direction :forward :amount 25}}))]
+             (re-frame/dispatch [:sdk/pagination-complete room-id])))
+         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
+       {}))))
+
 
 (re-frame/reg-event-db
  :timeline/set-loading
