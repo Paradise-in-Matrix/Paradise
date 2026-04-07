@@ -185,6 +185,23 @@ each of these later.
          {:db (assoc-in db [:timeline/loading-more? room-id] true)})
        {}))))
 
+(re-frame/reg-event-fx
+ :sdk/forward-paginate
+ (fn [{:keys [db]} [_ room-id]]
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
+         loading-forward? (get-in db [:timeline/loading-forward? room-id])]
+     (if (and room-id (not loading-back?) (not loading-forward?))
+       (do
+         (log/info "Triggering Worker Forward Paginate for" room-id)
+         (go
+           (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                             {:handler :paginate-timeline
+                                              :arguments {:room-id room-id :direction :forward :amount 25}}))]
+             (re-frame/dispatch [:sdk/pagination-complete room-id])))
+         {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
+       {}))))
+
+
 (re-frame/reg-event-db
  :timeline/set-loading
  (fn [db [_ room-id loading?]]
