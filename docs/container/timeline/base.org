@@ -133,9 +133,27 @@ each of these later.
    (if (get-in db [:timeline-subs room-id])
      (do (log/warn "Prevented duplicate timeline boot for:" room-id) {})
      (do
-       (main/do-with-pool! @state/!engine-pool {:handler :boot-timeline
-                                                :arguments {:room-id room-id}})
+       (main/do-with-pool! @state/!engine-pool
+                           {:handler :boot-timeline
+                            :arguments {:room-id room-id :mode :live}})
        {:db (assoc-in db [:timeline-subs room-id] true)}))))
+
+(re-frame/reg-event-fx
+ :room/boot-focused-timeline
+ (fn [{:keys [db]} [_ room-id event-id]]
+   (main/do-with-pool! @state/!engine-pool
+                       {:handler :boot-timeline
+                        :arguments {:room-id room-id :mode :focused :event-id event-id}})
+   {:db (assoc-in db [:timeline-subs room-id :focused] true)}))
+
+
+(re-frame/reg-event-fx
+ :room/boot-pinned-timeline
+ (fn [{:keys [db]} [_ room-id]]
+   (main/do-with-pool! @state/!engine-pool
+                       {:handler :boot-timeline
+                        :arguments {:room-id room-id :mode :pins}})
+   {:db (assoc-in db [:timeline-subs room-id :pins] true)}))
 
 (re-frame/reg-event-fx
  :sdk/cleanup-timeline
