@@ -438,12 +438,6 @@
                 session (.session client)
                 token   (.-accessToken session)
                 hs      (.-homeserverUrl session)
-                pins (.-pinnedEventIds (.roomInfo room))
-                pin-timeline (boot-timeline! {:source :focus :room room :room-id room-id
-                                 :focus-obj (focus {:type :pins})
-                                 :track-receipts 0 :paginate-amount {:back 25}})
-
-                _ (log/error pin-timeline)
                 url     (str hs "/_matrix/client/v3/rooms/" room-id "/state/m.room.pinned_events/")
                 resp    (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
             (if-not (.-ok resp)

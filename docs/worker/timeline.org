@@ -604,6 +604,9 @@ usually; so this shouldn't be too taxing.
           (catch :default e
             {:status :error :msg (str e)}))
         {:status :error :msg "Room not found"}))))
+
+
+
 #+end_src
 
 
