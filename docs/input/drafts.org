@@ -226,7 +226,7 @@ export interface MediaSourceInterface {
 #+end_src
 
 For now this is just exploratory.
-#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
+#+begin_src clojurescript
 (defn create-media-source [url]
   (.fromUrl MediaSource url))
 
