@@ -18,10 +18,11 @@
                      (let [data      (.-data event)
                            msg-type  (.-type data)
                            source-id (.. event -source -id)]
+                           (js/console.log "SW: Version " (:version config))
                        (cond
                          (= msg-type "SKIP_WAITING")
                          (do
-                           (js/console.log "SW: Config " config)
+
                            (js/console.log "SW: Received SKIP_WAITING, taking control...")
                            (.skipWaiting js/self))
 
