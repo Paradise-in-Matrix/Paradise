@@ -147,49 +147,6 @@
       (.new (.-File (.-DraftAttachment sdk))
             #js {:fileInfo file-info :source source}))))
 
-(defn create-media-source [url]
-  (.fromUrl MediaSource url))
-
-(defn create-image-info [att source]
-  (let [{:keys [width height size mime blurhash is-animated]} att]
-
-    (js/console.error source)
-    #js {:height          (if height (js/BigInt height) js/undefined)
-         :width           (if width (js/BigInt width) js/undefined)
-         :mimetype        (if mime mime js/undefined)
-         :size            (if size (js/BigInt size) js/undefined)
-         :thumbnailInfo  #js {
-                           :height (if height (js/BigInt height) js/undefined)
-                           :width   (if width (js/BigInt width) js/undefined)
-                           :mimetype  (if mime mime js/undefined)
-                           :size (if size (js/BigInt size) js/undefined)
-                           } ;; js/undefined
-         :thumbnailSource js/undefined
-         :blurhash        (if blurhash blurhash js/undefined)
-         :isAnimated      (if (some? is-animated) is-animated js/undefined)}))
-
-(defn create-video-info [att source]
-  (let [{:keys [width height size mime blurhash duration]} att]
-    #js {:duration        (if duration duration js/undefined)
-         :height          (if height (js/BigInt height) js/undefined)
-         :width           (if width (js/BigInt width) js/undefined)
-         :mimetype        (if mime mime js/undefined)
-         :size            (if size (js/BigInt size) js/undefined)
-         :thumbnailInfo   #js {
-                           :height (if height (js/BigInt height) js/undefined)
-                           :width   (if width (js/BigInt width) js/undefined)
-                           :mimetype  (if mime mime js/undefined)
-                           :size (if size (js/BigInt size) js/undefined)
-                           } ;; js/undefined
-         :thumbnailSource js/undefined
-         :blurhash        (if blurhash blurhash js/undefined)}))
-
-(defn create-audio-info [att source]
-  (let [{:keys [size mime duration]} att]
-    #js {:duration (if duration duration js/undefined)
-         :size     (if size (js/BigInt size) js/undefined)
-         :mimetype (if mime mime js/undefined)}))
-
 (defn prepare-attachment [sdk att]
   (let [mime      (or (:mime att) "application/octet-stream")
         _ (log/error att)
