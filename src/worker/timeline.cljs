@@ -171,6 +171,7 @@
 (defmulti focus (fn [{:keys [type]}] type))
 (defmethod focus :event [{:keys [id count]}] (new (.. sdk -TimelineFocus -Event) #js {:eventId id :numEventsToLoad count}))
 (defmethod focus :live [{:keys [threaded?]}] (new (.. sdk -TimelineFocus -Live) #js {:hideThreadedEvents threaded?}))
+(defmethod focus :pins [] (new (.. sdk -TimelineFocus -PinnedEvents)))
 
 (defn create-timeline-config [focus-obj track-receipts]
   (.create TimelineConfiguration
@@ -437,6 +438,12 @@
                 session (.session client)
                 token   (.-accessToken session)
                 hs      (.-homeserverUrl session)
+                pins (.-pinnedEventIds (.roomInfo room))
+                pin-timeline (boot-timeline! {:source :focus :room room :room-id room-id
+                                 :focus-obj (focus {:type :pins})
+                                 :track-receipts 0 :paginate-amount {:back 25}})
+
+                _ (log/error pin-timeline)
                 url     (str hs "/_matrix/client/v3/rooms/" room-id "/state/m.room.pinned_events/")
                 resp    (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
             (if-not (.-ok resp)
@@ -450,6 +457,9 @@
           (catch :default e
             {:status :error :msg (str e)}))
         {:status :error :msg "Room not found"}))))
+
+
+
 
 (worker/register :search-room
   (fn [{:keys [room-id query]}]
