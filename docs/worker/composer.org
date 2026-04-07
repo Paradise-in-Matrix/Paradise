@@ -100,7 +100,7 @@
                                         #js {:source source
                                              :caption (or caption js/undefined)
                                              :formattedCaption (or format js/undefined)})]
-                  (<p! (.sendFile timeline params info))
+                  (.sendFile timeline params info)
                   (<p! (p/delay 100))
                   (recur (inc idx)))))
             {:status :success})
