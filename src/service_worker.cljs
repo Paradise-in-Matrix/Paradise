@@ -13,6 +13,22 @@
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
   (precacheAndRoute manifest))
 
+(registerRoute
+ (fn [opts]
+   (let [path (.. opts -url -pathname)]
+     (str/includes? path "/element-call/")))
+ (new CacheFirst
+      #js {:cacheName "element-call-cache"
+           :plugins #js [(new ExpirationPlugin #js {:maxEntries 50})]}))
+
+(registerRoute
+ (fn [opts]
+   (let [url (.-url opts)]
+     (str/ends-with? (.-pathname url) ".wasm")))
+ (new CacheFirst
+      #js {:cacheName "wasm-heavy-cache"
+           :plugins #js [(new ExpirationPlugin #js {:maxEntries 10})] }))
+
 (.addEventListener js/self "message"
                    (fn [event]
                      (let [data      (.-data event)
