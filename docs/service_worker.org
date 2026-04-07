@@ -60,6 +60,14 @@ hand we have the home-server and the token used too.
 (cleanupOutdatedCaches)
 (let [manifest (or js/self.__WB_MANIFEST #js [])]
   (precacheAndRoute manifest))
+
+(registerRoute
+ (fn [opts]
+   (let [url (.-url opts)]
+     (str/ends-with? (.-pathname url) ".wasm")))
+ (new CacheFirst
+      #js {:cacheName "wasm-heavy-cache"
+           :plugins #js [(new ExpirationPlugin #js {:maxEntries 10})] }))
 #+end_src
 
 
