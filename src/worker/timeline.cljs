@@ -184,21 +184,21 @@
 
 (defn boot-timeline! [{:keys [source room room-id focus-obj track-receipts paginate-amount]}]
   (worker/stream! {:type "timeline-loading" :room-id room-id :loading? true})
-  (-> (p/let [config (create-timeline-config focus-obj track-receipts)
-              tl     (.timelineWithConfiguration room config)]
-        (let [is-live? (= source :live)
+  (-> (p/let [config   (create-timeline-config focus-obj track-receipts)
+              tl       (.timelineWithConfiguration room config)
+              is-live? (= source :live)
               handle   (.addListener tl #js {:onUpdate #(apply-timeline-diffs-async! room-id source %)})
               t-handle (when is-live?
                          (.subscribeToTypingNotifications room #js {:call #(worker/stream! {:type "typing-update" :room-id room-id :users (js->clj %)})}))
               p-handle (when is-live?
                          (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))]
-          (swap! !active-timelines assoc-in [room-id source]
-                 {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
-          (when (:forward paginate-amount) (.paginateForwards tl (:forward paginate-amount)))
-          (-> (.paginateBackwards tl (:back paginate-amount))
-              (p/then #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))
-              (p/catch #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false})))))
-      (p/catch #(log/error source "boot failed:" %))))
+        (swap! !active-timelines assoc-in [room-id source]
+               {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
+        (when (:forward paginate-amount) (.paginateForwards tl (:forward paginate-amount)))
+        (-> (.paginateBackwards tl (:back paginate-amount))
+            (p/then #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))
+            (p/catch #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false})))))
+      (p/catch #(log/error source "boot failed:" %)))
 
 (worker/register :boot-timeline
   (fn [{:keys [room-id]}]
