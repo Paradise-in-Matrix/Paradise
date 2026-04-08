@@ -190,43 +190,48 @@
                                       "#1e1f22"})
   (.setStyle StatusBar #js {:style "DARK"}))
 
+
 (defn main-layout []
-  (let [auth-status   @(re-frame/subscribe [:auth/status])
-        sidebar-open? @(re-frame/subscribe [:ui/sidebar-open?])
-        update-ready? @(re-frame/subscribe [:app/update-available?])]
-   (r/with-let [!drag-state (r/atom {:start-x nil :dx 0})
-                swipe-props (make-swipe-handlers
-                             !drag-state
-    {:on-end (fn [dx]
-              (let [start-x (:start-x @!drag-state)]
-               (cond
-                (and (not sidebar-open?) (< start-x 40) (> dx 60))
-                (re-frame/dispatch [:ui/set-sidebar true])
-                (and sidebar-open? (< dx -60))
-                (re-frame/dispatch [:ui/set-sidebar false]))))})]
-    (case auth-status
-     :checking [booting-screen]
-               (:logged-out :authenticating) [login-screen]
-     :logged-in
-          [:<>
-           (when update-ready?
-            [:div.global-update-banner
+  (r/with-let [!drag-state (r/atom {:start-x nil :dx 0})]
+    (let [auth-status   @(re-frame/subscribe [:auth/status])
+          sidebar-open? @(re-frame/subscribe [:ui/sidebar-open?])
+          update-ready? @(re-frame/subscribe [:app/update-available?])
+          swipe-props (make-swipe-handlers
+                       !drag-state
+                       {:on-end (fn [dx]
+                                  (let [start-x (:start-x @!drag-state)]
+                                    (cond
+                                      (and (not sidebar-open?) (< start-x 40) (> dx 60))
+                                      (re-frame/dispatch [:ui/set-sidebar true])
+                                      (and sidebar-open? (< dx -60))
+                                      (re-frame/dispatch [:ui/set-sidebar false]))))})]
+
+      (case auth-status
+        :checking [booting-screen]
+        (:logged-out :authenticating) [login-screen]
+        :logged-in
+        [:<>
+         (when update-ready?
+           [:div.global-update-banner
             [:span "A new version of the app is available!"]
-            [:button {:on-click #(re-frame/dispatch [:app/apply-update])} "Refresh"]])
-           [persistent-call-container]
-           (into [:div.app-root
-                       (merge {:class (when sidebar-open? "sidebars-open")
-                               :style {:touch-action "pan-y"}}
+            [:button {:on-click #(re-frame/dispatch [:app/apply-update])}
+             "Refresh"]])
+
+         [persistent-call-container]
+         (into [:div.app-root
+                (merge {:class (when sidebar-open? "sidebars-open")
+                        :style {:touch-action "pan-y"}}
                        swipe-props)]
-            [[spaces-sidebar]
-             [room-list]
-             (when sidebar-open?
-              [:div.mobile-overlay {:on-click #(re-frame/dispatch [:ui/set-sidebar false])}])
+               [[spaces-sidebar]
+                [room-list]
+                (when sidebar-open?
+                  [:div.mobile-overlay {:on-click #(re-frame/dispatch [:ui/set-sidebar false])}])
                 [container]])
-           [modal-root]
-           [popover-root]
-           [global-context-menu]]
-          [:div "Unknown State"]))))
+         [modal-root]
+         [popover-root]
+         [global-context-menu]]
+        [:div "Unknown State"]))))
+
 
 (defn init-window-size-listener! []
   (re-frame/dispatch [:ui/window-resized (.-innerWidth js/window)])
