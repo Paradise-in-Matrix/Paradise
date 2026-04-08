@@ -98,7 +98,6 @@
                                                   (let [formatted  (.-formattedCaption m-content-obj)
                                                         info       (.-info m-content-obj)
                                                         ffi-source (.-source m-content-obj)
-                                                        raw-mxc    (extract-mxc-url ffi-source)
                                                         res        {:mimetype (some-> info .-mimetype)
                                                                     :size     (some-> info .-size js/Number)}]
                                                     (when ffi-source
@@ -114,9 +113,8 @@
                                                                     res)})
                                                   {:unsupported true})})
                                     "Sticker"
-                                    (let [ffi-source (.-source kind-inner)
-                                          raw-mxc    (extract-mxc-url ffi-source)]
-                                      (swap! state/!media-cache assoc real-id (.-url kind-inner))
+                                    (let [ffi-source (.-source kind-inner)]
+                                      (swap! state/!media-cache assoc real-id ffi-source)
                                       {:source raw-mxc
                                        :info   (when-let [info (.-info kind-inner)]
                                                  {:w (some-> info .-width js/Number)
@@ -347,34 +345,62 @@
             {:status :error :msg (str e)}))
         {:status :error :msg "Timeline not found"}))))
 
+(defn b64->uint8 [b64]
+  (let [b1     (str/replace b64 "-" "+")
+        b2     (str/replace b1 "_" "/")
+        pad    (mod (- 4 (mod (count b2) 4)) 4)
+        padded (str b2 (apply str (repeat pad "=")))
+        raw    (js/atob padded)
+        len    (.-length raw)
+        arr    (js/Uint8Array. len)]
+    (dotimes [i len]
+      (aset arr i (.charCodeAt raw i)))
+    arr))
+
 (worker/register :get-media
   (fn [{:keys [event-id source]}]
     (go
       (try
         (if-let [ffi-source (get @state/!media-cache event-id)]
-          (let [raw-bytes (<p! (.getMediaContent @state/!client ffi-source))
-                ]
-            {:status :success :bytes raw-bytes})
+          (let [source-map (js/JSON.parse (.toJson ffi-source))
+                file-info  (.-file source-map)
+                client     @state/!client
+                session    (.session client)
+                hs-url      (.-homeserverUrl session)
+                token      (.-accessToken session)]
+            (if-not file-info
+              (let [server    (clojure.string/replace (str hs-url) #"/+$" "")
+                    mxc       (or source (.-url source-map) (some-> source-map .-plain .-url) "")
+                    resource  (clojure.string/replace (str mxc) #"^mxc://" "")
+                    fetch-url (cljs.core/str server "/_matrix/client/v1/media/download/" resource)
 
-          (if (and (string? source) (str/starts-with? source "mxc://"))
-            (let [client      @state/!client
-                  hs-url      (.-homeserverUrl (.session client))
-                  token       (.-accessToken (.session client))
-                  server-base (str/replace hs-url #"/+$" "")
-                  resource    (str/replace source #"^mxc://" "")
-                  fetch-url   (str server-base "/_matrix/client/v1/media/download/" resource)
-                  resp        (<p! (js/fetch fetch-url
-                                             #js {:headers #js {"Authorization" (str "Bearer " token)}}))
-                  ]
-              (if (.-ok resp)
-                (let [buf       (<p! (.arrayBuffer resp))
-                      raw-bytes (js/Uint8Array. buf)]
-                  {:status :success :bytes raw-bytes})
-                {:status :error :msg (str "HTTP fetch failed: " (.-status resp))}))
-            {:status :error :msg "No FFI pointer and invalid source."})
-          )
-        (catch :default e
-          {:status :error :msg (str e)})))))
+                    resp      (<p! (js/fetch fetch-url))
+                    buf       (<p! (.arrayBuffer resp))]
+                {:status "success"
+                 :bytes  buf
+                 :transfer [:bytes]})
+              (let [jwk      (.-key file-info)
+                    iv-b64   (.-iv file-info)
+                    mxc-url  (.-url file-info)
+                    server    (clojure.string/replace (str hs-url) #"/+$" "")
+                    resource  (clojure.string/replace (str mxc-url) #"^mxc://" "")
+                    fetch-url (cljs.core/str server "/_matrix/client/v1/media/download/" resource)
+                    resp      (<p! (js/fetch fetch-url))
+                    enc-buf   (<p! (.arrayBuffer resp))
+
+                    iv-arr    (b64->uint8 iv-b64)
+                    algo      #js {:name "AES-CTR"}
+                    crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
+                    dec-buf    (<p! (js/crypto.subtle.decrypt
+                                      #js {:name "AES-CTR" :counter iv-arr :length 64}
+                                      crypto-key
+                                      enc-buf))]
+                {:status "success"
+                 :bytes  dec-buf
+                 :transfer [:bytes]})))
+          {:status "error" :msg "FFI pointer not found in worker cache."})
+        (catch js/Error e
+          {:status "error" :msg (.-message e)})))))
 
 (defn make-timeline-item-shim [item event-id]
   #js {:uniqueId (fn [] #js {:id event-id})
