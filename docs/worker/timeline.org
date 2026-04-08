@@ -127,7 +127,6 @@ help anyone later who wants to make changes to aspects of the timeline.
                                                   (let [formatted  (.-formattedCaption m-content-obj)
                                                         info       (.-info m-content-obj)
                                                         ffi-source (.-source m-content-obj)
-                                                        raw-mxc    (extract-mxc-url ffi-source)
                                                         res        {:mimetype (some-> info .-mimetype)
                                                                     :size     (some-> info .-size js/Number)}]
                                                     (when ffi-source
@@ -143,9 +142,8 @@ help anyone later who wants to make changes to aspects of the timeline.
                                                                     res)})
                                                   {:unsupported true})})
                                     "Sticker"
-                                    (let [ffi-source (.-source kind-inner)
-                                          raw-mxc    (extract-mxc-url ffi-source)]
-                                      (swap! state/!media-cache assoc real-id (.-url kind-inner))
+                                    (let [ffi-source (.-source kind-inner)]
+                                      (swap! state/!media-cache assoc real-id ffi-source)
                                       {:source raw-mxc
                                        :info   (when-let [info (.-info kind-inner)]
                                                  {:w (some-> info .-width js/Number)
