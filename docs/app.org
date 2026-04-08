@@ -222,7 +222,6 @@ This at least begins starting that off by providing some useful enough defaults.
  :ui/hotswap-css
  (fn [new-filename]
    (let [links (.querySelectorAll js/document "link[rel='stylesheet']")
-         ;; Assuming the main app style is the first one
          link (aget links 0)]
      (if link
        (do
