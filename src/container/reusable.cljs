@@ -1,6 +1,7 @@
 (ns container.reusable
   (:require [re-frame.core :as re-frame]
             [container.timeline.item :refer [event-tile]]
+            [navigation.rooms.entry :refer [build-room-actions]]
             [utils.svg :as icons]))
 
 
