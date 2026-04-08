@@ -123,7 +123,7 @@
                                                               :mode "cors"
                                                               :credentials "omit"})]
                         (when (and (.-ok resp) (< (js/parseInt (.get (.-headers resp) "content-length") 10) 10485760))
-                          (.put cache request (.clone resp)))
+                         (.put cache request (.clone resp)))
                         resp)))))))
 
           legacy-path?
