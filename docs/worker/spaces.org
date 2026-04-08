@@ -58,6 +58,30 @@ aren't particularly useful in the current sdk.
 #+end_src
 
 
+**** Booting the space lists
+
+So for the actual spaces themselves. We need to watch their rooms independently and paginate. Currently we'll keep it simple
+as pagination will just make it render more rooms. Not entirely necessary at the moment. The benefit of doing it like this
+is that we keep space loading at effectively O(1) since we're just asking the Rust SDK which already has built the dependency
+graph out for us what the Space contains.
+
+#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+(defn boot-space-list! [space-id]
+  (when-not (get @!space-list-subs space-id)
+    (-> (.spaceRoomList @!space-service space-id)
+        (p/then (fn [space-list]
+                  (let [listener #js {:onUpdate #(apply-space-rooms-diffs! space-id %)}]
+                    (try
+                      (let [sub-handle (.subscribeToRoomUpdate space-list listener)]
+                        (swap! !space-list-subs assoc space-id {:list space-list :sub sub-handle})
+                        (.paginate space-list))
+                      (catch :default e
+                        (log/error "FFI Space Subscription Panic:" e))))))
+        (p/catch (fn [err]
+                   (log/error "Failed to boot space list for" space-id ":" err))))))
+#+end_src
+
+
 
 **** Diff Handling
 
@@ -116,28 +140,6 @@ out the parent-child relationships.
     (process-parent-queue! client space-service)))
 #+end_src
 
-**** Booting the space lists
-
-So for the actual spaces themselves. We need to watch their rooms independently and paginate. Currently we'll keep it simple
-as pagination will just make it render more rooms. Not entirely necessary at the moment. The benefit of doing it like this
-is that we keep space loading at effectively O(1) since we're just asking the Rust SDK which already has built the dependency
-graph out for us what the Space contains.
-
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
-(defn boot-space-list! [space-id]
-  (when-not (get @!space-list-subs space-id)
-    (-> (.spaceRoomList @!space-service space-id)
-        (p/then (fn [space-list]
-                  (let [listener #js {:onUpdate #(apply-space-rooms-diffs! space-id %)}]
-                    (try
-                      (let [sub-handle (.subscribeToRoomUpdate space-list listener)]
-                        (swap! !space-list-subs assoc space-id {:list space-list :sub sub-handle})
-                        (.paginate space-list))
-                      (catch :default e
-                        (log/error "FFI Space Subscription Panic:" e))))))
-        (p/catch (fn [err]
-                   (log/error "Failed to boot space list for" space-id ":" err))))))
-#+end_src
 
 
 **** Paginate
