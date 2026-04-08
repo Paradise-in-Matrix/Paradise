@@ -334,8 +334,7 @@ read receipts. This prevents any sort of spamming to the home server.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn async-media-wrapper [event content {:keys [class default-ratio]} render-fn]
-  (r/with-let [_ (log/error "Load media")
-               room-id      @(re-frame/subscribe [:rooms/active-id])
+  (r/with-let [room-id      @(re-frame/subscribe [:rooms/active-id])
                event-id     (:id event)
                info         (:info content)
                w            (:w info)
