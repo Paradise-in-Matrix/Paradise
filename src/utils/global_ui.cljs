@@ -358,36 +358,62 @@
 
 
 
+(defn make-swipe-handlers
+  "Abstracts pointer event tracking for horizontal swipes.
+   !drag-state should be an atom containing {:start-x nil :dx 0}."
+  [!drag-state {:keys [on-start on-move on-end]}]
+  (let [handle-ptr-down
+        (fn [e]
+          (when (= (.-button e) 0)
+            (.setPointerCapture (.-target e) (.-pointerId e))
+            (let [x (.-clientX e)]
+              (reset! !drag-state {:start-x x :dx 0})
+              (when on-start (on-start x)))))
+
+        handle-ptr-move
+        (fn [e]
+          (let [{:keys [start-x]} @!drag-state]
+            (when start-x
+              (let [dx (- (.-clientX e) start-x)]
+                (swap! !drag-state assoc :dx dx)
+                (when on-move (on-move dx))))))
+
+        handle-ptr-up
+        (fn [e]
+          (let [{:keys [start-x dx]} @!drag-state]
+            (when start-x
+              (.releasePointerCapture (.-target e) (.-pointerId e))
+              (when on-end (on-end dx))
+              (swap! !drag-state assoc :start-x nil :dx 0))))]
+
+    {:on-pointer-down   handle-ptr-down
+     :on-pointer-move   handle-ptr-move
+     :on-pointer-up     handle-ptr-up
+     :on-pointer-cancel handle-ptr-up}))
+
 (defn swipe-to-action-wrapper [{:keys [can-edit? on-action wrapper-props enabled?]} & children]
   (if-not enabled?
     (into [:div.swipe-foreground wrapper-props] children)
-    (r/with-let [!drag-state     (r/atom {:start-x nil :current-x 0 :action nil})
+    (r/with-let [!drag-state     (r/atom {:start-x nil :dx 0 :action nil :current-x 0})
                  reply-threshold 50
-                 edit-threshold  140]
+                 edit-threshold  140
+                 swipe-props (make-swipe-handlers
+                              !drag-state
+                              {:on-move (fn [dx]
+                                          (let [pull-dist  (- dx)
+                                                bounded-dx (max 0 (min pull-dist 180))
+                                                new-action (cond
+                                                             (and can-edit? (> bounded-dx edit-threshold)) :edit
+                                                             (> bounded-dx reply-threshold)                :reply
+                                                             :else                                         nil)]
+                                            (swap! !drag-state assoc :current-x bounded-dx :action new-action)))
+                               :on-end (fn [_]
+                                         (when-let [action (:action @!drag-state)]
+                                           (on-action action))
+                                         (swap! !drag-state assoc :action nil :current-x 0))})]
+
       (let [{:keys [start-x current-x action]} @!drag-state
-            is-dragging? (some? start-x)
-
-            handle-ptr-down (fn [e]
-                              (when (= (.-button e) 0)
-                                (.setPointerCapture (.-target e) (.-pointerId e))
-                                (reset! !drag-state {:start-x (.-clientX e) :current-x 0 :action nil})))
-
-            handle-ptr-move (fn [e]
-                              (when start-x
-                                (let [dx (- start-x (.-clientX e))
-                                      bounded-dx (max 0 (min dx 180))
-                                      new-action (cond
-                                                   (and can-edit? (> bounded-dx edit-threshold)) :edit
-                                                   (> bounded-dx reply-threshold)               :reply
-                                                   :else                                        nil)]
-                                  (swap! !drag-state assoc :current-x bounded-dx :action new-action))))
-
-            handle-ptr-up (fn [e]
-                            (when start-x
-                              (.releasePointerCapture (.-target e) (.-pointerId e))
-                              (when action
-                                (on-action action))
-                              (reset! !drag-state {:start-x nil :current-x 0 :action nil})))]
+            is-dragging? (some? start-x)]
 
         [:div.timeline-swipe-wrapper
          {:style {:position "relative" :overflow "hidden"}}
@@ -402,14 +428,10 @@
             (= action :edit)  [:span [icons/edit] " Edit"]
             (= action :reply) [:span "Reply " [icons/reply]]
             :else             [:span [icons/reply]])]
-
          (into [:div.swipe-foreground
                 (merge wrapper-props
-                       {:on-pointer-down   handle-ptr-down
-                        :on-pointer-move   handle-ptr-move
-                        :on-pointer-up     handle-ptr-up
-                        :on-pointer-cancel handle-ptr-up
-                        :style {:transform    (str "translateX(-" current-x "px)")
+                       swipe-props
+                       {:style {:transform    (str "translateX(-" current-x "px)")
                                 :transition   (if is-dragging? "none" "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)")
                                 :touch-action "pan-y"
                                 :position     "relative"
