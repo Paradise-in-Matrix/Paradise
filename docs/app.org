@@ -40,7 +40,7 @@ actual UI components themselves.
    [container.call.call-container :refer [persistent-call-container]]
    [client.config :refer [load-config check-remote-version load-i18n]]
    [taoensso.tempura :as tempura :refer [tr]]
-   [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay]]
+   [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay make-swipe-handlers]]
    ["@capacitor/status-bar" :refer [StatusBar]]
    [utils.macros :refer [i18n-data]]
    [utils.svg :as icons]
