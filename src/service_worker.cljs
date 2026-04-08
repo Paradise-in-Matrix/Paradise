@@ -143,7 +143,7 @@
 
 (js/self.addEventListener "install"
   (fn [event]
-    #_(.skipWaiting js/self)))
+    (.skipWaiting js/self)))
 
 (js/self.addEventListener "activate"
   (fn [event]
