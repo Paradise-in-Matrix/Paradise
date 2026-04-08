@@ -262,7 +262,7 @@ Once this goes off the service worker starts to come alive.
 #+begin_src clojurescript :tangle ../src/service_worker.cljs
 (js/self.addEventListener "install"
   (fn [event]
-    #_(.skipWaiting js/self)))
+    (.skipWaiting js/self)))
 #+end_src
 
 
