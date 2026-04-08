@@ -246,8 +246,7 @@
     [:span.body (linkify-text body)]))
 
 (defn async-media-wrapper [event content {:keys [class default-ratio]} render-fn]
-  (r/with-let [_ (log/error "Load media")
-               room-id      @(re-frame/subscribe [:rooms/active-id])
+  (r/with-let [room-id      @(re-frame/subscribe [:rooms/active-id])
                event-id     (:id event)
                info         (:info content)
                w            (:w info)
@@ -262,22 +261,22 @@
                                :max-width "300px"
                                :background "var(--bg-secondary)"})
                !blob-url    (r/atom nil)
-
-
-               _            (go
-                              (let [pool @state/!engine-pool
-                                    res  (<! (main/do-with-pool! pool {:handler :get-media
-                                                                       :arguments {:room-id room-id
-                                                                                   :event-id event-id
-                                                                                   :source (or (:source content) (:url content))}}))]
-
-
-                                (when (= (:status res) "success")
-                                  (let [bytes-arr (clj->js (:bytes res))
-                                        bytes     (js/Uint8Array. bytes-arr)
-                                        blob      (js/Blob. #js [bytes] #js {:type (or (:mimetype info) "image/png")})
-                                        url       (js/URL.createObjectURL blob)]
-                                    (reset! !blob-url url)))))]
+               _   (go
+                     (let [pool @state/!engine-pool
+                           res  (<! (main/do-with-pool! pool {:handler :get-media
+                                                              :arguments {:room-id room-id
+                                                                          :event-id event-id}}))]
+                       (case (:status res)
+                         "unencrypted"
+                         (reset! !blob-url (:url res))
+                         "success"
+                         (let [buffer (:bytes res)
+                               blob   (js/Blob. #js [buffer] #js {:type (or (:mimetype info) "image/png")})
+                               url    (js/URL.createObjectURL blob)]
+                           (reset! !blob-url url))
+                         "error"
+                         (log/error "Media load failed:" (:msg res))
+                         (log/error "Unknown status from worker:" res))))]
     (let [url @!blob-url]
       [:div.media-container {:class class :style style}
        (if url
@@ -289,15 +288,12 @@
       (when-let [url @!blob-url]
         (js/URL.revokeObjectURL url)))))
 
-
-
-
-
 (defn image-message [event content]
   [:div.image-attachment-container
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
       [:img {:src url :alt alt-text :loading "eager"
+;;             :decoding "async"
              :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox
                                             {:url url
                                              :backdrop-props {:class "lightbox-backdrop"}
