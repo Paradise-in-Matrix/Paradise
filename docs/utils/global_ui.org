@@ -705,6 +705,41 @@ also likely not be selectable (as the fallback will be literal text).
 
 
 
+#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+(defn make-swipe-handlers
+  "Abstracts pointer event tracking for horizontal swipes.
+   !drag-state should be an atom containing {:start-x nil :dx 0}."
+  [!drag-state {:keys [on-start on-move on-end]}]
+  (let [handle-ptr-down
+        (fn [e]
+          (when (= (.-button e) 0)
+            (.setPointerCapture (.-target e) (.-pointerId e))
+            (let [x (.-clientX e)]
+              (reset! !drag-state {:start-x x :dx 0})
+              (when on-start (on-start x)))))
+
+        handle-ptr-move
+        (fn [e]
+          (let [{:keys [start-x]} @!drag-state]
+            (when start-x
+              (let [dx (- (.-clientX e) start-x)]
+                (swap! !drag-state assoc :dx dx)
+                (when on-move (on-move dx))))))
+
+        handle-ptr-up
+        (fn [e]
+          (let [{:keys [start-x dx]} @!drag-state]
+            (when start-x
+              (.releasePointerCapture (.-target e) (.-pointerId e))
+              (when on-end (on-end dx))
+              (swap! !drag-state assoc :start-x nil :dx 0))))]
+
+    {:on-pointer-down   handle-ptr-down
+     :on-pointer-move   handle-ptr-move
+     :on-pointer-up     handle-ptr-up
+     :on-pointer-cancel handle-ptr-up}))
+#+end_src
+
 
 This is more targeted to Slide to Reply and Long Slide to Edit, but I'll likely come back
 and pull this apart more.
