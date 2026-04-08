@@ -98,6 +98,7 @@
                                                   (let [formatted  (.-formattedCaption m-content-obj)
                                                         info       (.-info m-content-obj)
                                                         ffi-source (.-source m-content-obj)
+                                                        raw-mxc    (extract-mxc-url ffi-source)
                                                         res        {:mimetype (some-> info .-mimetype)
                                                                     :size     (some-> info .-size js/Number)}]
                                                     (when ffi-source
@@ -113,7 +114,9 @@
                                                                     res)})
                                                   {:unsupported true})})
                                     "Sticker"
-                                    (let [ffi-source (.-source kind-inner)]
+                                    (let [ffi-source (.-source kind-inner)
+                                          raw-mxc    (extract-mxc-url ffi-source)
+                                          ]
                                       (swap! state/!media-cache assoc real-id ffi-source)
                                       {:source raw-mxc
                                        :info   (when-let [info (.-info kind-inner)]
