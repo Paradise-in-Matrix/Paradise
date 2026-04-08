@@ -1,6 +1,6 @@
 {
     "name": "Paradise",
-    "version": "0.21.1",
+    "version": "0.21.2",
     "repository": {
         "type": "git",
         "url": "https://github.com/Paradise-in-Matrix/Paradise"
@@ -29,6 +29,7 @@
         "@capacitor/cli": "^8.3.0",
         "@capacitor/core": "^8.3.0",
         "@capacitor/ios": "^8.3.0",
+        "@capacitor/push-notifications": "^8.0.3",
         "@capacitor/status-bar": "^8.0.2",
         "@chenglou/pretext": "^0.0.4",
         "@element-hq/element-call-embedded": "^0.16.3",
