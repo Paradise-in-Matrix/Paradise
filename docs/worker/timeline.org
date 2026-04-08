@@ -446,6 +446,18 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
 **** Media Fetching
 
 #+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+(defn b64->uint8 [b64]
+  (let [b1     (str/replace b64 "-" "+")
+        b2     (str/replace b1 "_" "/")
+        pad    (mod (- 4 (mod (count b2) 4)) 4)
+        padded (str b2 (apply str (repeat pad "=")))
+        raw    (js/atob padded)
+        len    (.-length raw)
+        arr    (js/Uint8Array. len)]
+    (dotimes [i len]
+      (aset arr i (.charCodeAt raw i)))
+    arr))
+
 (worker/register :get-media
   (fn [{:keys [event-id source]}]
     (go
