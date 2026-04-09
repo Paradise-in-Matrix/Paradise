@@ -2,7 +2,7 @@
 (:require
  [utils.svg :as icons]
  [utils.global-ui :refer [avatar]]
- [utils.helpers :refer [mxc->url]]
+ [utils.images :refer [mxc-image]]
  [re-frame.core :as re-frame]
  [clojure.string :as str]
  [taoensso.timbre :as log]
@@ -10,9 +10,9 @@
  [overlays.base :refer [modal-component popover-component]]))
 
 (defn reaction-details-content [{:keys [room-id reactions]}]
-  (let [tr           @(re-frame/subscribe [:i18n/tr])
-        members-map  @(re-frame/subscribe [:room/members-map room-id])
-        close-fn     #(re-frame/dispatch [:ui/close-modal])]
+  (let [tr          @(re-frame/subscribe [:i18n/tr])
+        members-map @(re-frame/subscribe [:room/members-map room-id])
+        close-fn    #(re-frame/dispatch [:ui/close-modal])]
     [:<>
      [:div.reaction-details-close-btn
       {:on-click close-fn :title "Close"}
@@ -26,8 +26,12 @@
        [:div.reaction-detail-row
         [:div.reaction-detail-icon
          (if (str/starts-with? emoji "mxc://")
-           [:img.reaction-detail-img
-            {:src (mxc->url emoji {:width 40 :height 40 :method "crop"})}]
+           [mxc-image {:mxc   emoji
+                       :class "reaction-detail-img"
+                       :style {:width "40px"
+                               :height "40px"
+                               :object-fit "cover"}
+                       :alt   "Custom Emote"}]
            [:span emoji])]
 
         [:div.reaction-detail-users
@@ -40,11 +44,8 @@
               [avatar {:id user-id :name dname :url avatar-url :size 28 :shape :circle}]
               [:span.reaction-detail-user-name dname]]))]])]))
 
-
 (defmethod modal-component :reaction-details [_]
   reaction-details-content)
-
-
 
 (defn reaction-picker-content [{:keys [room-id msg-id close-fn]}]
   [emoji-sticker-board
