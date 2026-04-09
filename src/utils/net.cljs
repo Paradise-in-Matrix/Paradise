@@ -63,6 +63,7 @@
            headers      (or (.-headers opts) #js {})
            safe-headers (js/Object.assign #js {} headers)
            wants-auth?  (or (.-auth opts)
+                            is-media?
                             (and is-absolute?
                                  hs-url
                                  (safe-auth-path? raw-url hs-url)))]
@@ -70,20 +71,4 @@
        (aset safe-headers "Authorization" (str "Bearer " token)))
      (js-delete opts "auth")
      (aset opts "headers" safe-headers)
-     (if (and is-absolute? (.isNativePlatform Capacitor))
-       (let [cap-req #js {:url raw-url
-                          :method method
-                          :headers safe-headers
-                          :data (.-body opts)}]
-         (-> (.request CapacitorHttp cap-req)
-             (p/then (fn [response]
-                       (let [status (.-status response)
-                             data   (.-data response)]
-                         #js {:ok     (and (>= status 200) (< status 300))
-                              :status status
-                              :json   (fn [] (p/resolved data))
-                              :text   (fn [] (p/resolved (if (string? data) data (js/JSON.stringify data))))})))))
-       (js/fetch raw-url opts)))))
-
-
-
+     (js/fetch raw-url opts))))
