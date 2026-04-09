@@ -44,7 +44,7 @@
              (not (get @!ui-blob-cache mxc))
              (not (contains? @!in-flight mxc)))
     (swap! !in-flight conj mxc)
-    (let [url (if (clojure.string/starts-with? mxc "mxc://")
+    (let [url (if (str/starts-with? mxc "mxc://")
                 (mxc->url mxc)
                 mxc)]
       (if-not url
