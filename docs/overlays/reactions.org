@@ -14,7 +14,7 @@ Realistically, we should have a rather generic modal in which we just offer prop
 (:require
  [utils.svg :as icons]
  [utils.global-ui :refer [avatar]]
- [utils.helpers :refer [mxc->url]]
+ [utils.images :refer [mxc-image]]
  [re-frame.core :as re-frame]
  [clojure.string :as str]
  [taoensso.timbre :as log]
