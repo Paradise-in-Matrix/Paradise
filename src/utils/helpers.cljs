@@ -1,6 +1,7 @@
 (ns utils.helpers
   (:require
    [utils.net :as net]
+   [utils.images :refer [mxc-image]]
    [clojure.string :as str]
    [promesa.core :as p]
    [hickory.core :as h]
@@ -8,33 +9,6 @@
    [clojure.walk :as walk]
    [taoensso.timbre :as log]
    ))
-
-(defn mxc->url
-  ([mxc-url] (mxc->url mxc-url {}))
-  ([mxc-url {:keys [homeserver type width height method] :or {type :download}}]
-   (when (and (string? mxc-url) (str/starts-with? mxc-url "mxc://"))
-     (let [db       (try @re-frame.db/app-db (catch :default _ {}))
-           base-url (or homeserver (:homeserver-url db))]
-       (when base-url
-         (let [server-base (str/replace base-url #"/+$" "")
-               resource    (str/replace mxc-url #"^mxc://" "")
-               base-path   (str "/_matrix/client/v1/media/" (name type) "/" resource)]
-           (if (= type :thumbnail)
-             (str server-base base-path
-                  "?width="  (or width 48)
-                  "&height=" (or height 48)
-                  "&method=" (or method "crop"))
-             (str server-base base-path))))))))
-
-
-(defn url->mxc [url]
-  (if (and (string? url) (str/includes? url "/_matrix/"))
-    (let [parts (str/split url #"/media/(?:download|thumbnail)/")]
-      (if (= (count parts) 2)
-        (str "mxc://" (second parts))
-        url))
-    url))
-
 
 (def max-tag-nesting 100)
 
@@ -90,8 +64,10 @@
 (defn- transform-img [attrs]
   (let [src (get attrs :src "")]
     (if (and (string? src) (str/starts-with? src "mxc://"))
-      {:tag :img
-       :attrs (-> attrs (assoc :class "timeline-emotes") (assoc :src (mxc->url src)))}
+      {:tag mxc-image
+       :attrs {:mxc   src
+               :class "timeline-emotes"
+               :alt   (get attrs :alt)}}
       {:tag :a
        :attrs {:href src :rel "noopener" :target "_blank"}
        :content [(or (get attrs :alt) src)]})))
