@@ -6,7 +6,8 @@
             [cljs-workers.core :as main]
             [client.state :as state]
             [cljs.core.async :refer [go <!]]
-            [utils.helpers :refer [mxc->url sanitize-custom-html format-divider-date format-time linkify-text truncate-name]]
+            [utils.helpers :refer [sanitize-custom-html format-divider-date format-time linkify-text truncate-name]]
+            [utils.images :refer [mxc->url]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [inline-editor]]
@@ -360,36 +361,42 @@
 
 
 (defn reaction-row [{:keys [reactions my-id members-map active-room event-id]}]
-  (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])]
-    [:div.reactions-row
-     (for [[emoji count senders] reactions]
-       ^{:key emoji}
-       (let [hover-text (->> senders
-                             (map (fn [uid]
-                                    (or (:display-name (get members-map uid)) uid)))
-                             (str/join ", "))]
-         [:span.reaction-pill
-          {:class (when (contains? senders my-id) "active")
-           :title hover-text
-           :on-context-menu (fn [e]
-                              (.preventDefault e)
-                              (.stopPropagation e)
-                              (re-frame/dispatch
-                               [:ui/open-modal :reaction-details
-                                {:room-id active-room
-                                 :reactions reactions
-                                 :window-props {:style {:max-width "400px" :min-height "300px"}}}]))
-           :on-click (fn [e]
-                       (.preventDefault e)
-                       (.stopPropagation e)
-                       (re-frame/dispatch [:sdk/toggle-reaction active-room event-id emoji]))
-           :style {:cursor "pointer" :user-select "none"}}
-          (if (str/starts-with? emoji "mxc://")
-            [:img.reaction-custom
-             {:src (mxc->url emoji {:homeserver hs-url :width 32 :height 32 :method "crop"})
-              :style {:pointer-events "none"}}]
-            [:span.reaction-emoji {:style {:pointer-events "none"}} emoji])
-          [:span.reaction-count {:style {:pointer-events "none"}} count]]))]))
+  [:div.reactions-row
+   (for [[emoji count senders] reactions]
+     ^{:key emoji}
+     (let [hover-text (->> senders
+                           (map (fn [uid]
+                                  (or (:display-name (get members-map uid)) uid)))
+                           (str/join ", "))]
+       [:span.reaction-pill
+        {:class (when (contains? senders my-id) "active")
+         :title hover-text
+         :on-context-menu (fn [e]
+                            (.preventDefault e)
+                            (.stopPropagation e)
+                            (re-frame/dispatch
+                             [:ui/open-modal :reaction-details
+                              {:room-id active-room
+                               :reactions reactions
+                               :window-props {:style {:max-width "400px" :min-height "300px"}}}]))
+         :on-click (fn [e]
+                     (.preventDefault e)
+                     (.stopPropagation e)
+                     (re-frame/dispatch [:sdk/toggle-reaction active-room event-id emoji]))
+         :style {:cursor "pointer" :user-select "none"}}
+        (if (str/starts-with? emoji "mxc://")
+          [mxc-image
+           {:mxc   emoji
+            :class "reaction-custom"
+            :style {:pointer-events "none"
+                    :height "1.2em"
+                    :width "auto"
+                    :vertical-align "middle"
+                    :object-fit "contain"}
+            :alt   "emote"}]
+          [:span.reaction-emoji {:style {:pointer-events "none"}} emoji])
+        [:span.reaction-count {:style {:pointer-events "none"}} count]]))])
+
 
 (defn system-event-view [icon text]
   [:div.timeline-system-event
