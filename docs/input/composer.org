@@ -15,16 +15,17 @@ just keep this to defining the look and feel itself.
 (ns input.composer
     (:require
      [clojure.string :as str]
-            [utils.helpers :refer [mxc->url url->mxc]]
-            [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
-            ["react" :as react]
-            ["@tiptap/react" :refer [useEditor EditorContent]]
-            ["@tiptap/starter-kit" :default StarterKit]
-            ["@tiptap/extension-placeholder" :default Placeholder]
-            ["@tiptap/extension-mention" :default Mention]
-            ["@tiptap/extension-link" :default Link]
-            ["@tiptap/core" :refer [Extension Node mergeAttributes]]
-            ["prosemirror-state" :refer [Plugin PluginKey]]))
+     [utils.images :refer [mxc->url url->mxc mxc-image]]
+     [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
+     ["react" :as react]
+     [reagent.core :as r]
+     ["@tiptap/react" :refer [useEditor EditorContent ReactNodeViewRenderer NodeViewWrapper]]
+     ["@tiptap/starter-kit" :default StarterKit]
+     ["@tiptap/extension-placeholder" :default Placeholder]
+     ["@tiptap/extension-mention" :default Mention]
+     ["@tiptap/extension-link" :default Link]
+     ["@tiptap/core" :refer [Extension Node mergeAttributes]]
+      ["prosemirror-state" :refer [Plugin PluginKey]]))
 #+end_src
 
 
