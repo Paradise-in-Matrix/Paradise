@@ -84,8 +84,10 @@ Just use Reagent.
 (defn- transform-img [attrs]
   (let [src (get attrs :src "")]
     (if (and (string? src) (str/starts-with? src "mxc://"))
-      {:tag :img
-       :attrs (-> attrs (assoc :class "timeline-emotes") (assoc :src (mxc->url src)))}
+      {:tag mxc-image
+       :attrs {:mxc   src
+               :class "timeline-emotes"
+               :alt   (get attrs :alt)}}
       {:tag :a
        :attrs {:href src :rel "noopener" :target "_blank"}
        :content [(or (get attrs :alt) src)]})))
