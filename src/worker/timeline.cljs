@@ -7,6 +7,7 @@
    ["ffi-bindings" :as sdk :refer [TimelineConfiguration MessageType ReceiptType]]
    [cljs.core.async.interop :refer-macros [<p!]]
    [client.diff-handler :refer [apply-matrix-diffs]]
+   [utils.net :as net]
    [worker.state :as state])
   (:require-macros
    [cljs.core.async.macros :refer [go]]))
@@ -377,7 +378,7 @@
                     resource  (clojure.string/replace (str mxc) #"^mxc://" "")
                     fetch-url (cljs.core/str server "/_matrix/client/v1/media/download/" resource)
 
-                    resp      (<p! (js/fetch fetch-url))
+                    resp      (<p! (net/fetch fetch-url))
                     buf       (<p! (.arrayBuffer resp))]
                 {:status "success"
                  :bytes  buf
@@ -388,7 +389,7 @@
                     server    (clojure.string/replace (str hs-url) #"/+$" "")
                     resource  (clojure.string/replace (str mxc-url) #"^mxc://" "")
                     fetch-url (cljs.core/str server "/_matrix/client/v1/media/download/" resource)
-                    resp      (<p! (js/fetch fetch-url))
+                    resp      (<p! (net/fetch fetch-url))
                     enc-buf   (<p! (.arrayBuffer resp))
 
                     iv-arr    (b64->uint8 iv-b64)
@@ -489,7 +490,7 @@
                 token   (.-accessToken session)
                 hs      (.-homeserverUrl session)
                 url     (str hs "/_matrix/client/v3/rooms/" room-id "/state/m.room.pinned_events/")
-                resp    (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
+                resp    (<p! (net/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
             (if-not (.-ok resp)
               {:status :success :events []}
               (let [state-json (<p! (.json resp))
@@ -522,7 +523,7 @@
                                        :order_by    "recent"
                                        :filter      {:rooms [room-id]}
                                        :event_context {:before_limit 1 :after_limit 1}}}})
-              resp         (<p! (js/fetch url
+              resp         (<p! (net/fetch url
                                           #js {:method "POST"
                                                :headers #js {"Authorization" (str "Bearer " token)
                                                              "Content-Type"  "application/json"}
