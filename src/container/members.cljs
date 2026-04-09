@@ -5,7 +5,7 @@
    [clojure.string :as str]
    ["react-virtuoso" :refer [GroupedVirtuoso]]
    [reagent.core :as r]
-   [utils.helpers :refer [mxc->url]]
+   [utils.images :refer [mxc-image]]
    [utils.svg :as icons]
    [utils.global-ui :refer [avatar]]
    [cljs.core.async :refer [go <!]]
@@ -33,10 +33,8 @@
 (re-frame/reg-event-db
  :room/fetch-members-success
  (fn [db [_ room-id raw-members]]
-   (let [hs-url (:homeserver-url db)
-         clean-members (mapv (fn [m]
-                               (assoc m :avatar-url (when (:avatar-mxc m)
-                                                      (mxc->url (:avatar-mxc m) {:homeserver hs-url}))))
+   (let [clean-members (mapv (fn [m]
+                               (assoc m :avatar-url (:avatar-mxc m)))
                              raw-members)]
      (-> db
          (assoc-in [:room-members room-id :data] clean-members)
@@ -259,7 +257,7 @@
         tag-data   (get custom-tags (keyword (str pl)))
         role-name  (:name tag-data)
         role-color (or (:color tag-data) "var(--text-primary)")
-        icon-url   (some-> tag-data :icon :key mxc->url)]
+        icon-mxc   (some-> tag-data :icon :key)]
     [profile-popover-trigger m custom-tags active-room :left
      [:div.member-item
       [avatar {:id (:user-id m) :name (:display-name m) :url (:avatar-url m) :size 32}]
@@ -268,8 +266,8 @@
         [:span.member-item-name {:style {:color role-color}} (:display-name m)]
         (when role-name
           [:div.member-item-role-badge {:style {:color role-color :border (str "1px solid " role-color)}}
-           (when icon-url
-             [:img.member-item-role-icon {:src icon-url}])
+           (when icon-mxc
+             [mxc-image {:mxc icon-mxc :class "member-item-role-icon"}])
            role-name])]
        [:span.member-item-user-id (:user-id m)]]]]))
 
