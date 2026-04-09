@@ -5,7 +5,7 @@
    [reagent.core :as r]
    [utils.svg :as icons]
    [overlays.base :refer [modal-component]]
-   [utils.helpers :refer [mxc->url]]
+   [utils.global-ui :refer [avatar]]
    [taoensso.timbre :as log]
    [utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
@@ -124,10 +124,12 @@
                                       :label (tr [:settings.context-menu/logout])
                                       :action #(re-frame/dispatch [:sdk/logout])
                                       :class-name "danger"}]}]))}
-      (if (:avatar-url profile)
-        [:img.profile-avatar {:src (mxc->url (:avatar-url profile))}]
-        [:div.avatar-placeholder (subs (or (:display-name profile) "?") 0 1)])
+      [avatar {:id   (:user-id profile)
+               :name (or (:display-name profile) "?")
+               :url  (:avatar-url profile)
+               :size 40}]
       [:div.status-dot]]]))
+
 
 (defn verification-tab []
   (r/with-let [!passphrase (r/atom "")]
@@ -172,9 +174,10 @@
     [:<>
      [:h2.settings-heading (tr [:settings.profile/title])]
      [:div.profile-card
-      (if (:avatar-url profile)
-        [:img.profile-avatar-large {:src (mxc->url (:avatar-url profile))}]
-        [:div.profile-avatar-placeholder-large])
+      [avatar {:id   (:user-id profile)
+               :name (or (:display-name profile) "?")
+               :url  (:avatar-url profile)
+               :size 80}]
       [:div.profile-info
        [:div.profile-name
         (or (:display-name profile)
