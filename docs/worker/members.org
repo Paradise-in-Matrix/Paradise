@@ -12,6 +12,7 @@
 (ns worker.members
   (:require [cljs-workers.worker :as worker]
             [clojure.string :as str]
+            [utils.net :as net]
             [worker.state :as state])
   (:require-macros [cljs.core.async.macros :refer [go]]
                    [cljs.core.async.interop :refer [<p!]]))
@@ -71,7 +72,7 @@
               hs-url     (.-homeserverUrl session)
               clean-base (str/replace hs-url #"/+$" "")
               url        (str clean-base "/_matrix/client/v3/rooms/" (js/encodeURIComponent room-id) "/state/in.cinny.room.power_level_tags/")]
-          (let [resp (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
+          (let [resp (<p! (net/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
             (if (.-ok resp)
               (let [data (<p! (.json resp))]
                 {:status :success :tags (js->clj data :keywordize-keys true)})
