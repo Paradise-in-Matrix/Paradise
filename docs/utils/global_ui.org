@@ -600,10 +600,9 @@ provide an avatar color.
     (let [show-image? (and url (not @!broken?))
           len         (count name)
           target      (if (#{:space :squircle :square} shape) 2 1)
-          initials    (if (> len 0)
-                        (subs name 0 (min len target))
-                        "?")
-          bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))]
+          initials    (if (> len 0) (subs name 0 (min len target)) "?")
+          bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))
+          is-mxc?     (and url (str/starts-with? url "mxc://"))]
       [:div.avatar-wrapper
        {:class (kname shape)
         :style {:width size :height size}}
