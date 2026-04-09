@@ -13,9 +13,11 @@ them collected together
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
+   [clojure.string :as str]
    [reagent.core :as r]
    [overlays.base :refer [modal-component popover-component]]
    [utils.svg :as icons]
+   [utils.images :refer [mxc-image]]
    ))
 #+end_src
 
