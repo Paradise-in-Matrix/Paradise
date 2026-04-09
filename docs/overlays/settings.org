@@ -26,7 +26,7 @@ Not entirely important to read, but certainly interesting.
    [reagent.core :as r]
    [utils.svg :as icons]
    [overlays.base :refer [modal-component]]
-   [utils.helpers :refer [mxc->url]]
+   [utils.global-ui :refer [avatar]]
    [taoensso.timbre :as log]
    [utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
