@@ -14,6 +14,7 @@
             [cljs-workers.worker :as worker]
             [promesa.core :as p]
             [clojure.string :as str]
+            [utils.net :as net]
             [worker.state :as state]
             [worker.timeline :refer [!active-timelines]]
             ["ffi-bindings" :as sdk :refer [MessageFormat UploadSource UploadParameters]]
@@ -121,7 +122,7 @@
               payload #js {:body (if (keyword? alt-text) (name alt-text) (or alt-text "Sticker"))
                            :url  mxc
                            :info (clj->js (merge {:mimetype "image/png"} info))}]
-          (let [resp (<p! (js/fetch url #js {:method "PUT"
+          (let [resp (<p! (net/fetch url #js {:method "PUT"
                                              :headers #js {"Authorization" (str "Bearer " token)
                                                            "Content-Type" "application/json"}
                                              :body (js/JSON.stringify payload)}))]
@@ -232,13 +233,13 @@
                                fetch-state (fn [rid evt-type state-key]
                                              (let [key-path (if (empty? state-key) "" (str "/" state-key))
                                                    url      (str hs "/_matrix/client/v3/rooms/" rid "/state/" evt-type key-path)]
-                                               (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})
+                                               (p/let [resp (net/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})
                                                        json (when (.-ok resp) (.json resp))]
                                                  (when json
                                                    (js->clj json :keywordize-keys true)))))
                                fetch-room-state (fn [rid]
                                                   (let [url (str hs "/_matrix/client/v3/rooms/" rid "/state")]
-                                                    (p/let [resp (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})
+                                                    (p/let [resp (net/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}})
                                                             json (when (.-ok resp) (.json resp))]
                                                       (when json
                                                         (let [data (js->clj json :keywordize-keys true)]
