@@ -11,6 +11,7 @@ So there a couple methods that don't mesh perfectly in any one location that for
 #+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
 (ns utils.helpers
   (:require
+   [utils.net :as net]
    [clojure.string :as str]
    [promesa.core :as p]
    [hickory.core :as h]
@@ -322,7 +323,7 @@ we are finding more and more that we should have a method that enables the arbit
   (let [clean-hs (clojure.string/replace homeserver #"/+$" "")
         key-path (if (empty? state-key) "" (str "/" state-key))
         url      (str clean-hs "/_matrix/client/v3/rooms/" room-id "/state/" event-type key-path)]
-    (-> (p/let [resp (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
+    (-> (p/let [resp (net/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
           (when (.-ok resp)
             (.json resp)))
         (p/catch (constantly nil)))))
@@ -343,7 +344,7 @@ we can allow transducers to be passed for elegant filtering from the caller.
          key-path (if (empty? state-key) "" (str "/" state-key))
          url      (str clean-hs "/_matrix/client/v3/rooms/" room-id "/state"
                        (when event-type (str "/" event-type key-path)))]
-     (-> (p/let [resp (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
+     (-> (p/let [resp (net/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
            (when (.-ok resp)
              (p/let [json (.json resp)
                      data (js->clj json :keywordize-keys true)]
