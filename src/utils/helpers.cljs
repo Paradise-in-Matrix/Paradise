@@ -1,5 +1,6 @@
 (ns utils.helpers
   (:require
+   [utils.net :as net]
    [clojure.string :as str]
    [promesa.core :as p]
    [hickory.core :as h]
@@ -249,7 +250,7 @@
   (let [clean-hs (clojure.string/replace homeserver #"/+$" "")
         key-path (if (empty? state-key) "" (str "/" state-key))
         url      (str clean-hs "/_matrix/client/v3/rooms/" room-id "/state/" event-type key-path)]
-    (-> (p/let [resp (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
+    (-> (p/let [resp (net/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
           (when (.-ok resp)
             (.json resp)))
         (p/catch (constantly nil)))))
@@ -265,7 +266,7 @@
          key-path (if (empty? state-key) "" (str "/" state-key))
          url      (str clean-hs "/_matrix/client/v3/rooms/" room-id "/state"
                        (when event-type (str "/" event-type key-path)))]
-     (-> (p/let [resp (js/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
+     (-> (p/let [resp (net/fetch url #js {:headers #js {:Authorization (str "Bearer " token)}})]
            (when (.-ok resp)
              (p/let [json (.json resp)
                      data (js->clj json :keywordize-keys true)]
