@@ -2,9 +2,11 @@
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
+   [clojure.string :as str]
    [reagent.core :as r]
    [overlays.base :refer [modal-component popover-component]]
    [utils.svg :as icons]
+   [utils.images :refer [mxc-image]]
    ))
 
 (defn click-away-wrapper
@@ -335,10 +337,9 @@
     (let [show-image? (and url (not @!broken?))
           len         (count name)
           target      (if (#{:space :squircle :square} shape) 2 1)
-          initials    (if (> len 0)
-                        (subs name 0 (min len target))
-                        "?")
-          bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))]
+          initials    (if (> len 0) (subs name 0 (min len target)) "?")
+          bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))
+          is-mxc?     (and url (str/starts-with? url "mxc://"))]
       [:div.avatar-wrapper
        {:class (kname shape)
         :style {:width size :height size}}
@@ -351,10 +352,17 @@
              initials])])
 
        (when show-image?
-         [:img.avatar-img-layer
-          {:src      url
-           :alt      ""
-           :on-error #(reset! !broken? true)}])])))
+         (if is-mxc?
+           [mxc-image {:mxc      url
+                       :class    "avatar-img-layer"
+                       :alt      ""
+                       :on-error #(reset! !broken? true)}]
+           [:img.avatar-img-layer
+            {:src      url
+             :alt      ""
+             :on-error #(reset! !broken? true)}]))])))
+
+
 
 
 
