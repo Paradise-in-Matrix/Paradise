@@ -8,7 +8,6 @@
    [cljs.core.async :refer [go <!]]
    [overlays.settings :refer [sidebar-profile-mini]]
    [utils.svg :as icons]
-   [utils.helpers :refer [mxc->url]]
    [utils.global-ui :refer [avatar]]))
 
 (re-frame/reg-event-db
@@ -129,7 +128,7 @@
                          (->> (vals members-map)
                               (remove #(= (:user-id %) my-id))
                               first))
-          final-avatar (or (mxc->url avatar-url) (:avatar-url other-user))
+          final-avatar (or avatar-url (:avatar-url other-user))
           final-name   (if (and is-dm? other-user (= name "Loading..."))
                          (:display-name other-user)
                          name)]
