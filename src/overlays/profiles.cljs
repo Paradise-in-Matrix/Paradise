@@ -2,7 +2,6 @@
   (:require
    [overlays.base :refer [popover-component]]
    [utils.global-ui :refer [avatar]]
-   [utils.helpers :refer [mxc->url]]
    ))
 
 
@@ -12,7 +11,7 @@
         tag-data   (get tags (keyword (str pl)))
         role-name  (:name tag-data)
         role-color (or (:color tag-data) "var(--text-primary)")
-        icon-url   (some-> tag-data :icon :key mxc->url)]
+        icon-mxc   (some-> tag-data :icon :key)]
     [:div.profile-preview-card
      [:div.profile-preview-cover]
      [:div.profile-preview-content
@@ -28,8 +27,10 @@
         (:user-id member)]]
       (when role-name
         [:div.profile-preview-role-row
-         (when icon-url
-           [:img.member-item-role-icon {:src icon-url}])
+         (when icon-mxc
+           [mxc-image {:mxc icon-mxc
+                       :class "member-item-role-icon"
+                       :alt role-name}])
          [:span.profile-preview-role-text {:style {:color role-color}}
           role-name]])]]))
 
