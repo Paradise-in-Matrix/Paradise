@@ -2,7 +2,6 @@
   (:require [promesa.core :as p]
             [clojure.string :as str]
             [taoensso.timbre :as log]
-            [utils.helpers :refer [mxc->url]]
             )
   (:require-macros [utils.macros :refer [ocall oget]]))
 
@@ -22,7 +21,7 @@
              :invited                      invited}
         display-name (or (some-> (oget room-info :displayName) str/trim)
                          (oget room-info :id))
-        avatar-url (mxc->url  (oget room-info :avatarUrl) {:type :thumbnail :width 10 :height 10 :method "crop"})]
+        avatar-url (oget room-info :avatarUrl)]
     #js {:room                       room
          :id                         (oget room-info :id)
          :name                       display-name
