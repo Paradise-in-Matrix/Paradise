@@ -106,6 +106,19 @@ so below is a helper function that converts the node BACK to Mxc on send.
 ***** Custom TipTap Node
 
 #+begin_src clojurescript :tangle ../../src/input/composer.cljs
+
+(defn emote-node-view [props]
+  (let [node  (:node props)
+        attrs (.-attrs node)
+        mxc   (or (aget attrs "mxc") (aget attrs "src"))
+        alt   (aget attrs "shortcode")]
+    [:> NodeViewWrapper {:as "span" :style {:display "inline-block" :vertical-align "middle"}}
+     [mxc-image
+      {:mxc   mxc
+       :class "chat-input-emote"
+       :style {:height "1.5em" :width "auto"}
+       :alt   alt}]]))
+
 (def custom-emote
   (.create Node
    #js {:name "customEmote"
@@ -115,6 +128,8 @@ so below is a helper function that converts the node BACK to Mxc on send.
         :atom true
         :addAttributes (fn [] #js {:src #js {:default nil}
                                    :shortcode #js {:default nil}})
+        :addNodeView (fn []
+                       (ReactNodeViewRenderer (r/reactify-component emote-node-view)))
         :renderText (fn [^js props]
               (let [shortcode (str (.. props -node -attrs -shortcode))]
                 (if (and (seq shortcode)
