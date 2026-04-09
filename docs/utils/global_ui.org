@@ -615,10 +615,17 @@ provide an avatar color.
              initials])])
 
        (when show-image?
-         [:img.avatar-img-layer
-          {:src      url
-           :alt      ""
-           :on-error #(reset! !broken? true)}])])))
+         (if is-mxc?
+           [mxc-image {:mxc      url
+                       :class    "avatar-img-layer"
+                       :alt      ""
+                       :on-error #(reset! !broken? true)}]
+           [:img.avatar-img-layer
+            {:src      url
+             :alt      ""
+             :on-error #(reset! !broken? true)}]))])))
+
+
 
 
 #+end_src
