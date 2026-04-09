@@ -25,7 +25,7 @@ diffs like Timeline, Spaces, and Rooms.
    [clojure.string :as str]
    ["react-virtuoso" :refer [GroupedVirtuoso]]
    [reagent.core :as r]
-   [utils.helpers :refer [mxc->url]]
+   [utils.images :refer [mxc-image]]
    [utils.svg :as icons]
    [utils.global-ui :refer [avatar]]
    [cljs.core.async :refer [go <!]]
