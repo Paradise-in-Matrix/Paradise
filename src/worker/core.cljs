@@ -8,6 +8,7 @@
    ["ffi-bindings" :as sdk]
    [cljs.core.async.interop :refer-macros [<p!]]
    [cljs.core.async :refer [go]]
+   [utils.net :refer [set-auth-context!] :as net]
    [worker.state :as state]
    [worker.spaces :as spaces]
    [worker.timeline]
@@ -79,6 +80,7 @@
                                                #(.restoreSession % session))]
                    (reset! state/!media-cache nil)
                    (reset! state/!client client)
+                   (set-auth-context! token hs-url)
                    {:status :success
                     :user-id uid
                     :hs-url hs-url
@@ -103,7 +105,6 @@
                                     dev-id  (.-deviceId session)]
                               (reset! state/!client client)
                               (reset! state/!media-cache nil)
-
                               {:status :success
                                :user-id uid
                                :hs-url hs-url
@@ -181,7 +182,7 @@
                                  :endpoint endpoint
                                  :p256dh p256dh
                                  :auth auth}}
-              resp       (<p! (js/fetch url #js {:method "POST"
+              resp       (<p! (net/fetch url #js {:method "POST"
                                                  :headers #js {"Authorization" (str "Bearer " token)
                                                                "Content-Type" "application/json"}
                                                  :body (js/JSON.stringify (clj->js payload))}))]
