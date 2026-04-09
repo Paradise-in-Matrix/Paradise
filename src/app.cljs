@@ -201,7 +201,7 @@
                        {:on-end (fn [dx]
                                   (let [start-x (:start-x @!drag-state)]
                                     (cond
-                                      (and (not sidebar-open?) (< start-x 40) (> dx 60))
+                                      (and (not sidebar-open?) #_ (< start-x 40) (> dx 60))
                                       (re-frame/dispatch [:ui/set-sidebar true])
                                       (and sidebar-open? (< dx -60))
                                       (re-frame/dispatch [:ui/set-sidebar false]))))})]
