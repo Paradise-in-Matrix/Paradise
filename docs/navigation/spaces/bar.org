@@ -156,7 +156,7 @@ not (among many other indicators).
                          (->> (vals members-map)
                               (remove #(= (:user-id %) my-id))
                               first))
-          final-avatar (or (mxc->url avatar-url) (:avatar-url other-user))
+          final-avatar (or avatar-url (:avatar-url other-user))
           final-name   (if (and is-dm? other-user (= name "Loading..."))
                          (:display-name other-user)
                          name)]
