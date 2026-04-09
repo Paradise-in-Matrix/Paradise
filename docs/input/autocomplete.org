@@ -232,12 +232,16 @@ and the tab completion.
                   (if is-emoji?
                     (let [[shortcode emote-data] item]
                       [:<>
-                       [:img.suggestion-img {:src (mxc->url (:url emote-data))}]
+                       [mxc-image {:mxc   (:url emote-data)
+                                   :class "suggestion-img"
+                                   :alt   shortcode}]
                        [:span.suggestion-text ":" shortcode ":"]])
                     [:<>
-                     (if (:avatar-url item)
-                       [:img.suggestion-avatar {:src (mxc->url (:avatar-url item))}]
-                       [:div.suggestion-avatar-placeholder])
+                     [avatar {:id    (:user-id item)
+                              :name  (or (:display-name item) (:user-id item) "?")
+                              :url   (:avatar-url item)
+                              :size  24
+                              :shape :circle}]
                      [:div.suggestion-details
                       [:span.suggestion-name (:display-name item)]
                       [:span.suggestion-id (:user-id item)]]])]))
