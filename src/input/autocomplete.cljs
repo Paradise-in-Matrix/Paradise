@@ -3,7 +3,7 @@
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [utils.helpers :refer [mxc->url]]))
+   [utils.images :refer [mxc->url]]))
 
 (re-frame/reg-sub
  :mention/filtered-users
@@ -155,7 +155,7 @@
   (let [{:keys [active? type rect index] :as state} @(re-frame/subscribe [:suggestion/state])
         emojis  @(re-frame/subscribe [:emoji/filtered-suggestions])
         members @(re-frame/subscribe [:mention/filtered-users])
-        tr              @(re-frame/subscribe [:i18n/tr])]
+        tr      @(re-frame/subscribe [:i18n/tr])]
     (when (and active? rect)
       (let [is-emoji? (= type :emoji)
             items     (if is-emoji? emojis members)
@@ -186,12 +186,16 @@
                   (if is-emoji?
                     (let [[shortcode emote-data] item]
                       [:<>
-                       [:img.suggestion-img {:src (mxc->url (:url emote-data))}]
+                       [mxc-image {:mxc   (:url emote-data)
+                                   :class "suggestion-img"
+                                   :alt   shortcode}]
                        [:span.suggestion-text ":" shortcode ":"]])
                     [:<>
-                     (if (:avatar-url item)
-                       [:img.suggestion-avatar {:src (mxc->url (:avatar-url item))}]
-                       [:div.suggestion-avatar-placeholder])
+                     [avatar {:id    (:user-id item)
+                              :name  (or (:display-name item) (:user-id item) "?")
+                              :url   (:avatar-url item)
+                              :size  24
+                              :shape :circle}]
                      [:div.suggestion-details
                       [:span.suggestion-name (:display-name item)]
                       [:span.suggestion-id (:user-id item)]]])]))
