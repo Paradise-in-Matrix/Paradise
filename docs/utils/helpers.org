@@ -12,6 +12,7 @@ So there a couple methods that don't mesh perfectly in any one location that for
 (ns utils.helpers
   (:require
    [utils.net :as net]
+   [utils.images :refer [mxc-image]]
    [clojure.string :as str]
    [promesa.core :as p]
    [hickory.core :as h]
