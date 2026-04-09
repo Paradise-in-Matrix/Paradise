@@ -10,9 +10,7 @@ making wrapper functions to catch the specific calls needed.
 
 #+begin_src clojurescript :tangle ../../src/utils/net.cljs
 (ns utils.net
-  (:require ["@capacitor/core" :refer [Capacitor CapacitorHttp]]
-            [promesa.core :as p]
-            [taoensso.timbre :as log]
+  (:require [promesa.core :as p]
             [clojure.string :as str]
             ))
 #+end_src
