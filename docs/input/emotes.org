@@ -24,8 +24,9 @@ https://github.com/matrix-org/matrix-spec-proposals/pull/2545
    [cljs-workers.core :as main]
    [client.state :as state]
    [reagent.core :as r]
-   [utils.helpers :refer [mxc->url fetch-state-event fetch-room-state]]
+   [utils.helpers :refer [fetch-state-event fetch-room-state]]
    [utils.global-ui :refer [click-away-wrapper]]
+   [utils.images :refer [mxc-image]]
    ["emojibase-data/en/data.json" :as emoji-data]
    ["react" :as react]
    ))
