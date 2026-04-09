@@ -5,6 +5,7 @@
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
             [utils.svg :as icons]
+            [utils.net :refer [set-auth-context!]]
             [service-worker-handler :refer [register-sw!]]
             [taoensso.timbre :as log]))
 
@@ -57,6 +58,8 @@
    (when session-data
      (register-sw!))
    (log/error session-data)
+   (set-auth-context! (:accessToken session) (:homeserverUrl session))
+
    (log/info "Login successful for:" user-id)
    {:db (cond-> (assoc db :auth-status :logged-in
                           :active-user-id user-id
