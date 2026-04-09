@@ -18,6 +18,7 @@
    [cljs.core.async.interop :refer-macros [<p!]]
    [client.diff-handler :refer [apply-matrix-diffs]]
    [navigation.rooms.room-summary :refer [build-room-summary]]
+   [utils.net :as net]
    [worker.state :as state])
   (:require-macros
    [cljs.core.async.macros :refer [go]]))
@@ -405,7 +406,7 @@ repeat fetches for the space rooms for now.
                              token      (.-accessToken session)
                              clean-base (str/replace base-url #"/+$" "")
                              url        (str clean-base "/_matrix/client/v1/rooms/" space-id "/hierarchy")
-                             resp       (<p! (js/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))
+                             resp       (<p! (net/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))
                              json       (<p! (.json resp))]
                          (if (.-ok resp)
                            {:status :success :rooms (:rooms (js->clj json :keywordize-keys true))}
