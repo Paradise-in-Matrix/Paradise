@@ -1,16 +1,17 @@
 (ns input.composer
     (:require
      [clojure.string :as str]
-            [utils.helpers :refer [mxc->url url->mxc]]
-            [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
-            ["react" :as react]
-            ["@tiptap/react" :refer [useEditor EditorContent]]
-            ["@tiptap/starter-kit" :default StarterKit]
-            ["@tiptap/extension-placeholder" :default Placeholder]
-            ["@tiptap/extension-mention" :default Mention]
-            ["@tiptap/extension-link" :default Link]
-            ["@tiptap/core" :refer [Extension Node mergeAttributes]]
-            ["prosemirror-state" :refer [Plugin PluginKey]]))
+     [utils.images :refer [mxc->url url->mxc mxc-image]]
+     [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
+     ["react" :as react]
+     [reagent.core :as r]
+     ["@tiptap/react" :refer [useEditor EditorContent ReactNodeViewRenderer NodeViewWrapper]]
+     ["@tiptap/starter-kit" :default StarterKit]
+     ["@tiptap/extension-placeholder" :default Placeholder]
+     ["@tiptap/extension-mention" :default Mention]
+     ["@tiptap/extension-link" :default Link]
+     ["@tiptap/core" :refer [Extension Node mergeAttributes]]
+      ["prosemirror-state" :refer [Plugin PluginKey]]))
 
 (defn renderHtml [^js props]
   (let [attrs         (.-HTMLAttributes props)
@@ -69,6 +70,19 @@
                   "</p>"))
            (js/Array.from json)))))
 
+
+(defn emote-node-view [props]
+  (let [node  (:node props)
+        attrs (.-attrs node)
+        mxc   (or (aget attrs "mxc") (aget attrs "src"))
+        alt   (aget attrs "shortcode")]
+    [:> NodeViewWrapper {:as "span" :style {:display "inline-block" :vertical-align "middle"}}
+     [mxc-image
+      {:mxc   mxc
+       :class "chat-input-emote"
+       :style {:height "1.5em" :width "auto"}
+       :alt   alt}]]))
+
 (def custom-emote
   (.create Node
    #js {:name "customEmote"
@@ -78,6 +92,8 @@
         :atom true
         :addAttributes (fn [] #js {:src #js {:default nil}
                                    :shortcode #js {:default nil}})
+        :addNodeView (fn []
+                       (ReactNodeViewRenderer (r/reactify-component emote-node-view)))
         :renderText (fn [^js props]
               (let [shortcode (str (.. props -node -attrs -shortcode))]
                 (if (and (seq shortcode)
