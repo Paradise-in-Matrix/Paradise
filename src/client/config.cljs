@@ -2,15 +2,16 @@
   (:require [cljs.reader :refer [read-string]]
             [taoensso.timbre :as log]
             [re-frame.core :as re-frame]
+            [utils.net :as net]
             [promesa.core :as p]))
 
 (defn load-config []
-  (-> (js/fetch "./config.edn"  #js {:cache "no-store"} )
+  (-> (net/fetch "./config.edn"  #js {:cache "no-store"} )
       (p/then #(.text %))
       (p/then #(read-string %))))
 
 (defn load-i18n []
-  (-> (js/fetch "./i18n.edn" #js {:cache "no-store"})
+  (-> (net/fetch "./i18n.edn" #js {:cache "no-store"})
       (p/then #(.text %))
       (p/then (fn [raw]
                 (let [dict (cljs.reader/read-string raw)]
@@ -20,7 +21,7 @@
 
 (defn check-remote-version []
   (let [url (str "./config.edn?t=" (.getTime (js/Date.)))]
-    (-> (js/fetch url #js {:cache "no-store"})
+    (-> (net/fetch url #js {:cache "no-store"})
         (p/then #(.text %))
         (p/then #(read-string %))
         (p/then :version)
