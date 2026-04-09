@@ -13,7 +13,6 @@ to map out. So it isn't the cleanest, but for now it is sufficient.
   (:require [promesa.core :as p]
             [clojure.string :as str]
             [taoensso.timbre :as log]
-            [utils.helpers :refer [mxc->url]]
             )
   (:require-macros [utils.macros :refer [ocall oget]]))
 #+end_src
