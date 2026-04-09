@@ -23,43 +23,6 @@ So there a couple methods that don't mesh perfectly in any one location that for
 
 
 
-**** Mxc->Url/Url->Mxc
-
-This just provides a mechanism to convert mxc urls to usable urls
-according to the Matrix spec. Now it is convenient to be able
-to force it to use a home-server, but we should likely swap to retrieval
-from re-frame for the client to determine the home-server dynamically.
-This works for now though.
-
-#+begin_src clojurescript :tangle ../../src/utils/helpers.cljs
-(defn mxc->url
-  ([mxc-url] (mxc->url mxc-url {}))
-  ([mxc-url {:keys [homeserver type width height method] :or {type :download}}]
-   (when (and (string? mxc-url) (str/starts-with? mxc-url "mxc://"))
-     (let [db       (try @re-frame.db/app-db (catch :default _ {}))
-           base-url (or homeserver (:homeserver-url db))]
-       (when base-url
-         (let [server-base (str/replace base-url #"/+$" "")
-               resource    (str/replace mxc-url #"^mxc://" "")
-               base-path   (str "/_matrix/client/v1/media/" (name type) "/" resource)]
-           (if (= type :thumbnail)
-             (str server-base base-path
-                  "?width="  (or width 48)
-                  "&height=" (or height 48)
-                  "&method=" (or method "crop"))
-             (str server-base base-path))))))))
-
-
-(defn url->mxc [url]
-  (if (and (string? url) (str/includes? url "/_matrix/"))
-    (let [parts (str/split url #"/media/(?:download|thumbnail)/")]
-      (if (= (count parts) 2)
-        (str "mxc://" (second parts))
-        url))
-    url))
-
-#+end_src
-
 
 **** Hickory HTML Parsing
 
