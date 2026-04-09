@@ -71,25 +71,47 @@ we do some level of URL validation in the service worker this may be
 more sensible.
 I can later revise the SW to use this mechanism instead to remove the duplication.
 #+begin_src clojurescript :tangle ../../src/utils/net.cljs
+(defn- wait-for-auth []
+  (p/create
+   (fn [resolve]
+     (let [{:keys [token hs-url]} @!auth-context]
+       (if (and token hs-url)
+         (resolve true)
+         (let [watch-key (keyword (gensym "auth-watch"))
+               timer     (js/setTimeout #(do
+                                           (remove-watch !auth-context watch-key)
+                                           (resolve false))
+                                        2000)]
+           (add-watch !auth-context watch-key
+                      (fn [_ _ _ new-state]
+                        (when (and (:token new-state) (:hs-url new-state))
+                          (js/clearTimeout timer)
+                          (remove-watch !auth-context watch-key)
+                          (resolve true))))))))))
+
 (defn fetch
   ([url] (fetch url nil))
   ([raw-url options]
-   (let [{:keys [token hs-url]} @!auth-context
-         opts         (cond
-                        (nil? options) #js {}
-                        (map? options) (reduce-kv (fn [acc k v]
-                                                    (aset acc (name k) v) acc)
-                                                  #js {} options)
-                        :else (js/Object.assign #js {} options))
-         method       (or (.-method opts) "GET")
-         headers      (or (.-headers opts) #js {})
-         safe-headers (js/Object.assign #js {} headers)
-         is-absolute? (or (str/starts-with? raw-url "http://")
-                          (str/starts-with? raw-url "https://"))
-         wants-auth?  (or (.-auth opts)
-                          (and is-absolute?
-                               hs-url
-                               (safe-auth-path? raw-url hs-url)))]
+   (p/let [opts         (cond
+                          (nil? options) #js {}
+                          (map? options) (reduce-kv (fn [acc k v]
+                                                      (aset acc (name k) v) acc)
+                                                    #js {} options)
+                          :else (js/Object.assign #js {} options))
+           is-absolute? (or (str/starts-with? raw-url "http://")
+                            (str/starts-with? raw-url "https://"))
+           needs-wait?  (or (.-auth opts)
+                            (str/includes? raw-url "/_matrix/client/v1/media/"))
+           _            (when needs-wait?
+                          (wait-for-auth))
+           {:keys [token hs-url]} @!auth-context
+           method       (or (.-method opts) "GET")
+           headers      (or (.-headers opts) #js {})
+           safe-headers (js/Object.assign #js {} headers)
+           wants-auth?  (or (.-auth opts)
+                            (and is-absolute?
+                                 hs-url
+                                 (safe-auth-path? raw-url hs-url)))]
      (when (and token wants-auth?)
        (aset safe-headers "Authorization" (str "Bearer " token)))
      (js-delete opts "auth")
@@ -109,50 +131,7 @@ I can later revise the SW to use this mechanism instead to remove the duplicatio
                               :text   (fn [] (p/resolved (if (string? data) data (js/JSON.stringify data))))})))))
        (js/fetch raw-url opts)))))
 
-(defn fetch
-  ([url] (fetch url nil))
-  ([raw-url options]
-   (let [{:keys [token hs-url]} @!auth-context
-         
-         opts         (cond
-                        (nil? options) #js {}
-                        (map? options) (reduce-kv (fn [acc k v] 
-                                                    (aset acc (name k) v) acc) 
-                                                  #js {} options)
-                        :else (js/Object.assign #js {} options))
-         
-         method       (or (.-method opts) "GET")
-         headers      (or (.-headers opts) #js {})
-         safe-headers (js/Object.assign #js {} headers)
-         
-         is-absolute? (or (str/starts-with? raw-url "http://")
-                          (str/starts-with? raw-url "https://"))
-                          
-         wants-auth?  (or (.-auth opts)
-                          (and is-absolute?
-                               hs-url
-                               (safe-auth-path? raw-url hs-url)))]
-     
-     (when (and token wants-auth?)
-       (aset safe-headers "Authorization" (str "Bearer " token)))
-       
-     (js-delete opts "auth")
-     (aset opts "headers" safe-headers)
-     
-     (if (and is-absolute? (.isNativePlatform Capacitor))
-       (let [cap-req #js {:url raw-url
-                          :method method
-                          :headers safe-headers
-                          :data (.-body opts)}]
-         (-> (.request CapacitorHttp cap-req)
-             (p/then (fn [response]
-                       (let [status (.-status response)
-                             data   (.-data response)]
-                         #js {:ok     (and (>= status 200) (< status 300))
-                              :status status
-                              :json   (fn [] (p/resolved data))
-                              :text   (fn [] (p/resolved (if (string? data) data (js/JSON.stringify data))))})))))
-       (js/fetch raw-url opts)))))
+
 
 
 #+end_src
