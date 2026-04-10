@@ -1,6 +1,9 @@
 {
     "name": "Paradise",
     "version": "0.23.3",
+    "config": {
+        "build": "7"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/Paradise-in-Matrix/Paradise"
@@ -20,7 +23,10 @@
         "ios:add": "npx cap add ios",
         "ios:sync": "npx cap sync ios",
         "ad:sync": "npx cap sync android",
-        "bump:ios": "npx capacitor-set-version set:ios -v 0.21.2 -b",
+        "version:ios": "npx capacitor-set-version set:ios -v $npm_package_version -b $npm_package_config_build",
+        "version:android": "npx capacitor-set-version set:android -v $npm_package_version -b $npm_package_config_build",
+        "config:ios": ". ./.env && TEAM_ID=$APPLE_TEAM_ID npx trapeze run trapeze.yaml -y --ios",
+        "version:sync": "npm run version:ios && npm run version:android && npm run config:ios",
         "electron:make": "npm run electron:make --prefix electron",
         "guix:electron:make": "guix shell -FCN -m ./electron-manifest.scm -- npm run electron:make --prefix electron"
     },
@@ -61,6 +67,7 @@
         "@babel/preset-env": "^7.29.0",
         "@babel/preset-typescript": "^7.28.5",
         "@capacitor/assets": "^3.0.5",
+        "@trapezedev/configure": "^7.1.3",
         "babel-plugin-transform-rename-import": "^2.3.0",
         "capacitor-set-version": "^2.2.0",
         "concurrently": "^9.2.1",
