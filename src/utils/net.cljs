@@ -10,11 +10,14 @@
 
 (defn- safe-auth-path? [request-url hs-url]
   (try
-    (let [req-obj (js/URL. request-url)
-          hs-obj  (js/URL. hs-url)
-          path    (.-pathname req-obj)]
-      (and (= (.-origin req-obj) (.-origin hs-obj))
-           (str/includes? path "/_matrix/client/v1/media/")))
+    (let [req-obj  (js/URL. request-url)
+          hs-obj   (js/URL. hs-url)
+          req-host (.-hostname req-obj)
+          hs-host  (.-hostname hs-obj)
+          path     (.-pathname req-obj)]
+      (and (or (= req-host hs-host)
+               (str/ends-with? req-host (str "." hs-host)))
+           (str/starts-with? path "/_matrix/")))
     (catch :default _ false)))
 
 (defn ensure-protocol [hs-url]
@@ -72,11 +75,12 @@
            method       (or (.-method opts) "GET")
            headers      (or (.-headers opts) #js {})
            safe-headers (js/Object.assign #js {} headers)
+           auth-path?   (if (and is-absolute? safe-hs-url)
+                          (safe-auth-path? final-url safe-hs-url)
+                          false)
            wants-auth?  (or (.-auth opts)
                             is-media?
-                            (and is-absolute?
-                                 safe-hs-url
-                                 (safe-auth-path? final-url safe-hs-url)))]
+                            auth-path?)]
      (when (and token wants-auth?)
        (aset safe-headers "Authorization" (str "Bearer " token)))
      (js-delete opts "auth")
