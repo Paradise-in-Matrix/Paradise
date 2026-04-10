@@ -101,10 +101,16 @@ I can later revise the SW to use this mechanism instead to remove the duplicatio
            _            (when needs-wait?
                           (wait-for-auth))
            {:keys [token hs-url]} @!auth-context
-           final-url    (if (or (str/starts-with? raw-url "/")
-                                (str/starts-with? raw-url "http://")
-                                (str/starts-with? raw-url "https://"))
+           final-url    (cond
+                          (or (str/starts-with? raw-url "http://")
+                              (str/starts-with? raw-url "https://"))
                           raw-url
+                          (or (str/starts-with? raw-url "/")
+                              (str/starts-with? raw-url "./")
+                              (str/starts-with? raw-url "../")
+                              (not (str/includes? raw-url "/")))
+                          raw-url
+                          :else
                           (ensure-protocol raw-url))
            is-absolute? (or (str/starts-with? final-url "http://")
                             (str/starts-with? final-url "https://"))
@@ -121,7 +127,11 @@ I can later revise the SW to use this mechanism instead to remove the duplicatio
        (aset safe-headers "Authorization" (str "Bearer " token)))
      (js-delete opts "auth")
      (aset opts "headers" safe-headers)
-     (js/fetch final-url opts))))
+     (-> (js/fetch final-url opts)
+         (p/catch (fn [err]
+                    (js/console.error "Fetch failed on URL:" final-url)
+                    (throw err)))))))
+
 #+end_src
 
 
