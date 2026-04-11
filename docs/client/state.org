@@ -10,4 +10,5 @@ This may be move-able there too, but will let it remain for now.
 (ns client.state)
 
 (defonce !engine-pool (atom nil))
+(defonce !config (atom nil))
 #+end_src
