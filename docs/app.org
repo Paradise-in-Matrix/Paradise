@@ -582,6 +582,7 @@ when we detatch and reload (basically when you hit control + s to save).
   (re-frame/dispatch-sync [:initialize-db])
   (-> (load-config)
       (p/then (fn [config]
+                (reset! !config config)
                 (re-frame/dispatch-sync [:app/config-loaded config])
                 (log/info "Config loaded:" config)
                 (load-i18n)))
@@ -589,6 +590,7 @@ when we detatch and reload (basically when you hit control + s to save).
                 (let [params  (js/URLSearchParams. js/window.location.search)
                       room-id (.get params "room")]
                   (re-frame/dispatch [:app/bootstrap])
+                  (notifications/init!)
                   (when room-id
                     (log/info "App started with room-id:" room-id)
                     (re-frame/dispatch [:rooms/select room-id])
