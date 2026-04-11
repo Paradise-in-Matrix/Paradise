@@ -46,6 +46,7 @@ Probably needs a better name (and logical grouping)
     :fx [[:dispatch [:settings/close]]
          [:dispatch [:settings/load-accounts]]]}))
 
+
 (re-frame/reg-event-fx
  :auth/login
  (fn [{:keys [db]} [_ hs user pass]]
@@ -57,32 +58,36 @@ Probably needs a better name (and logical grouping)
                                                              :user user
                                                              :pass pass}}))]
            (if (= (:status res) "success")
-             (re-frame/dispatch [:auth/login-success res])
+             (re-frame/dispatch [:auth/login-success
+                                 (assoc res :credentials {:homeserver hs
+                                                          :username user
+                                                          :password pass})])
              (re-frame/dispatch [:auth/login-failure (:msg res)])))
          (catch :default e
            (re-frame/dispatch [:auth/login-failure (str e)]))))
      (log/error "Cannot login: Engine pool not initialized"))
 
    {:db (assoc db :auth-status :authenticating
-               :login-error nil)}))
+                  :login-error nil)}))
 
 (re-frame/reg-event-fx
  :auth/login-success
- (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data]}]]
+ (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials]}]]
    (when session-data
      (register-sw!)
-     (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data))
-     )
+     (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data)))
    (log/info "Login successful for:" user-id)
    {:db (cond-> (assoc db :auth-status :logged-in
-                          :active-user-id user-id
-                          :rooms/data {}
-                          :timeline/current-events [])
+                       :active-user-id user-id
+                       :rooms/data {}
+                       :timeline/current-events [])
           hs-url (assoc :homeserver-url hs-url))
 
     :fx [[:dispatch [:sdk/start-sync]]
          [:dispatch [:sdk/fetch-all-emotes]]
-         [:dispatch [:sdk/fetch-own-profile]]]}))
+         [:dispatch [:sdk/fetch-own-profile]]
+         [:dispatch [:push/create-sleepy-shadow credentials]]]}))
+
 
 (re-frame/reg-event-fx
  :auth/switch-account
