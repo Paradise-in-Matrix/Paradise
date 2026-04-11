@@ -6,6 +6,7 @@
    [reagent.core :as r]
    [reagent.dom.client :as rdom]
    [navigation.spaces.bar :refer [spaces-sidebar]]
+   [overlays.notifications :as notifications]
    [overlays.settings]
    [overlays.lightbox]
    [overlays.profiles]
@@ -13,6 +14,7 @@
    [auth.events :refer [login-screen]]
    [container.call.call-container :refer [persistent-call-container]]
    [client.config :refer [load-config check-remote-version load-i18n]]
+   [client.state :refer [!config]]
    [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay make-swipe-handlers]]
    ["@capacitor/status-bar" :refer [StatusBar]]
@@ -257,6 +259,7 @@
   (re-frame/dispatch-sync [:initialize-db])
   (-> (load-config)
       (p/then (fn [config]
+                (reset! !config config)
                 (re-frame/dispatch-sync [:app/config-loaded config])
                 (log/info "Config loaded:" config)
                 (load-i18n)))
@@ -264,6 +267,7 @@
                 (let [params  (js/URLSearchParams. js/window.location.search)
                       room-id (.get params "room")]
                   (re-frame/dispatch [:app/bootstrap])
+                  (notifications/init!)
                   (when room-id
                     (log/info "App started with room-id:" room-id)
                     (re-frame/dispatch [:rooms/select room-id])
