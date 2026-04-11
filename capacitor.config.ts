@@ -23,6 +23,9 @@ const config: CapacitorConfig = {
             iosSpinnerStyle: "small",
             spinnerColor: "#dbdee1",
         },
+        PushNotifications: {
+            presentationOptions: ["badge", "sound", "alert"],
+        },
     },
 };
 
