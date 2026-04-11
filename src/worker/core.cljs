@@ -162,7 +162,7 @@
                          {:status :error :msg (str e)})))))
 
 (worker/register :register-pusher
-  (fn [{:keys [p256dh auth endpoint app-id push-url app-name lang]}]
+  (fn [{:keys [p256dh auth endpoint app-id push-url app-name lang pushkey is-native platform]}]
     (go
       (try
         (let [client     @state/!client
@@ -170,28 +170,56 @@
               token      (.-accessToken (.session client))
               clean-base (str/replace hs-url #"/+$" "")
               url        (str clean-base "/_matrix/client/v3/pushers/set")
-              payload    {:kind "http"
-                          :app_id app-id
-                          :pushkey p256dh
-                          :app_display_name app-name
-                          :device_display_name "Web Browser"
-                          :lang lang
-                          :append false
-                          :data {:url push-url
-                                 :events_only true
-                                 :endpoint endpoint
-                                 :p256dh p256dh
-                                 :auth auth}}
+              payload    (cond
+                           (and is-native (= platform "ios"))
+                           {:kind "http"
+                            :app_id app-id
+                            :pushkey pushkey
+                            :app_display_name app-name
+                            :device_display_name "iOS Device"
+                            :lang lang
+                            :append false
+                            :data {:url push-url
+                                   :format "event_id_only"
+                                   :default_payload {:aps {:alert {:loc-key "New Message"}
+                                                           :sound "default"
+                                                           :badge 1
+                                                           :content-available 1}}}}
+                           (and is-native (= platform "android"))
+                           {:kind "http"
+                            :app_id app-id
+                            :pushkey pushkey
+                            :app_display_name app-name
+                            :device_display_name "Android Device"
+                            :lang lang
+                            :append false
+                            :data {:url push-url
+                                   :format "event_id_only"
+                                   }}
+                           :else
+                           {:kind "http"
+                            :app_id app-id
+                            :pushkey p256dh
+                            :app_display_name app-name
+                            :device_display_name "Web Browser"
+                            :lang lang
+                            :append false
+                            :data {:url push-url
+                                   :events_only true
+                                   :endpoint endpoint
+                                   :p256dh p256dh
+                                   :auth auth}})
               resp       (<p! (net/fetch url #js {:method "POST"
-                                                 :headers #js {"Authorization" (str "Bearer " token)
-                                                               "Content-Type" "application/json"}
-                                                 :body (js/JSON.stringify (clj->js payload))}))]
+                                                  :headers #js {"Authorization" (str "Bearer " token)
+                                                                "Content-Type" "application/json"}
+                                                  :body (js/JSON.stringify (clj->js payload))}))]
           (if (.-ok resp)
-            {:status :success}
+            {:status "success"}
             (let [err-body (<p! (.json resp))]
-              {:status :error :msg err-body})))
+              {:status "error" :msg err-body})))
         (catch :default e
-          {:status :error :msg (str e)})))))
+          {:status "error" :msg (str e)})))))
+
 
 (worker/register :recover-session
                  (fn [{:keys [recovery-key]}]
