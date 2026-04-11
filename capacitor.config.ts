@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
     appName: "Paradise",
     webDir: "dist",
     server: {
-        //        url: "http://192.168.3.33:8000",
+        // url: "http://192.168.3.33:8000",
         cleartext: true,
         //        allowNavigation: ["192.168.3.33"],
         // androidScheme: "https",
