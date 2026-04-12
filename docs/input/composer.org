@@ -31,7 +31,30 @@ just keep this to defining the look and feel itself.
 
 
 **** Custom HTML Rendering (Emotes) Extension
+**** Custom HTML Rendering (Emotes / Mentions) Extension
 
+
+***** Extension Definitions
+
+#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+(def emoji-trigger
+  (-> Mention
+      (.extend #js {:name "emojiTrigger"})
+      (.configure #js {:suggestion (emoji-suggestion-options)})))
+
+(def user-trigger
+  (-> Mention
+      (.extend #js {:name "userMention"
+                    :renderHTML (fn [^js props]
+                                  (let [node  (.-node props)
+                                        id    (.. node -attrs -id)
+                                        label (.. node -attrs -label)]
+                                    #js ["a" #js {:href  (str "https://matrix.to/#/" id)
+                                                  :class "user-mention"
+                                                  :data-mx-user id}
+                                         (str "@" label)]))})
+      (.configure #js {:suggestion (user-mention-options)})))
+#+end_src
 
 
 ***** Helper Functions
