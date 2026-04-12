@@ -89,7 +89,7 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
                 let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: "DISCOVER")
                 try await client.login(username: username, password: password, initialDeviceName: "Paradise Background Sync", deviceId: nil)
                 
-                let session = try client.session() 
+                let session = try client.session()
                 sharedDefaults.set(session.accessToken, forKey: "access_token")
                 sharedDefaults.set(session.userId, forKey: "user_id")
                 sharedDefaults.set(session.deviceId, forKey: "device_id")
@@ -117,7 +117,8 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
             return call.reject("No homeserver saved")
         }
         let ssStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
-        
+
+
         Task {
             do {
                 let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: ssStr)
@@ -182,3 +183,4 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 }
+

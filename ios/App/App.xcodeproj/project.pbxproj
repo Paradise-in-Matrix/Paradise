@@ -8,12 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
-		305CA05F2F8AE28B007D5900 /* MatrixRustSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 305CA05E2F8AE28B007D5900 /* MatrixRustSDK */; };
-		305CA06B2F8AE2E4007D5900 /* ParadisePushExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 305CA0642F8AE2E4007D5900 /* ParadisePushExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		305CA0742F8AE303007D5900 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 305CA0732F8AE303007D5900 /* CapApp-SPM */; };
-		305CA0762F8AE305007D5900 /* MatrixRustSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 305CA0752F8AE305007D5900 /* MatrixRustSDK */; };
-		305CA0B82F8AF969007D5900 /* ShadowDevicePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305CA0B72F8AF969007D5900 /* ShadowDevicePlugin.swift */; };
-		305CA0B92F8AF969007D5900 /* MyViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305CA0B62F8AF969007D5900 /* MyViewController.swift */; };
+		304405DF2F8B2F700008BFD1 /* MatrixRustSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 304405DE2F8B2F700008BFD1 /* MatrixRustSDK */; };
+		304405EC2F8B30C60008BFD1 /* ParadisePushExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 304405E52F8B30C60008BFD1 /* ParadisePushExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		304405F42F8B30E70008BFD1 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 304405F32F8B30E70008BFD1 /* CapApp-SPM */; };
+		304405F62F8B30EA0008BFD1 /* MatrixRustSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 304405F52F8B30EA0008BFD1 /* MatrixRustSDK */; };
+		304405FA2F8B31CD0008BFD1 /* MyViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304405F92F8B31CD0008BFD1 /* MyViewController.swift */; };
+		304405FC2F8B31FC0008BFD1 /* ShadowDevicePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304405FB2F8B31FC0008BFD1 /* ShadowDevicePlugin.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -24,23 +24,23 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		305CA0692F8AE2E4007D5900 /* PBXContainerItemProxy */ = {
+		304405EA2F8B30C60008BFD1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 305CA0632F8AE2E4007D5900;
+			remoteGlobalIDString = 304405E42F8B30C60008BFD1;
 			remoteInfo = ParadisePushExtension;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		305CA0702F8AE2E4007D5900 /* Embed Foundation Extensions */ = {
+		304405F12F8B30C60008BFD1 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				305CA06B2F8AE2E4007D5900 /* ParadisePushExtension.appex in Embed Foundation Extensions */,
+				304405EC2F8B30C60008BFD1 /* ParadisePushExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -49,10 +49,10 @@
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
-		305CA05C2F8AE23B007D5900 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
-		305CA0642F8AE2E4007D5900 /* ParadisePushExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ParadisePushExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		305CA0B62F8AF969007D5900 /* MyViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyViewController.swift; sourceTree = "<group>"; };
-		305CA0B72F8AF969007D5900 /* ShadowDevicePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowDevicePlugin.swift; sourceTree = "<group>"; };
+		304405E02F8B308C0008BFD1 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		304405E52F8B30C60008BFD1 /* ParadisePushExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ParadisePushExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		304405F92F8B31CD0008BFD1 /* MyViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyViewController.swift; sourceTree = "<group>"; };
+		304405FB2F8B31FC0008BFD1 /* ShadowDevicePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowDevicePlugin.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -65,37 +65,26 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		305CA06C2F8AE2E4007D5900 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		304405ED2F8B30C60008BFD1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 305CA0632F8AE2E4007D5900 /* ParadisePushExtension */;
+			target = 304405E42F8B30C60008BFD1 /* ParadisePushExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		305CA0652F8AE2E4007D5900 /* ParadisePushExtension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				305CA06C2F8AE2E4007D5900 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = ParadisePushExtension;
-			sourceTree = "<group>";
-		};
+		304405E62F8B30C60008BFD1 /* ParadisePushExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (304405ED2F8B30C60008BFD1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ParadisePushExtension; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		305CA0612F8AE2E4007D5900 /* Frameworks */ = {
+		304405E22F8B30C60008BFD1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				305CA0762F8AE305007D5900 /* MatrixRustSDK in Frameworks */,
-				305CA0742F8AE303007D5900 /* CapApp-SPM in Frameworks */,
+				304405F62F8B30EA0008BFD1 /* MatrixRustSDK in Frameworks */,
+				304405F42F8B30E70008BFD1 /* CapApp-SPM in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -103,7 +92,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				305CA05F2F8AE28B007D5900 /* MatrixRustSDK in Frameworks */,
+				304405DF2F8B2F700008BFD1 /* MatrixRustSDK in Frameworks */,
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -111,7 +100,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		305CA0722F8AE303007D5900 /* Frameworks */ = {
+		304405F22F8B30E70008BFD1 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -123,8 +112,8 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
-				305CA0652F8AE2E4007D5900 /* ParadisePushExtension */,
-				305CA0722F8AE303007D5900 /* Frameworks */,
+				304405E62F8B30C60008BFD1 /* ParadisePushExtension */,
+				304405F22F8B30E70008BFD1 /* Frameworks */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -133,7 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
-				305CA0642F8AE2E4007D5900 /* ParadisePushExtension.appex */,
+				304405E52F8B30C60008BFD1 /* ParadisePushExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,9 +130,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
-				305CA0B62F8AF969007D5900 /* MyViewController.swift */,
-				305CA0B72F8AF969007D5900 /* ShadowDevicePlugin.swift */,
-				305CA05C2F8AE23B007D5900 /* App.entitlements */,
+				304405E02F8B308C0008BFD1 /* App.entitlements */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -152,6 +139,8 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				304405F92F8B31CD0008BFD1 /* MyViewController.swift */,
+				304405FB2F8B31FC0008BFD1 /* ShadowDevicePlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -159,28 +148,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		305CA0632F8AE2E4007D5900 /* ParadisePushExtension */ = {
+		304405E42F8B30C60008BFD1 /* ParadisePushExtension */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 305CA06D2F8AE2E4007D5900 /* Build configuration list for PBXNativeTarget "ParadisePushExtension" */;
+			buildConfigurationList = 304405EE2F8B30C60008BFD1 /* Build configuration list for PBXNativeTarget "ParadisePushExtension" */;
 			buildPhases = (
-				305CA0602F8AE2E4007D5900 /* Sources */,
-				305CA0612F8AE2E4007D5900 /* Frameworks */,
-				305CA0622F8AE2E4007D5900 /* Resources */,
+				304405E12F8B30C60008BFD1 /* Sources */,
+				304405E22F8B30C60008BFD1 /* Frameworks */,
+				304405E32F8B30C60008BFD1 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				305CA0652F8AE2E4007D5900 /* ParadisePushExtension */,
+				304405E62F8B30C60008BFD1 /* ParadisePushExtension */,
 			);
 			name = ParadisePushExtension;
 			packageProductDependencies = (
-				305CA0732F8AE303007D5900 /* CapApp-SPM */,
-				305CA0752F8AE305007D5900 /* MatrixRustSDK */,
+				304405F32F8B30E70008BFD1 /* CapApp-SPM */,
+				304405F52F8B30EA0008BFD1 /* MatrixRustSDK */,
 			);
 			productName = ParadisePushExtension;
-			productReference = 305CA0642F8AE2E4007D5900 /* ParadisePushExtension.appex */;
+			productReference = 304405E52F8B30C60008BFD1 /* ParadisePushExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 		504EC3031FED79650016851F /* App */ = {
@@ -190,17 +179,17 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
-				305CA0702F8AE2E4007D5900 /* Embed Foundation Extensions */,
+				304405F12F8B30C60008BFD1 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				305CA06A2F8AE2E4007D5900 /* PBXTargetDependency */,
+				304405EB2F8B30C60008BFD1 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
 				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
-				305CA05E2F8AE28B007D5900 /* MatrixRustSDK */,
+				304405DE2F8B2F700008BFD1 /* MatrixRustSDK */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -215,7 +204,7 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 920;
 				TargetAttributes = {
-					305CA0632F8AE2E4007D5900 = {
+					304405E42F8B30C60008BFD1 = {
 						CreatedOnToolsVersion = 26.4;
 					};
 					504EC3031FED79650016851F = {
@@ -236,20 +225,20 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
-				305CA05D2F8AE28B007D5900 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */,
+				304405DD2F8B2F700008BFD1 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
-				305CA0632F8AE2E4007D5900 /* ParadisePushExtension */,
+				304405E42F8B30C60008BFD1 /* ParadisePushExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		305CA0622F8AE2E4007D5900 /* Resources */ = {
+		304405E32F8B30C60008BFD1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -272,7 +261,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		305CA0602F8AE2E4007D5900 /* Sources */ = {
+		304405E12F8B30C60008BFD1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -283,8 +272,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				305CA0B82F8AF969007D5900 /* ShadowDevicePlugin.swift in Sources */,
-				305CA0B92F8AF969007D5900 /* MyViewController.swift in Sources */,
+				304405FC2F8B31FC0008BFD1 /* ShadowDevicePlugin.swift in Sources */,
+				304405FA2F8B31CD0008BFD1 /* MyViewController.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -292,10 +281,10 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		305CA06A2F8AE2E4007D5900 /* PBXTargetDependency */ = {
+		304405EB2F8B30C60008BFD1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 305CA0632F8AE2E4007D5900 /* ParadisePushExtension */;
-			targetProxy = 305CA0692F8AE2E4007D5900 /* PBXContainerItemProxy */;
+			target = 304405E42F8B30C60008BFD1 /* ParadisePushExtension */;
+			targetProxy = 304405EA2F8B30C60008BFD1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -319,7 +308,7 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		305CA06E2F8AE2E4007D5900 /* Debug */ = {
+		304405EF2F8B30C60008BFD1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -330,7 +319,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = ParadisePushExtension/ParadisePushExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3JGDN6PLX6;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -338,7 +327,7 @@
 				INFOPLIST_FILE = ParadisePushExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ParadisePushExtension;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -361,7 +350,7 @@
 			};
 			name = Debug;
 		};
-		305CA06F2F8AE2E4007D5900 /* Release */ = {
+		304405F02F8B30C60008BFD1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -372,7 +361,7 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CODE_SIGN_ENTITLEMENTS = ParadisePushExtension/ParadisePushExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3JGDN6PLX6;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -380,7 +369,7 @@
 				INFOPLIST_FILE = ParadisePushExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ParadisePushExtension;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -561,11 +550,11 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		305CA06D2F8AE2E4007D5900 /* Build configuration list for PBXNativeTarget "ParadisePushExtension" */ = {
+		304405EE2F8B30C60008BFD1 /* Build configuration list for PBXNativeTarget "ParadisePushExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				305CA06E2F8AE2E4007D5900 /* Debug */,
-				305CA06F2F8AE2E4007D5900 /* Release */,
+				304405EF2F8B30C60008BFD1 /* Debug */,
+				304405F02F8B30C60008BFD1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -598,7 +587,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		305CA05D2F8AE28B007D5900 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */ = {
+		304405DD2F8B2F700008BFD1 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/matrix-org/matrix-rust-components-swift";
 			requirement = {
@@ -609,19 +598,19 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		305CA05E2F8AE28B007D5900 /* MatrixRustSDK */ = {
+		304405DE2F8B2F700008BFD1 /* MatrixRustSDK */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 305CA05D2F8AE28B007D5900 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */;
+			package = 304405DD2F8B2F700008BFD1 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */;
 			productName = MatrixRustSDK;
 		};
-		305CA0732F8AE303007D5900 /* CapApp-SPM */ = {
+		304405F32F8B30E70008BFD1 /* CapApp-SPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
 		};
-		305CA0752F8AE305007D5900 /* MatrixRustSDK */ = {
+		304405F52F8B30EA0008BFD1 /* MatrixRustSDK */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 305CA05D2F8AE28B007D5900 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */;
+			package = 304405DD2F8B2F700008BFD1 /* XCRemoteSwiftPackageReference "matrix-rust-components-swift" */;
 			productName = MatrixRustSDK;
 		};
 		4D22ABE82AF431CB00220026 /* CapApp-SPM */ = {
