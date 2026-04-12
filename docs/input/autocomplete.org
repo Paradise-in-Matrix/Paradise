@@ -22,7 +22,8 @@ and the tab completion.
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [utils.images :refer [mxc->url]]))
+   [utils.images :refer [mxc->url mxc-image]]
+   [utils.global-ui :refer [avatar]]))
 #+end_src
 
 
