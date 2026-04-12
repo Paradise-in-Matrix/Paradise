@@ -101,6 +101,10 @@ so below is a helper function that converts the node BACK to Mxc on send.
                                    mxc-uri    (or (aget attrs "mxc") (url->mxc (aget attrs "src")))]
                                (str "<img data-mx-emoticon=\"\" src=\"" mxc-uri "\""
                                     " alt=\"" shortcode ":\" title=\"" shortcode ":\" height=\"32\">"))
+                             (= type "userMention")
+                             (let [id    (aget attrs "id")
+                                   label (or (aget attrs "label") id)]
+                               (str "<a href=\"https://matrix.to/#/" id "\">@" label "</a>"))
                              (= type "text") (.-text node)
                              :else "")
                            with-marks
