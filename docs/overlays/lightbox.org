@@ -52,6 +52,7 @@ So we define the component contents and then register in the modal multi-method.
                         (reset-zoom-fn)
                         (swap! !state assoc :scale new-scale :last-scale new-scale))))
         :on-pointer-down (fn [e]
+                           (.setPointerCapture (.-target e) (.-pointerId e))
                            (swap! !active-pointers assoc (.-pointerId e) e)
                            (let [ps (vals @!active-pointers)]
                              (cond
@@ -68,10 +69,16 @@ So we define the component contents and then register in the modal multi-method.
                                        new-scale (max 1 (min 5 (* last-scale (/ new-dist start-dist))))]
                                    (swap! !state assoc :scale new-scale))
                                  (and (= (count ps) 1) (> scale 1))
-                                 (let [dx (- (.-clientX e) (:last-x @!state))
-                                       dy (- (.-clientY e) (:last-y @!state))]
-                                   (swap! !state assoc :x (+ x dx) :y (+ y dy) :last-x (.-clientX e) :last-y (.-clientY e)))))))
+                                 (swap! !state (fn [{:keys [x y last-x last-y] :as curr}]
+                                                 (let [dx (- (.-clientX e) last-x)
+                                                       dy (- (.-clientY e) last-y)]
+                                                   (assoc curr
+                                                          :x (+ x dx)
+                                                          :y (+ y dy)
+                                                          :last-x (.-clientX e)
+                                                          :last-y (.-clientY e)))))))))
         :on-pointer-up (fn [e]
+                         (.releasePointerCapture (.-target e) (.-pointerId e))
                          (swap! !active-pointers dissoc (.-pointerId e))
                          (let [ps (vals @!active-pointers)
                                curr-scale (:scale @!state)]
@@ -80,7 +87,9 @@ So we define the component contents and then register in the modal multi-method.
                              (= (count ps) 1)  (let [p (first ps)]
                                                  (swap! !state assoc :last-scale curr-scale :last-x (.-clientX p) :last-y (.-clientY p)))
                              (zero? (count ps)) (swap! !state assoc :last-scale curr-scale))))
-        :on-pointer-cancel (fn [_] (reset! !active-pointers {}))}
+        :on-pointer-cancel (fn [e]
+                             (.releasePointerCapture (.-target e) (.-pointerId e))
+                             (reset! !active-pointers {}))}
 
        [:div.lightbox-close-btn
         {:on-click close-fn :title (@tr [:lightbox/close])
