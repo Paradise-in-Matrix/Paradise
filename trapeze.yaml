@@ -1,0 +1,9 @@
+vars:
+  TEAM_ID:
+    default: ""
+platforms:
+  ios:
+    targets:
+      App:
+        buildSettings:
+          DEVELOPMENT_TEAM: $TEAM_ID
