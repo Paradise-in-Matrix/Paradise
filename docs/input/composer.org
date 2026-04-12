@@ -30,7 +30,6 @@ just keep this to defining the look and feel itself.
 
 
 
-**** Custom HTML Rendering (Emotes) Extension
 **** Custom HTML Rendering (Emotes / Mentions) Extension
 
 
