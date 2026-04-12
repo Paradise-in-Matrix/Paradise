@@ -3,7 +3,8 @@
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [utils.images :refer [mxc->url]]))
+   [utils.images :refer [mxc->url mxc-image]]
+   [utils.global-ui :refer [avatar]]))
 
 (re-frame/reg-sub
  :mention/filtered-users
@@ -164,10 +165,12 @@
             render-above? (> (:top rect) 250)]
         [:div.suggestion-popup
          {:class (when render-above? "is-above")
-          :style {:top  (if render-above?
-                          (str (- (:top rect) 210) "px")
-                          (str (+ (:top rect) (:height rect) 5) "px"))
-                  :left (str (:left rect) "px")}}
+          :style (if render-above?
+                   {:bottom (str (+ (- (.-innerHeight js/window) (:top rect)) 5) "px")
+                    :left   (str (:left rect) "px")}
+                   {:top    (str (+ (:top rect) (:height rect) 5) "px")
+                    :left   (str (:left rect) "px")
+                    })}
          (if (empty? items)
            [:div.suggestion-no-results (tr [:composer.suggestions/no-results])]
            (doall
@@ -177,6 +180,9 @@
                  ^{:key (if is-emoji? (first item) (:user-id item))}
                  [:div.suggestion-item
                   {:class (when selected? "is-selected")
+                   :ref (fn [el]
+                          (when (and selected? el)
+                            (.scrollIntoView el #js {:block "nearest" :behavior "auto"})))
                    :on-mouse-down (fn [e]
                                     (.preventDefault e)
                                     (.stopPropagation e)
