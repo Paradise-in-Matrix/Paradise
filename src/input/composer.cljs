@@ -13,6 +13,24 @@
      ["@tiptap/core" :refer [Extension Node mergeAttributes]]
       ["prosemirror-state" :refer [Plugin PluginKey]]))
 
+(def emoji-trigger
+  (-> Mention
+      (.extend #js {:name "emojiTrigger"})
+      (.configure #js {:suggestion (emoji-suggestion-options)})))
+
+(def user-trigger
+  (-> Mention
+      (.extend #js {:name "userMention"
+                    :renderHTML (fn [^js props]
+                                  (let [node  (.-node props)
+                                        id    (.. node -attrs -id)
+                                        label (.. node -attrs -label)]
+                                    #js ["a" #js {:href  (str "https://matrix.to/#/" id)
+                                                  :class "user-mention"
+                                                  :data-mx-user id}
+                                         (str "@" label)]))})
+      (.configure #js {:suggestion (user-mention-options)})))
+
 (defn renderHtml [^js props]
   (let [attrs         (.-HTMLAttributes props)
         raw-shortcode (aget attrs "shortcode")
@@ -47,6 +65,10 @@
                                    mxc-uri    (or (aget attrs "mxc") (url->mxc (aget attrs "src")))]
                                (str "<img data-mx-emoticon=\"\" src=\"" mxc-uri "\""
                                     " alt=\"" shortcode ":\" title=\"" shortcode ":\" height=\"32\">"))
+                             (= type "userMention")
+                             (let [id    (aget attrs "id")
+                                   label (or (aget attrs "label") id)]
+                               (str "<a href=\"https://matrix.to/#/" id "\">@" label "</a>"))
                              (= type "text") (.-text node)
                              :else "")
                            with-marks
@@ -184,10 +206,8 @@
                                                       (let [cb (.-onFiles (.-current latest-cbs))]
                                                         (when cb (cb files))))})
                                       (.configure custom-emote #js {})
-                                      (.configure Mention #js {:name "emojiSuggestion"
-                                                               :suggestion (emoji-suggestion-options)})
-                                      (.configure Mention #js {:name "userMention"
-                                                               :suggestion (user-mention-options)})
+                                      emoji-trigger
+                                      user-trigger
                                       (.configure Link #js {:openOnClick false
                                                             :autolink true
                                                             :linkOnPaste true})]
