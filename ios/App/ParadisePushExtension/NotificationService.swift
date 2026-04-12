@@ -1,0 +1,150 @@
+import UserNotifications
+import MatrixRustSDK
+
+class NotificationService: UNNotificationServiceExtension {
+
+    var contentHandler: ((UNNotificationContent) -> Void)?
+    var bestAttemptContent: UNMutableNotificationContent?
+    let appGroupId = "group.com.gigiaj.paradise"
+
+    override func didReceive(_ request: UNNotificationRequest, withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
+        self.contentHandler = contentHandler
+        bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
+        
+        guard let bestAttemptContent = bestAttemptContent else { return }
+        
+        let userInfo = request.content.userInfo
+        guard let roomId = userInfo["room_id"] as? String,
+              let eventId = userInfo["event_id"] as? String else {
+            contentHandler(bestAttemptContent)
+            return
+        }
+
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
+        guard let homeserverUrl = sharedDefaults.string(forKey: "homeserver_url") else {
+            contentHandler(bestAttemptContent)
+            return
+        }
+        
+        let ssStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
+
+        Task {
+            do {
+                guard let containerUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else { throw NSError() }
+                let dataPath = containerUrl.appendingPathComponent("matrix-shadow/data").path
+                let cachePath = containerUrl.appendingPathComponent("matrix-shadow/cache").path
+                
+                let ssBuilder: SlidingSyncVersionBuilder = (ssStr == "NATIVE") ? .native : .none
+                
+                let client = try await ClientBuilder()
+                    .homeserverUrl(url: homeserverUrl)
+                    .sessionPaths(dataPath: dataPath, cachePath: cachePath)
+                    .systemIsMemoryConstrained()
+                    .slidingSyncVersionBuilder(versionBuilder: ssBuilder)
+                    .build()
+                
+                try await restoreShadowSession(client: client, sharedDefaults: sharedDefaults)
+                
+                let pushClient = try await client.notificationClient(processSetup: .multipleProcesses)
+                let status = try await pushClient.getNotification(roomId: roomId, eventId: eventId)
+                
+                switch status {
+                case .event(let item):
+                    
+                    let senderName = item.senderInfo.displayName
+                     ?? "Unknown Sender"
+                    
+                    let rawRoom = item.roomInfo.displayName
+                    let roomName = rawRoom.isEmpty ? "Unknown Room" : rawRoom
+
+                    var messageBody = "New activity in \(roomName)"
+                    
+                    switch item.event {
+                    case .timeline(let timelineEvent):
+                        do {
+                            let content = try timelineEvent.content()
+                            switch content {
+                            case .messageLike(let messageLike):
+                                switch messageLike {
+                                case .roomMessage(let messageType, _):
+                                    switch messageType {
+                                    case .text(let textMsg): messageBody = textMsg.body
+                                    case .image: messageBody = "Sent an image"
+                                    case .video: messageBody = "Sent a video"
+                                    case .audio: messageBody = "Sent an audio clip"
+                                    case .file: messageBody = "Sent a file"
+                                    case .emote(let emoteMsg): messageBody = "* \(senderName) \(emoteMsg.body)"
+                                    case .notice(let noticeMsg): messageBody = noticeMsg.body
+                                    default: messageBody = "Sent a message"
+                                    }
+                                case .reactionContent: messageBody = "Reacted to a message"
+                                case .sticker: messageBody = "Sent a sticker"
+                                case .callInvite: messageBody = "Incoming call"
+                                default: messageBody = "Unhandled messageLike: \(String(describing: messageLike))"
+                                }
+                            case .state:
+                                messageBody = "Room settings changed"
+                            @unknown default:
+                                messageBody = "Unknown content: \(String(describing: content))"
+                            }
+                        } catch {
+                            messageBody = "Decryption error: \(error.localizedDescription)"
+                        }
+                    case .invite:
+                        messageBody = "Invited you to the room"
+                    @unknown default:
+                        messageBody = "Unknown event type: \(String(describing: item.event))"
+                    }
+
+
+                    
+                    bestAttemptContent.title = senderName
+                    bestAttemptContent.subtitle = roomName
+                    bestAttemptContent.body = messageBody
+                    
+                case .eventNotFound:
+                    bestAttemptContent.body = "Open Paradise to view."
+                case .eventFilteredOut, .eventRedacted:
+                    break
+                @unknown default:
+                    break
+                }
+                
+                contentHandler(bestAttemptContent)
+                
+            } catch {
+                print("Paradise iOS Decryption Failed: \(error)")
+                bestAttemptContent.body = "Open Paradise to view."
+                contentHandler(bestAttemptContent)
+            }
+        }
+
+        
+    }
+    
+    private func restoreShadowSession(client: Client, sharedDefaults: UserDefaults) async throws {
+        guard let accessToken = sharedDefaults.string(forKey: "access_token"),
+              let userId = sharedDefaults.string(forKey: "user_id"),
+              let deviceId = sharedDefaults.string(forKey: "device_id"),
+              let homeserverUrl = sharedDefaults.string(forKey: "homeserver_url") else {
+            throw NSError(domain: "ShadowDevice", code: 2, userInfo: nil)
+        }
+        
+        let slidingSyncStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
+        let ssVersion: SlidingSyncVersion = (slidingSyncStr == "NATIVE") ? .native : .none
+        
+        let session = Session(
+            accessToken: accessToken, refreshToken: nil, userId: userId,
+            deviceId: deviceId, homeserverUrl: homeserverUrl, oidcData: nil,
+            slidingSyncVersion: ssVersion
+        )
+        try await client.restoreSession(session: session)
+    }
+
+    override func serviceExtensionTimeWillExpire() {
+        if let contentHandler = contentHandler, let bestAttemptContent =  bestAttemptContent {
+            bestAttemptContent.body = "Open Paradise to view (Encrypted)"
+            contentHandler(bestAttemptContent)
+        }
+    }
+}
