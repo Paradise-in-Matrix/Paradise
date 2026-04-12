@@ -288,11 +288,11 @@ export enum TimelineEventFocusThreadMode_Tags {
                          (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))]
         (swap! !active-timelines assoc-in [room-id source]
                {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
-        (when (:forward paginate-amount) (.paginateForwards tl (:forward paginate-amount)))
-        (-> (.paginateBackwards tl (:back paginate-amount))
-            (p/then #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))
-            (p/catch #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false})))))
-      (p/catch #(log/error source "boot failed:" %)))
+        (when (:forward paginate-amount)
+          (.paginateForwards tl (:forward paginate-amount)))
+        (.paginateBackwards tl (:back paginate-amount)))
+      (p/catch #(log/error source "boot failed:" %))
+      (p/finally #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))))
 
 (worker/register :boot-timeline
   (fn [{:keys [room-id mode event-id] :or {mode :live}}]
