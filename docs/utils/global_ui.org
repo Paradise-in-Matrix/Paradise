@@ -90,7 +90,20 @@ them collected together
     (let [{:keys [open? x y items]} @(re-frame/subscribe [:context-menu/state])]
       (when-not open?
         (reset! !drag-y 0)
-        (reset! !start-y 0))
+        (reset! !start-y 0)
+        (reset! !safe-to-click? false)
+        (when @!listener-active?
+          (enable-clicks!)))
+
+      (when (and open? (not @!safe-to-click?) (not @!listener-active?))
+        (if is-mobile?
+          (do
+            (reset! !listener-active? true)
+            (.addEventListener js/window "touchend" enable-clicks! true)
+            (.addEventListener js/window "pointerup" enable-clicks! true)
+            (.addEventListener js/window "touchcancel" enable-clicks! true))
+          (enable-clicks!)))
+
       (when open?
         (let [menu-width  200
               item-height (if is-mobile? 48 32)
