@@ -84,16 +84,15 @@ them collected together
         (reset! !drag-y 0)
         (reset! !start-y 0))
       (when open?
-        (let [
-              menu-width  200
-      item-height (if is-mobile? 48 32)
-      menu-height (* (count items) item-height)
-      render-x (if (> (+ x menu-width) js/window.innerWidth)
-                 (- x menu-width)
-                 x)
-      render-y (if (> (+ y menu-height) js/window.innerHeight)
-                 (- y menu-height)
-                 y)
+        (let [menu-width  200
+              item-height (if is-mobile? 48 32)
+              menu-height (* (count items) item-height)
+              render-x (if (> (+ x menu-width) js/window.innerWidth)
+                         (- x menu-width)
+                         x)
+              render-y (if (> (+ y menu-height) js/window.innerHeight)
+                         (- y menu-height)
+                         y)
 
               handle-ptr-down (fn [e]
                                 (reset! !start-y (.-clientY e))
