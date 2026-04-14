@@ -316,7 +316,10 @@
                                 dist-sq (+ (* dx dx) (* dy dy))]
                             (when (> dist-sq 100)
                               (clear-timer!)))))
-     :on-touch-end    (fn [_] (clear-timer!))
+     :on-touch-end    (fn [e]
+                        (clear-timer!)
+                        (when @fired?
+                          (.preventDefault e)))
      :on-touch-cancel (fn [_] (clear-timer!))}))
 
 (def avatar-colors
@@ -388,6 +391,7 @@
 
         handle-ptr-up
         (fn [e]
+         (.stopPropagation e)
           (let [{:keys [start-x dx]} @!drag-state]
             (when start-x
               (.releasePointerCapture (.-target e) (.-pointerId e))
