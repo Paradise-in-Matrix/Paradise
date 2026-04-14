@@ -563,7 +563,10 @@ much simpler.
                                 dist-sq (+ (* dx dx) (* dy dy))]
                             (when (> dist-sq 100)
                               (clear-timer!)))))
-     :on-touch-end    (fn [_] (clear-timer!))
+     :on-touch-end    (fn [e]
+                        (clear-timer!)
+                        (when @fired?
+                          (.preventDefault e)))
      :on-touch-cancel (fn [_] (clear-timer!))}))
 #+end_src
 
