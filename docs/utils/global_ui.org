@@ -119,15 +119,15 @@ them collected together
              :on-pointer-move (when is-mobile? handle-ptr-move)
              :on-pointer-up   (when is-mobile? handle-ptr-up)
              :style (if is-mobile?
-           {:transform (str "translateY(" @!drag-y "px)")
-            :transition (if (pos? @!start-y) "none" "transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)")
-            :z-index 99999
-            }
-           {:left (str render-x "px")
-            :top  (str render-y "px")
-            :transform "none"
-            :z-index 99999})
-             }
+                      {:transform (str "translateY(" @!drag-y "px)")
+                       :transition (if (pos? @!start-y) "none" "transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)")
+                       :z-index 99999
+                       :pointer-events (if @!safe-to-click? "auto" "none")}
+                      {:left (str render-x "px")
+                       :top  (str render-y "px")
+                       :transform "none"
+                       :z-index 99999
+                       :pointer-events (if @!safe-to-click? "auto" "none")})}
             [:div.mobile-drag-handle]
             (for [{:keys [id label action class-name icon]} items]
               ^{:key (or id label)}
