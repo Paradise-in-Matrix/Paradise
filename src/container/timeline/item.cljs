@@ -7,7 +7,7 @@
             [client.state :as state]
             [cljs.core.async :refer [go <!]]
             [utils.helpers :refer [sanitize-custom-html format-divider-date format-time linkify-text truncate-name]]
-            [utils.images :refer [mxc->url]]
+            [utils.images :refer [mxc->url mxc-image]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [inline-editor]]
