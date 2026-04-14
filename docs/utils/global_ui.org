@@ -78,7 +78,15 @@ them collected together
 (defn global-context-menu []
   (r/with-let [!drag-y (r/atom 0)
                !start-y (r/atom 0)
-               is-mobile? (<= js/window.innerWidth 768)]
+               !safe-to-click? (r/atom false)
+               !listener-active? (r/atom false)
+               is-mobile? (<= js/window.innerWidth 768)
+               enable-clicks! (fn enable-clicks! []
+                                (reset! !safe-to-click? true)
+                                (reset! !listener-active? false)
+                                (.removeEventListener js/window "touchend" enable-clicks! true)
+                                (.removeEventListener js/window "pointerup" enable-clicks! true)
+                                (.removeEventListener js/window "touchcancel" enable-clicks! true))]
     (let [{:keys [open? x y items]} @(re-frame/subscribe [:context-menu/state])]
       (when-not open?
         (reset! !drag-y 0)
