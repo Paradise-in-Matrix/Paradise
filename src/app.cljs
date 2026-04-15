@@ -227,10 +227,7 @@
                [[spaces-sidebar]
                 [room-list]
                 (when sidebar-open?
-                  [:div.mobile-overlay {:on-pointer-down #(do
-                                                            (.preventDefault %)
-                                                            (.stopPropagation %)
-                                                            re-frame/dispatch [:ui/set-sidebar false])}]
+                  [:div.mobile-overlay {:on-click #(re-frame/dispatch [:ui/set-sidebar false])}])
                 [container]])
          [modal-root]
          [popover-root]
