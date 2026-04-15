@@ -211,8 +211,7 @@
     :action #(js/console.log "Kick:" user-id)}])
 
 (defn profile-popover-trigger [member custom-tags active-room pos & children]
-  (let [tr @(re-frame/subscribe [:i18n/tr])
-        open-popover! (fn [current-target]
+  (let [open-popover! (fn [current-target]
                         (let [rect (.getBoundingClientRect current-target)
                               px (if (= pos :left)
                                    (- (.-left rect) 265)
