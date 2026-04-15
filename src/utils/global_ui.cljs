@@ -46,22 +46,42 @@
 (defn global-context-menu []
   (r/with-let [!drag-y (r/atom 0)
                !start-y (r/atom 0)
-               is-mobile? (<= js/window.innerWidth 768)]
+               !safe-to-click? (r/atom false)
+               !listener-active? (r/atom false)
+               is-mobile? (<= js/window.innerWidth 768)
+               enable-clicks! (fn enable-clicks! []
+                                (reset! !safe-to-click? true)
+                                (reset! !listener-active? false)
+                                (.removeEventListener js/window "touchend" enable-clicks! true)
+                                (.removeEventListener js/window "pointerup" enable-clicks! true)
+                                (.removeEventListener js/window "touchcancel" enable-clicks! true))]
     (let [{:keys [open? x y items]} @(re-frame/subscribe [:context-menu/state])]
       (when-not open?
         (reset! !drag-y 0)
-        (reset! !start-y 0))
+        (reset! !start-y 0)
+        (reset! !safe-to-click? false)
+        (when @!listener-active?
+          (enable-clicks!)))
+
+      (when (and open? (not @!safe-to-click?) (not @!listener-active?))
+        (if is-mobile?
+          (do
+            (reset! !listener-active? true)
+            (.addEventListener js/window "touchend" enable-clicks! true)
+            (.addEventListener js/window "pointerup" enable-clicks! true)
+            (.addEventListener js/window "touchcancel" enable-clicks! true))
+          (enable-clicks!)))
+
       (when open?
-        (let [
-              menu-width  200
-      item-height (if is-mobile? 48 32)
-      menu-height (* (count items) item-height)
-      render-x (if (> (+ x menu-width) js/window.innerWidth)
-                 (- x menu-width)
-                 x)
-      render-y (if (> (+ y menu-height) js/window.innerHeight)
-                 (- y menu-height)
-                 y)
+        (let [menu-width  200
+              item-height (if is-mobile? 48 32)
+              menu-height (* (count items) item-height)
+              render-x (if (> (+ x menu-width) js/window.innerWidth)
+                         (- x menu-width)
+                         x)
+              render-y (if (> (+ y menu-height) js/window.innerHeight)
+                         (- y menu-height)
+                         y)
 
               handle-ptr-down (fn [e]
                                 (reset! !start-y (.-clientY e))
@@ -87,15 +107,15 @@
              :on-pointer-move (when is-mobile? handle-ptr-move)
              :on-pointer-up   (when is-mobile? handle-ptr-up)
              :style (if is-mobile?
-           {:transform (str "translateY(" @!drag-y "px)")
-            :transition (if (pos? @!start-y) "none" "transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)")
-            :z-index 99999
-            }
-           {:left (str render-x "px")
-            :top  (str render-y "px")
-            :transform "none"
-            :z-index 99999})
-             }
+                      {:transform (str "translateY(" @!drag-y "px)")
+                       :transition (if (pos? @!start-y) "none" "transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)")
+                       :z-index 99999
+                       :pointer-events (if @!safe-to-click? "auto" "none")}
+                      {:left (str render-x "px")
+                       :top  (str render-y "px")
+                       :transform "none"
+                       :z-index 99999
+                       :pointer-events (if @!safe-to-click? "auto" "none")})}
             [:div.mobile-drag-handle]
             (for [{:keys [id label action class-name icon]} items]
               ^{:key (or id label)}
@@ -172,34 +192,10 @@
  (fn [db _]
    (:ui/active-popover db)))
 
-#_(defn popover-root []
-  (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
-    (when active-popover
-      (let [{:keys [id props]} active-popover
-            _ (js/console.error props)
-            _ (log/error props)
-            {:keys [x y width height] :or {width 320 height 380}} props
-            close-fn #(re-frame/dispatch [:ui/close-popover])
-            Target   (popover-component id)
-            render-x (if (> (+ x width) js/window.innerWidth) (- x width) x)
-            render-y (if (> (+ y height) js/window.innerHeight) (- y height) y)]
-        [:<>
-         [:div.popover-backdrop
-          {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
-           :on-click close-fn
-           :on-context-menu (fn [e] (.preventDefault e) (close-fn))}]
-         [:div.popover-container
-          {:style {:left (str render-x "px")
-                   :top  (str render-y "px")
-                   :position "fixed"
-                   :z-index 12000}}
-          [Target (assoc props :close-fn close-fn)]]]))))
-
 (defn popover-root []
   (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
     (when active-popover
       (let [{:keys [id props]} active-popover
-            ;; Ensure props is a map
             props    (if (map? props) props (js->clj props :keywordize-keys true))
             {:keys [x y width height backdrop?]
              :or {width 320 height 380 backdrop? true}} props
@@ -278,49 +274,61 @@
                               (re-frame/dispatch [:msg/close-reaction-picker]))
            :on-send-sticker (fn [& _] (log/warn "No stickers in reactions!"))}]]))))
 
+(defonce !long-press-state
+  (atom {:timer nil
+         :fired? false
+         :start-pos nil
+         :scroll-handler nil}))
+
+(defn clear-long-press! []
+  (let [{:keys [timer scroll-handler]} @!long-press-state]
+    (when timer (js/clearTimeout timer))
+    (when scroll-handler
+      (.removeEventListener js/window "touchmove" scroll-handler true))
+    (reset! !long-press-state {:timer nil :fired? false :start-pos nil :scroll-handler nil})))
+
 (defn long-press-props [action-fn]
-  (let [timer (atom nil)
-        start-pos (atom nil)
-        fired? (atom false)
-        clear-timer! (fn []
-                       (when @timer
-                         (js/clearTimeout @timer)
-                         (reset! timer nil)))]
-    {:on-context-menu (fn [e]
-                        (.preventDefault e)
-                        (when-not @fired?
-                          (action-fn (.-clientX e) (.-clientY e)))
-                        (reset! fired? false))
-     :on-touch-start  (fn [e]
-                        (clear-timer!)
-                        (reset! fired? false)
-                        (let [touch (aget (.-touches e) 0)
-                              mx (.-clientX touch)
-                              my (.-clientY touch)]
-                          (reset! start-pos {:x mx :y my})
-                          (reset! timer
-                                  (js/setTimeout
-                                   (fn []
-                                     (reset! fired? true)
-                                     (action-fn mx my)
-                                     (clear-timer!))
-                                   500))))
-     :on-touch-move   (fn [e]
-                        (when @timer
+  {:on-context-menu (fn [e]
+                      (.stopPropagation e)
+                      (.preventDefault e)
+                      (when-not (:fired? @!long-press-state)
+                        (action-fn (.-clientX e) (.-clientY e)))
+                      (clear-long-press!))
+   :on-touch-start  (fn [e]
+                      (clear-long-press!)
+                      (let [touch (aget (.-touches e) 0)
+                            mx (.-clientX touch)
+                            my (.-clientY touch)]
+                        (swap! !long-press-state assoc
+                               :start-pos {:x mx :y my}
+                               :timer (js/setTimeout
+                                        (fn []
+                                          (let [handler (fn [ev] (.preventDefault ev))]
+                                            (swap! !long-press-state assoc
+                                                   :fired? true
+                                                   :scroll-handler handler)
+                                            (.addEventListener js/window "touchmove" handler #js {:passive false :capture true})
+                                            (action-fn mx my)))
+                                        500))))
+   :on-touch-move   (fn [e]
+                      (let [{:keys [timer start-pos fired?]} @!long-press-state]
+                        (when (and timer (not fired?))
                           (let [touch (aget (.-touches e) 0)
                                 mx (.-clientX touch)
                                 my (.-clientY touch)
-                                {:keys [x y]} @start-pos
+                                {:keys [x y]} start-pos
                                 dx (- mx x)
                                 dy (- my y)
                                 dist-sq (+ (* dx dx) (* dy dy))]
                             (when (> dist-sq 100)
-                              (clear-timer!)))))
-     :on-touch-end    (fn [e]
-                        (clear-timer!)
-                        (when @fired?
-                          (.preventDefault e)))
-     :on-touch-cancel (fn [_] (clear-timer!))}))
+                              (clear-long-press!))))))
+   :on-touch-end    (fn [e]
+                      (let [{:keys [fired?]} @!long-press-state]
+                        (clear-long-press!)
+                        (when fired?
+                          (.preventDefault e))))
+   :on-touch-cancel (fn [_] (clear-long-press!))})
+
 
 (def avatar-colors
   ["#5865f2" "#3ba55c" "#faa61a" "#ed4245" "#eb459e" "#9b59b6"])
