@@ -14,6 +14,7 @@
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
             [container.timeline.item :refer [event-tile connected-event-tile]]
+            [container.timeline.virtualizer :refer [test-timeline]]
             [container.reusable :refer [room-header]]
             [input.base :refer [message-input]]))
 
@@ -575,6 +576,8 @@
        [timeline-empty-state active-id]
        [:<>
 ;;        ^{:key active-id}
-        [virtualized-timeline active-id]
+
+        [test-timeline active-id]
+;;        [virtualized-timeline active-id]
         [message-input]
         [status-indicator active-id]])]))
