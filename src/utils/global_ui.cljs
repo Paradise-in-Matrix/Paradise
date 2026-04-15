@@ -399,7 +399,6 @@
 
         handle-ptr-up
         (fn [e]
-         (.stopPropagation e)
           (let [{:keys [start-x dx]} @!drag-state]
             (when start-x
               (.releasePointerCapture (.-target e) (.-pointerId e))
