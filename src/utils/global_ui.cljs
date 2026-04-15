@@ -326,6 +326,7 @@
                       (let [{:keys [fired?]} @!long-press-state]
                         (clear-long-press!)
                         (when fired?
+                          (.stopPropagation e)
                           (.preventDefault e))))
    :on-touch-cancel (fn [_] (clear-long-press!))})
 
