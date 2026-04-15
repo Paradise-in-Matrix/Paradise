@@ -2,6 +2,7 @@
   (:require
    [overlays.base :refer [popover-component]]
    [utils.global-ui :refer [avatar]]
+   [utils.images :refer [mxc-image]]
    ))
 
 
