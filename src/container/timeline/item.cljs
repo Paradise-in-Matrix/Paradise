@@ -438,7 +438,7 @@
        {:style {:display "block" :width "100%" :min-height "40px"}}
        (case (:tag item)
          "DateDivider" [date-divider (:ts item)]
-         [system-event-view "-" (tr [:container.timeline.status/timeline-separator])])]
+           [system-event-view "-" (:tag item)])]
 
       [swipe-to-action-wrapper
        {:can-edit? is-own?
