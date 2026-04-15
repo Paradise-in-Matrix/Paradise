@@ -48,7 +48,7 @@ jobs:
 
       - name: Build Frontend and Electron
         run: |
-          npm ci
+          npm i
           npm run release
           echo '#!/bin/sh' > wrapper.sh
           echo 'exec /app/main/paradise "$@"' >> wrapper.sh
