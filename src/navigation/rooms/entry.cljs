@@ -131,7 +131,13 @@
          [:div.room-drawer-header
           (merge {:style {:padding-left (str indent "px")}
                   :class (when is-closed? "collapsed")
-                  :on-click #(re-frame/dispatch [:rooms/toggle-drawer id])
+                  :on-click #(do
+                               (.preventDefault %)
+                               (.stopPropagation %)
+                               (js/setTimeout
+                                (fn []
+                                  (re-frame/dispatch [:rooms/toggle-drawer id]))
+                                150))
                   :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
                  (long-press-props #(open-menu-fn nil %1 %2)))
           [:span.drawer-arrow (if is-closed? [icons/chevron-down] [icons/chevron-down])]
@@ -142,7 +148,16 @@
                   :class [(when active? "active")
                           (when unread? "has-unread")
                           (when highlight? "has-highlight")]
-                  :on-click #(re-frame/dispatch [:rooms/select id])
+
+                  :on-pointer-up #(do
+                                    (.preventDefault %)
+                                    (.stopPropagation %))
+                  :on-click #(do
+                               (.preventDefault %)
+                               (.stopPropagation %)
+                               (when-let [native-event (.-nativeEvent %)]
+                                 (.stopImmediatePropagation native-event))
+                               (re-frame/dispatch [:rooms/select id]))
                   :on-context-menu #(open-menu-fn % (.-clientX %) (.-clientY %))}
                  (long-press-props #(open-menu-fn nil %1 %2)))
 
