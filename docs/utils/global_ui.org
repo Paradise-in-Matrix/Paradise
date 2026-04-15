@@ -521,49 +521,61 @@ much simpler.
 
 500ms is the standard
 #+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+(defonce !long-press-state
+  (atom {:timer nil
+         :fired? false
+         :start-pos nil
+         :scroll-handler nil}))
+
+(defn clear-long-press! []
+  (let [{:keys [timer scroll-handler]} @!long-press-state]
+    (when timer (js/clearTimeout timer))
+    (when scroll-handler
+      (.removeEventListener js/window "touchmove" scroll-handler true))
+    (reset! !long-press-state {:timer nil :fired? false :start-pos nil :scroll-handler nil})))
+
 (defn long-press-props [action-fn]
-  (let [timer (atom nil)
-        start-pos (atom nil)
-        fired? (atom false)
-        clear-timer! (fn []
-                       (when @timer
-                         (js/clearTimeout @timer)
-                         (reset! timer nil)))]
-    {:on-context-menu (fn [e]
-                        (.preventDefault e)
-                        (when-not @fired?
-                          (action-fn (.-clientX e) (.-clientY e)))
-                        (reset! fired? false))
-     :on-touch-start  (fn [e]
-                        (clear-timer!)
-                        (reset! fired? false)
-                        (let [touch (aget (.-touches e) 0)
-                              mx (.-clientX touch)
-                              my (.-clientY touch)]
-                          (reset! start-pos {:x mx :y my})
-                          (reset! timer
-                                  (js/setTimeout
-                                   (fn []
-                                     (reset! fired? true)
-                                     (action-fn mx my)
-                                     (clear-timer!))
-                                   500))))
-     :on-touch-move   (fn [e]
-                        (when @timer
+  {:on-context-menu (fn [e]
+                      (.stopPropagation e)
+                      (.preventDefault e)
+                      (when-not (:fired? @!long-press-state)
+                        (action-fn (.-clientX e) (.-clientY e)))
+                      (clear-long-press!))
+   :on-touch-start  (fn [e]
+                      (clear-long-press!)
+                      (let [touch (aget (.-touches e) 0)
+                            mx (.-clientX touch)
+                            my (.-clientY touch)]
+                        (swap! !long-press-state assoc
+                               :start-pos {:x mx :y my}
+                               :timer (js/setTimeout
+                                        (fn []
+                                          (let [handler (fn [ev] (.preventDefault ev))]
+                                            (swap! !long-press-state assoc
+                                                   :fired? true
+                                                   :scroll-handler handler)
+                                            (.addEventListener js/window "touchmove" handler #js {:passive false :capture true})
+                                            (action-fn mx my)))
+                                        500))))
+   :on-touch-move   (fn [e]
+                      (let [{:keys [timer start-pos fired?]} @!long-press-state]
+                        (when (and timer (not fired?))
                           (let [touch (aget (.-touches e) 0)
                                 mx (.-clientX touch)
                                 my (.-clientY touch)
-                                {:keys [x y]} @start-pos
+                                {:keys [x y]} start-pos
                                 dx (- mx x)
                                 dy (- my y)
                                 dist-sq (+ (* dx dx) (* dy dy))]
                             (when (> dist-sq 100)
-                              (clear-timer!)))))
-     :on-touch-end    (fn [e]
-                        (clear-timer!)
-                        (when @fired?
-                          (.preventDefault e)))
-     :on-touch-cancel (fn [_] (clear-timer!))}))
+                              (clear-long-press!))))))
+   :on-touch-end    (fn [e]
+                      (let [{:keys [fired?]} @!long-press-state]
+                        (clear-long-press!)
+                        (when fired?
+                          (.preventDefault e))))
+   :on-touch-cancel (fn [_] (clear-long-press!))})
+
 #+end_src
 
 
