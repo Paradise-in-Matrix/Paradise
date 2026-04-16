@@ -68,11 +68,34 @@ sophisticated in determining these (so font can be varied throughout).
   (let [style (js/window.getComputedStyle el)
         font-size (.getPropertyValue style "font-size")
         font-family (.getPropertyValue style "font-family")
-        line-height (.getPropertyValue style "line-height")]
-    {:font (str font-size " " font-family)
-     :line-height (if (= line-height "normal")
-                    (* (js/parseFloat font-size) 1.2)
-                    (js/parseFloat line-height))}))
+        line-height (.getPropertyValue style "line-height")
+        get-var (fn [var-name fallback]
+                  (let [val (str/trim (.getPropertyValue style var-name))]
+                    (if (empty? val) fallback (js/parseFloat val))))
+        get-str-var (fn [var-name fallback]
+                      (let [val (str/trim (.getPropertyValue style var-name))]
+                        (if (empty? val) fallback val)))
+        avatar-size (get-var "--chat-avatar-size" 32)
+        avatar-gap  (get-var "--chat-avatar-gap" 14)]
+    {:font             (get-str-var "--chat-body-font" "15.2px sans-serif")
+     :line-height      (get-var "--chat-body-line-height" 22.8)
+
+     :avatar-h          avatar-size
+     :avatar-col-w      (+ avatar-size avatar-gap)
+     :header-h          (get-var "--chat-header-h" 26.8)
+     :message-padding-x (get-var "--chat-padding-x" 40)
+     :seq-padding       (get-var "--chat-seq-padding" 10)
+     :merged-padding    (get-var "--chat-merged-padding" 0)
+     :media-margin      (get-var "--chat-media-margin" 0)
+     :reaction-row-h    (get-var "--chat-reaction-row-h" 24)
+     :edited-label-h    (get-var "--chat-edited-label-h" 16)
+     :reply-banner-h    (get-var "--chat-reply-banner-h" 32.4)
+     :text-wrap-buffer  (get-var "--chat-text-wrap-buffer" 4)
+     :quote-wrap-buffer (get-var "--chat-quote-wrap-buffer" 19)
+     :url-wrap-buffer   (get-var "--chat-url-wrap-buffer" 40)
+     :code-padding      (get-var "--chat-code-padding" 28)
+     :code-font         (get-str-var "--chat-code-font" "13.68px 'fira code', monospace")
+     :code-line-height  (get-var "--chat-code-line-height" 20.52)}))
 #+end_src
 
 
