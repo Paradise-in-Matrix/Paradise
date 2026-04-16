@@ -21,6 +21,7 @@ So some key aspects to baking a Pretext virtualizer include:
             [re-frame.core :as re-frame]
             [clojure.string :as str]
             [taoensso.timbre :as log]
+            [container.timeline.item :as item]
             ["@chenglou/pretext" :refer [prepare layout]]
             [container.timeline.item :refer [connected-event-tile]]))
 #+end_src
