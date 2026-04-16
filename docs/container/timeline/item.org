@@ -542,6 +542,9 @@ individual's display name.
    [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
+(defmethod calc-item-height :virtual [_msg _width _pretext-cache theme-metrics]
+  (:virtual-divider-h theme-metrics 49))
+
 (defn virtual-item [item]
  [:div.timeline-item-virtual-wrapper
        {:style {:display "block" :width "100%" :min-height "40px"}}
