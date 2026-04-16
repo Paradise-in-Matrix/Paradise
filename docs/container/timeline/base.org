@@ -20,7 +20,6 @@ we've made interop with the WASM bindings.
             [re-frame.db :as db]
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
-            ["virtua" :refer [Virtualizer]]
             [reagent.core :as r]
             [client.state :as state]
             [reagent.dom.client :as rdom]
