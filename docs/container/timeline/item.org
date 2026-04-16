@@ -389,6 +389,27 @@ read receipts. This prevents any sort of spamming to the home server.
     (finally
       (when-let [url @!blob-url]
         (js/URL.revokeObjectURL url)))))
+
+(defn calc-media-height [content actual-tag available-w theme-metrics]
+  (let [info          (or (:info content)
+                          (get-in content [:inner :info])
+                          (get-in content [:inner :content :info]))
+        w             (js/parseFloat (:w info 0))
+        h             (js/parseFloat (:h info 0))
+        valid-dims?   (and (pos? w) (pos? h))
+        default-ratio (case actual-tag "Video" 1.77 "Sticker" 1.0 1.33)
+        calc-w        (if valid-dims? (min w available-w 400) 300)
+        calc-h        (if valid-dims?
+                        (min (* calc-w (/ h w)) 350)
+                        (min (/ calc-w default-ratio) 350))
+        media-margin  (:media-margin theme-metrics 0)
+        is-edited?    (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
+        raw-txt       (or (:body content) (get-in content [:inner :content :body]) (:caption content) (get-in content [:inner :content :caption]))
+        has-caption?  (seq raw-txt)
+
+        edited-h      (if (and is-edited? (not has-caption?)) (:edited-label-h theme-metrics 16) 0)]
+    (+ calc-h media-margin edited-h)))
+
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
