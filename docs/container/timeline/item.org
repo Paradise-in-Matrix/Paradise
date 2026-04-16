@@ -325,12 +325,6 @@ read receipts. This prevents any sort of spamming to the home server.
 (defn state-event-view [{:keys [sender-name content]}]
   (let [{:keys [tag inner]} content]
     [:div.timeline-state-event
-     {:style {:display "flex"
-              :justify-content "center"
-              :padding "12px"
-              :color "var(--cp-text-muted, #888)"
-              :font-size "0.85rem"
-              :font-style "italic"}}
      [:span
       (case tag
         "RoomPinnedEvents" (str sender-name " updated the pinned messages.")
