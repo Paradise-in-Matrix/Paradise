@@ -6,12 +6,23 @@
             [cljs-workers.core :as main]
             [client.state :as state]
             [cljs.core.async :refer [go <!]]
+            ["@chenglou/pretext" :refer [prepare layout]]
             [utils.helpers :refer [sanitize-custom-html format-divider-date format-time linkify-text truncate-name]]
             [utils.images :refer [mxc->url mxc-image]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [inline-editor]]
             [utils.svg :as icons]))
+
+(defmulti calc-item-height
+  (fn [msg _width _pretext-cache _theme-metrics]
+    (let [type (:type msg)
+          tag (:content-tag msg)]
+      (cond
+        (or (= type :virtual) (= type "virtual") (str/starts-with? (str (:id msg)) "virtual-divider")) :virtual
+        (and tag (not (#{"MsgLike" "Image" "Video" "Sticker" "File" "Text"} tag))) :system-or-state
+        :else :message))))
+
 
 (re-frame/reg-event-db
  :msg/open-reaction-picker
@@ -182,8 +193,9 @@
       is-mine? (conj {:id "delete" :label (tr [:container.timeline.item/delete])  :icon [icons/trash] :class-name "danger" :action #(re-frame/dispatch [:msg/delete active-room e-t-id])}))))
 
 
-(defn message-hover-toolbar [tr item active-room current-user-id]
-  (let [msg-id   (:id item)
+(defn message-hover-toolbar [item active-room current-user-id]
+  (let [tr               @(re-frame/subscribe [:i18n/tr])
+        msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)]
     [:div.message-hover-toolbar
      [:div.toolbar-btn
@@ -227,12 +239,6 @@
 (defn state-event-view [{:keys [sender-name content]}]
   (let [{:keys [tag inner]} content]
     [:div.timeline-state-event
-     {:style {:display "flex"
-              :justify-content "center"
-              :padding "12px"
-              :color "var(--cp-text-muted, #888)"
-              :font-size "0.85rem"
-              :font-style "italic"}}
      [:span
       (case tag
         "RoomPinnedEvents" (str sender-name " updated the pinned messages.")
@@ -289,6 +295,27 @@
       (when-let [url @!blob-url]
         (js/URL.revokeObjectURL url)))))
 
+(defn calc-media-height [content actual-tag available-w theme-metrics]
+  (let [info          (or (:info content)
+                          (get-in content [:inner :info])
+                          (get-in content [:inner :content :info]))
+        w             (js/parseFloat (:w info 0))
+        h             (js/parseFloat (:h info 0))
+        valid-dims?   (and (pos? w) (pos? h))
+        default-ratio (case actual-tag "Video" 1.77 "Sticker" 1.0 1.33)
+        calc-w        (if valid-dims? (min w available-w 400) 300)
+        calc-h        (if valid-dims?
+                        (min (* calc-w (/ h w)) 350)
+                        (min (/ calc-w default-ratio) 350))
+        media-margin  (:media-margin theme-metrics 0)
+        is-edited?    (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
+        raw-txt       (or (:body content) (get-in content [:inner :content :body]) (:caption content) (get-in content [:inner :content :caption]))
+        has-caption?  (seq raw-txt)
+
+        edited-h      (if (and is-edited? (not has-caption?)) (:edited-label-h theme-metrics 16) 0)]
+    (+ calc-h media-margin edited-h)))
+
+
 (defn image-message [event content]
   [:div.image-attachment-container
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
@@ -334,32 +361,6 @@
        [:div.media-caption
         [message-text content]])]))
 
-(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
-  (let [is-edited? (:is-edited? content-map)]
-    [:div.message-render-container
-     (when in-reply-to
-       [:div.timeline-reply-banner
-        [:div.reply-indicator [icons/reply]]
-        [:div.reply-content
-         (if reply-msg
-           [:<>
-            [:span.reply-sender (:sender-name reply-msg)]
-            [:span.reply-preview
-             (get-in reply-msg [:content :inner :content :body]
-                     (tr [:container.timeline.status/media-preview]))]]
-           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
-
-     (case msg-type-tag
-       "Text"    [message-text content-map]
-       "Image"   [image-message event content-map]
-       "Video"   [video-message event content-map]
-       "Sticker" [sticker-message event content-map]
-       "File"    [file-message event content-map tr]
-       [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
-     (when is-edited?
-       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
-
-
 (defn reaction-row [{:keys [reactions my-id members-map active-room event-id]}]
   [:div.reactions-row
    (for [[emoji count senders] reactions]
@@ -398,10 +399,19 @@
         [:span.reaction-count {:style {:pointer-events "none"}} count]]))])
 
 
+(defn calc-reaction-height [msg theme-metrics]
+  (if (seq (:reactions msg))
+    (:reaction-row-h theme-metrics 24)
+    0))
+
+
 (defn system-event-view [icon text]
   [:div.timeline-system-event
    [:span.system-icon icon]
    [:span.system-text text]])
+
+(defmethod calc-item-height :system-or-state [_msg _width _pretext-cache theme-metrics]
+  (:system-event-h theme-metrics 53))
 
 (defn date-divider [ts]
   [:div.timeline-date-separator
@@ -409,9 +419,181 @@
    [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
+(defmethod calc-item-height :virtual [_msg _width _pretext-cache theme-metrics]
+  (:virtual-divider-h theme-metrics 49))
+
+(defn virtual-item [item]
+ [:div.timeline-item-virtual-wrapper
+       {:style {:display "block" :width "100%" :min-height "40px"}}
+       (case (:tag item)
+         "DateDivider" [date-divider (:ts item)]
+           [system-event-view "-" (:tag item)])])
+
+(defn sub-virtual-items [content-tag item sender-name]
+  (let [tr               @(re-frame/subscribe [:i18n/tr])]
+    (cond
+      (= content-tag "RoomMembership")
+      [system-event-view "->" (tr [:container.timeline.status/membership] [sender-name])]
+      (= content-tag "ProfileChange")
+      [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
+      (= content-tag "State")
+      [state-event-view item]
+      :else
+      [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])))
+
+(defn timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
+ [:div.timeline-avatar-wrapper
+  (when (and (= content-tag "MsgLike") (not merge-with-prev?))
+    [profile-popover-trigger popover-member custom-tags active-room nil
+     [avatar {:id (:user-id popover-member) :name (:display-name popover-member)
+              :url (:avatar-url popover-member) :size 32 :status :online :shape :none}]])])
+
+(defn timeline-header [ts merge-with-prev? popover-member custom-tags active-room]
+  [:div.timeline-header
+   [profile-popover-trigger popover-member custom-tags active-room nil
+    [:span.timeline-sender-name (truncate-name (:display-name popover-member) 32)]]
+   [:span.timeline-timestamp (format-time ts)]])
+
+(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
+  (let [is-edited? (:is-edited? content-map)]
+    [:div.message-render-container
+     (when in-reply-to
+       [:div.timeline-reply-banner
+        [:div.reply-indicator [icons/reply]]
+        [:div.reply-content
+         (if reply-msg
+           [:<>
+            [:span.reply-sender (:sender-name reply-msg)]
+            [:span.reply-preview
+             (get-in reply-msg [:content :inner :content :body]
+                     (tr [:container.timeline.status/media-preview]))]]
+           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
+
+     (case msg-type-tag
+       "Text"    [message-text content-map]
+       "Notice"  [message-text content-map]
+       "Image"   [image-message event content-map]
+       "Video"   [video-message event content-map]
+       "Sticker" [sticker-message event content-map]
+       "File"    [file-message event content-map tr]
+       [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
+     (when is-edited?
+       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
+
+(defn calc-reply-height [content theme-metrics]
+  (if (:in-reply-to content)
+    (:reply-banner-h theme-metrics 32.4)
+    0))
+
+(defn timeline-body [item content active-room is-editing-this?]
+  (let [{:keys [tag inner in-reply-to]} content
+        reply-id  (:event-id in-reply-to)
+        tr               @(re-frame/subscribe [:i18n/tr])
+        events-map  @(re-frame/subscribe [:timeline/events-map active-room])
+        reply-msg (get events-map reply-id)]
+  [:div.timeline-body
+   (cond
+     is-editing-this? [inline-editor item active-room]
+     (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
+     (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
+     (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
+     (or (= tag "Message") (= tag "Notice") (= tag "Emote"))
+     (let [{m-tag :tag m-content :content} (if (= tag "Message") inner content)]
+       [render-message-content tr (or m-tag "Text") m-content in-reply-to reply-msg item])
+     :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
+
+(defn calc-text-height [msg available-w pretext-cache theme-metrics]
+  (let [content (:content msg)
+        raw-txt (or (:body msg)
+                    (:body content)
+                    (get-in content [:inner :content :body])
+                    (:caption content)
+                    (get-in content [:inner :content :caption])
+                    "")
+        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
+
+        is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
+
+        measure-str (if is-edited?
+                      (str txt-str " (edited)")
+                      txt-str)
+
+        html-txt (or (get-in content [:inner :content :html]) "")
+
+        is-quote?       (clojure.string/includes? html-txt "<blockquote")
+
+        has-code-block? (or (clojure.string/includes? measure-str "```")
+                            (clojure.string/includes? html-txt "<pre>"))
+
+        wrap-buffer     (if is-quote?
+                          (:quote-wrap-buffer theme-metrics 19)
+                          (:text-wrap-buffer theme-metrics 4))
+
+        safe-available-w (max 0 (- available-w wrap-buffer))
+
+        font-str (if has-code-block?
+                   (:code-font theme-metrics "13.68px 'fira code', monospace")
+                   (:font theme-metrics "16px sans-serif"))
+
+        lh       (if has-code-block?
+                   (:code-line-height theme-metrics 20.52)
+                   (:line-height theme-metrics 22.8))
+
+        code-padding (if has-code-block? (:code-padding theme-metrics 28) 0)
+
+        cache-key (str (:id msg) "-" safe-available-w "-" has-code-block? "-" is-quote? "-" is-edited?)
+        cached-text-h (get @pretext-cache cache-key)
+        ]
+
+    (or cached-text-h
+        (let [lines   (str/split measure-str #"\n")
+              total-h (reduce (fn [acc line]
+                                (if (empty? (str/trim line))
+                                  (+ acc lh)
+                                  (let [prep (prepare line font-str)
+                                        raw  (try (layout prep safe-available-w lh) (catch js/Error _ nil))
+                                        ]
+                                    (+ acc (if raw (.-height raw) lh)))))
+                              0 lines)
+              final-h (+ total-h code-padding)]
+          (swap! pretext-cache assoc cache-key final-h)
+          final-h))))
+
+(defmethod calc-item-height :message [msg width pretext-cache theme-metrics]
+  (let [is-sequence-start? (not (:merge-with-prev? msg))
+        content            (:content msg)
+        avatar-h          (:avatar-h theme-metrics 32)
+        avatar-col-w      (:avatar-col-w theme-metrics 46)
+        header-h          (:header-h theme-metrics 26.8)
+        seq-padding       (:seq-padding theme-metrics 10)
+        merged-padding    (:merged-padding theme-metrics 0)
+        message-padding-x (:message-padding-x theme-metrics 40)
+        available-w       (max 0 (- width avatar-col-w message-padding-x))
+        reply-h     (calc-reply-height content theme-metrics)
+        reaction-h  (calc-reaction-height msg theme-metrics)
+        tags-present #{(:tag content) (get-in content [:inner :tag]) (:content-tag msg)}
+        actual-tag   (first (filter #{"Image" "Video" "Sticker"} tags-present))
+        is-media?    (boolean actual-tag)
+        body-h      (if is-media?
+                      (let [m-h     (calc-media-height content actual-tag available-w theme-metrics)
+                            raw-txt (or (:body content) (get-in content [:inner :content :body]) (:caption content) (get-in content [:inner :content :caption]))
+                            t-h     (if (seq raw-txt) (calc-text-height msg available-w pretext-cache theme-metrics) 0)]
+                        (+ m-h t-h))
+                      (calc-text-height msg available-w pretext-cache theme-metrics))]
+
+    (if is-sequence-start?
+      (+ (max avatar-h (+ header-h body-h reply-h)) seq-padding reaction-h)
+      (max avatar-h (+ body-h reply-h merged-padding reaction-h)))))
+
+
+
+
+
+
+
+
 (defn event-tile-render [item]
   (let [{:keys [id sender sender-id sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
-        tr               @(re-frame/subscribe [:i18n/tr])
         active-room      @(re-frame/subscribe [:rooms/active-id])
         my-profile       @(re-frame/subscribe [:sdk/profile])
         hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
@@ -434,11 +616,7 @@
                               :items (build-message-actions tr item active-room my-id mx my)}]))]
 
     (if (= type :virtual)
-      [:div.timeline-item-virtual-wrapper
-       {:style {:display "block" :width "100%" :min-height "40px"}}
-       (case (:tag item)
-         "DateDivider" [date-divider (:ts item)]
-           [system-event-view "-" (:tag item)])]
+     [virtual-item item]
 
       [swipe-to-action-wrapper
        {:can-edit? is-own?
@@ -449,50 +627,18 @@
                                            (if (= content-tag "MsgLike") " is-message" " is-system")
                                            (when merge-with-prev? " is-merged"))})}
 
-       [:div.timeline-avatar-wrapper
-        (when (and (= content-tag "MsgLike") (not merge-with-prev?))
-          [profile-popover-trigger popover-member custom-tags active-room nil
-           [avatar {:id sender-id :name (:display-name popover-member)
-                    :url (:avatar-url popover-member) :size 32 :status :online :shape :none}]])]
+       [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
 
        [:div.timeline-content-wrapper
-        (when (= content-tag "MsgLike")
-          [message-hover-toolbar tr item active-room my-id])
-
-        (cond
-          (= content-tag "MsgLike")
-          (let [{:keys [tag inner in-reply-to]} content
-                reply-id  (:event-id in-reply-to)
-                events-map  @(re-frame/subscribe [:timeline/events-map active-room])
-                reply-msg (get events-map reply-id)
-                ]
-            [:<>
-             (when-not merge-with-prev?
-               [:div.timeline-header
-                [profile-popover-trigger popover-member custom-tags active-room nil
-                 [:span.timeline-sender-name (truncate-name (:display-name popover-member) 32)]]
-                [:span.timeline-timestamp (format-time ts)]])
-             [:div.timeline-body
-              (cond
-                is-editing-this? [inline-editor item active-room]
-                (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
-                (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
-                (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
-                (= tag "Message") (let [{m-tag :tag m-content :content} inner]
-                                    [render-message-content tr m-tag m-content in-reply-to reply-msg item])
-                :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]])
-
-          (= content-tag "RoomMembership")
-          [system-event-view "->" (tr [:container.timeline.status/membership] [sender-name])]
-
-          (= content-tag "ProfileChange")
-          [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
-
-          (= content-tag "State")
-          [state-event-view item]
-
-          :else
-          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])
+        (if (= content-tag "MsgLike")
+          [:<>
+           [message-hover-toolbar item active-room my-id]
+           (when-not merge-with-prev?
+             [timeline-header ts merge-with-prev? popover-member custom-tags active-room])
+           [timeline-body item content active-room is-editing-this?]
+           ]
+          [sub-virtual-items content-tag item sender-name]
+          )
 
         (when (seq reactions)
           [reaction-row {:reactions reactions
