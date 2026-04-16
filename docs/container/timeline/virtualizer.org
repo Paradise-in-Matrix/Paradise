@@ -88,6 +88,7 @@ sophisticated in determining these (so font can be varied throughout).
      :merged-padding    (get-var "--chat-merged-padding" 0)
      :media-margin      (get-var "--chat-media-margin" 0)
      :reaction-row-h    (get-var "--chat-reaction-row-h" 24)
+     :system-event-h    (get-var "--chat-system-event-h" 52)
      :edited-label-h    (get-var "--chat-edited-label-h" 16)
      :reply-banner-h    (get-var "--chat-reply-banner-h" 32.4)
      :text-wrap-buffer  (get-var "--chat-text-wrap-buffer" 4)
@@ -377,6 +378,7 @@ mostly just tweaking.
       --chat-sender-font-weight: 400;
       --chat-timestamp-font-size: 11.2px;
       --chat-timestamp-font-weight: 400;
+      --chat-state-font: italic 400 13.6px sans-serif;
       --chat-body-font-weight: 400;
       --chat-body-font: 15.2px "Inter", sans-serif;
       --chat-body-line-height: 22.8px;
@@ -466,12 +468,6 @@ mostly just tweaking.
 
   .timeline-sender-name:hover {
       text-decoration: underline;
-  }
-
-  .timeline-timestamp {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      letter-spacing: 0.02em;
   }
 
   .timeline-body {
@@ -705,12 +701,11 @@ mostly just tweaking.
   }
 
   .timeline-state-event {
-      display: "flex"
-      justify-content: "center"
-      padding: "12px"
-      color: "var(--cp-text-muted, #888)"
-      font-size: "0.85rem"
-      font-style: "italic"
+      display: flex;
+      justify-content: center;
+      padding: 12px;
+      color: var(--cp-text-muted, #888);
+      font: var(--chat-state-font);
       width: 100%;
   }
 
