@@ -580,7 +580,6 @@ individual's display name.
 
 (defn event-tile-render [item]
   (let [{:keys [id sender sender-id sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
-        tr               @(re-frame/subscribe [:i18n/tr])
         active-room      @(re-frame/subscribe [:rooms/active-id])
         my-profile       @(re-frame/subscribe [:sdk/profile])
         hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
