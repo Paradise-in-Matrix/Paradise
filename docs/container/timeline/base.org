@@ -29,7 +29,7 @@ we've made interop with the WASM bindings.
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
             [container.timeline.item :refer [event-tile connected-event-tile]]
-            [container.timeline.virtualizer :refer [test-timeline]]
+            [container.timeline.virtualizer :refer [pretext-timeline timeline-empty-state]]
             [container.reusable :refer [room-header]]
             [input.base :refer [message-input]]))
 #+end_src
