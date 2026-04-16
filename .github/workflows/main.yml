@@ -47,21 +47,6 @@ jobs:
           sudo apt-get install -y flatpak flatpak-builder
           curl -L https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh | sudo bash
 
-      - name: Build Frontend and Electron
-        run: |
-          npm i
-          npm run release
-          echo '#!/bin/sh' > wrapper.sh
-          echo 'exec /app/main/paradise "$@"' >> wrapper.sh
-          chmod +x wrapper.sh
-          chmod +x scripts/electron.sh
-          ./scripts/electron.sh
-
-      - name: Build Flatpak Bundle
-        run: |
-          flatpak-builder --repo=repo --force-clean build-dir electron/com.gigiaj.paradise.yml
-          flatpak build-bundle repo paradise-${{ env.PKG_VERSION }}.flatpak com.gigiaj.paradise
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
