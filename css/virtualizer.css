@@ -22,6 +22,7 @@
       --chat-sender-font-weight: 400;
       --chat-timestamp-font-size: 11.2px;
       --chat-timestamp-font-weight: 400;
+      --chat-state-font: italic 400 13.6px sans-serif;
       --chat-body-font-weight: 400;
       --chat-body-font: 15.2px "Inter", sans-serif;
       --chat-body-line-height: 22.8px;
@@ -111,12 +112,6 @@
 
   .timeline-sender-name:hover {
       text-decoration: underline;
-  }
-
-  .timeline-timestamp {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      letter-spacing: 0.02em;
   }
 
   .timeline-body {
@@ -350,12 +345,11 @@
   }
 
   .timeline-state-event {
-      display: "flex"
-      justify-content: "center"
-      padding: "12px"
-      color: "var(--cp-text-muted, #888)"
-      font-size: "0.85rem"
-      font-style: "italic"
+      display: flex;
+      justify-content: center;
+      padding: 12px;
+      color: var(--cp-text-muted, #888);
+      font: var(--chat-state-font);
       width: 100%;
   }
 
