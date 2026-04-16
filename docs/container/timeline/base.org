@@ -509,10 +509,7 @@ received an update.
      (if-not active-id
        [timeline-empty-state active-id]
        [:<>
-;;        ^{:key active-id}
-
-        [test-timeline active-id]
-;;        [virtualized-timeline active-id]
+        [pretext-timeline active-id]
         [message-input]
         [status-indicator active-id]])]))
 #+end_src
@@ -525,6 +522,10 @@ received an update.
 I will segment these another time
 
 #+begin_src css :tangle ../../../css/timeline.css
+
+
+
+
 
   .timeline-container {
       display: flex;
