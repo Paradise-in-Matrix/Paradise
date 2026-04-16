@@ -421,6 +421,7 @@ mostly just tweaking.
 
   .timeline-header {
       display: flex;
+      height: var(--chat-header-h);
       align-items: baseline;
       gap: 8px;
       padding-bottom: 4px;
@@ -464,6 +465,12 @@ mostly just tweaking.
       font-weight: 700;
       color: var(--text-highlight);
       cursor: pointer;
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+      max-width: 100%;
   }
 
   .timeline-sender-name:hover {
