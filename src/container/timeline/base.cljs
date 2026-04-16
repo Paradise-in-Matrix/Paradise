@@ -5,7 +5,6 @@
             [re-frame.db :as db]
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
-            ["virtua" :refer [Virtualizer]]
             [reagent.core :as r]
             [client.state :as state]
             [reagent.dom.client :as rdom]
@@ -14,7 +13,7 @@
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
             [container.timeline.item :refer [event-tile connected-event-tile]]
-            [container.timeline.virtualizer :refer [test-timeline]]
+            [container.timeline.virtualizer :refer [pretext-timeline timeline-empty-state]]
             [container.reusable :refer [room-header]]
             [input.base :refer [message-input]]))
 
@@ -372,196 +371,6 @@
 
 
 
-(defn timeline-loading-overlay []
-  [:div {:style {:position "absolute"
-                 :top "20px"
-                 :width "100%"
-                 :display "flex"
-                 :justify-content "center"
-                 :z-index 100
-                 :pointer-events "none"}}
-   [:div {:style {:background "var(--bg-color, white)"
-                  :padding "8px"
-                  :border-radius "50%"
-                  :box-shadow "0 2px 10px rgba(0,0,0,0.1)"}}
-    [:div.spinner]]])
-
-(defn timeline-empty-state [room-id]
-  (let [tr @(re-frame/subscribe [:i18n/tr])]
-    [:div.timeline-empty {:style {:padding "40px" :text-align "center"}}
-     (if room-id
-         (tr [:container.timeline/loading])
-         (tr [:container.timeline/no-room])
-         )]))
-
-
-(defn timeline-jump-button [do-jump! focus-mode?]
-  (let [tr @(re-frame/subscribe [:i18n/tr])]
-    [:button.jump-to-bottom
-     {:style {:position "absolute"
-              :bottom "20px"
-              :right "24px"
-              :z-index 10
-              :display "flex"
-              :align-items "center"
-              :gap "8px"}
-      :on-click do-jump!}
-     [:span (if focus-mode?
-              (tr [:container.timeline/return-to-live])
-              (tr [:container.timeline/jump-to-bottom]))]]))
-
-(defn virtualized-timeline [initial-room-id]
-  (r/with-let [!virtua-ref    (r/atom nil)
-               set-virtua-ref #(reset! !virtua-ref %)
-               !scroll-ref    (atom nil)
-               set-scroll-ref #(reset! !scroll-ref %)
-               !current-room  (r/atom initial-room-id)
-               !at-bottom?    (r/atom true)
-               !show-jump?    (r/atom false)
-               !prev-first-id (atom nil)
-               !prev-last-id  (atom nil)
-               !initialized?  (r/atom false)
-               !scroll-timer  (atom nil)]
-
-    (fn [room-id]
-      (when (not= room-id @!current-room)
-        (reset! !current-room room-id)
-        (reset! !initialized? false)
-        (reset! !prev-first-id nil)
-        (reset! !prev-last-id nil)
-        (reset! !at-bottom? true)
-        (reset! !show-jump? false))
-
-      (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
-            event-array      (to-array events)
-            cnt              (count event-array)
-            loading?         @(re-frame/subscribe [:timeline/loading-more? room-id])
-            loading-forward? @(re-frame/subscribe [:timeline/loading-forward? room-id])
-            jump-target      @(re-frame/subscribe [:timeline/jump-target-id room-id])
-            focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])
-
-            real-events      (filter #(not= (:type %) :virtual) events)
-            current-first-id (:id (first real-events))
-            current-last-id  (:id (last real-events))
-
-            did-prepend?     (boolean (and @!prev-first-id
-                                           (not= current-first-id @!prev-first-id)
-                                           (= current-last-id @!prev-last-id)))
-
-            new-msg-arrived? (boolean (and @!prev-last-id
-                                           (not= current-last-id @!prev-last-id)
-                                           (not did-prepend?)))
-
-            check-fill-viewport! (fn []
-                                   (when-let [target @!scroll-ref]
-                                     (let [max-scroll (- (.-scrollHeight target) (.-clientHeight target))]
-                                       (when (and (<= max-scroll 0) (not loading?))
-                                         (re-frame/dispatch [:sdk/back-paginate room-id])))))
-
-            do-jump!         (fn []
-                               (if focus-mode?
-                                 (re-frame/dispatch [:room/jump-to-live-bottom room-id])
-                                 (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))))]
-
-        (reset! !prev-first-id current-first-id)
-        (reset! !prev-last-id current-last-id)
-
-        (when (and (not @!initialized?) (pos? cnt) @!virtua-ref)
-          (let [target-idx (if jump-target
-                             (let [idx (.findIndex event-array #(= (:id %) jump-target))]
-                               (if (not= idx -1) idx (dec cnt)))
-                             (dec cnt))
-                align-opt  (if jump-target #js {:align "center"} #js {:align "end"})]
-            (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
-            (js/setTimeout #(do
-                              (some-> @!virtua-ref (.scrollToIndex target-idx align-opt))
-                              (reset! !initialized? true)
-                              (check-fill-viewport!))
-                           300)))
-
-        (when (and @!initialized? did-prepend?)
-          (js/setTimeout check-fill-viewport! 100))
-
-        (when (and @!initialized?
-                   @!at-bottom?
-                   new-msg-arrived?
-                   (not focus-mode?))
-          (js/requestAnimationFrame
-           (fn []
-             (some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"}))
-             (js/setTimeout #(some-> @!virtua-ref (.scrollToIndex (dec cnt) #js {:align "end"})) 200))))
-
-        [:div.virtua-timeline-wrapper
-         {:style {:flex 1
-                  :position "relative"
-                  :display "flex"
-                  :flex-direction "column"
-                  :min-height 0
-                  :opacity (if @!initialized? 1 0)
-                  :transition "opacity 0.15s ease-in-out"}}
-
-         [:div.timeline-messages
-          {:ref set-scroll-ref
-           :class (when jump-target "jumping-animation")
-           :style {:display "flex"
-                   :flex-direction "column"
-                   :flex 1
-                   :height "100%"
-                   :overflow-y "auto"
-                   :overflow-anchor "none"}
-           :on-scroll (fn [e]
-                        (let [target           (.-currentTarget e)
-                              scroll-top       (.-scrollTop target)
-                              max-scroll       (- (.-scrollHeight target) (.-clientHeight target))
-                              dist-from-bottom (- max-scroll scroll-top)]
-                          (when-not @!scroll-timer
-                            (reset! !scroll-timer
-                                    (js/setTimeout
-                                     (fn []
-                                       (reset! !scroll-timer nil)
-                                       (reset! !show-jump? (> dist-from-bottom 600))
-                                       (reset! !at-bottom? (<= dist-from-bottom 10))
-
-                                       (when (and @!initialized?
-                                                  (> max-scroll 0)
-                                                  (<= scroll-top 500)
-                                                  (not loading?))
-                                         (re-frame/dispatch [:sdk/back-paginate room-id]))
-
-                                       (when (and focus-mode?
-                                                  (<= dist-from-bottom 500)
-                                                  (not loading-forward?))
-                                         (re-frame/dispatch [:sdk/forward-paginate room-id])))
-                                     10)))))}
-
-          (when loading?
-            [timeline-loading-overlay])
-
-          (if (zero? cnt)
-            [timeline-empty-state room-id]
-            (into [:> Virtualizer
-                   {:ref set-virtua-ref
-                    :shift did-prepend?}]
-                  (for [item event-array]
-                    ^{:key (:id item)}
-                    [:div.virtua-item-wrapper
-                     {:style {:margin "0"
-                              :min-height "32px"
-                              :width "100%"}}
-                     [:div.timeline-item
-                      {:class (when (= (:id item) jump-target) "is-jump-target")
-                       :style {:margin "0"}}
-                      [connected-event-tile room-id item]]])))
-          (when (and focus-mode? loading-forward?)
-            [:div {:style {:min-height "60px"
-                           :display "flex"
-                           :align-items "center"
-                           :justify-content "center"
-                           :padding-bottom "20px"}}
-             [:div.spinner]])]
-         (when (and @!show-jump? (not @!at-bottom?))
-           [timeline-jump-button do-jump! focus-mode?])]))))
-
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
         room-meta    @(re-frame/subscribe [:rooms/active-metadata])
@@ -575,9 +384,6 @@
      (if-not active-id
        [timeline-empty-state active-id]
        [:<>
-;;        ^{:key active-id}
-
-        [test-timeline active-id]
-;;        [virtualized-timeline active-id]
+        [pretext-timeline active-id]
         [message-input]
         [status-indicator active-id]])]))
