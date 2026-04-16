@@ -129,6 +129,7 @@ is responsible for its calculations.
 
 
 
+
 **** Layout Calculation
 
 
@@ -155,8 +156,7 @@ for the most part it isn't from scratch as we know everything it'll likely need.
 mostly just tweaking.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/virtualizer.cljs
-(defn test-timeline [room-id]
-  (log/info "Outer re-render")
+(defn pretext-timeline [room-id]
   (r/with-let [!scroll-ref      (atom nil)
                !scroll-top      (r/atom 0)
                !container-width (r/atom 400)
