@@ -653,10 +653,10 @@ state for now.
 
         html-txt (or (get-in content [:inner :content :html]) "")
 
-        is-quote?       (clojure.string/includes? html-txt "<blockquote")
+        is-quote?       (str/includes? html-txt "<blockquote")
 
-        has-code-block? (or (clojure.string/includes? measure-str "```")
-                            (clojure.string/includes? html-txt "<pre>"))
+        has-code-block? (or (str/includes? measure-str "```")
+                            (str/includes? html-txt "<pre>"))
 
         wrap-buffer     (if is-quote?
                           (:quote-wrap-buffer theme-metrics 19)
