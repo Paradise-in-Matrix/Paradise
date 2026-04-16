@@ -27,6 +27,23 @@ It is convenient to define the actual items that make up a timeline.
 #+end_src
 
 
+**** Item Height Multi-Method
+
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defmulti calc-item-height
+  (fn [msg _width _pretext-cache _theme-metrics]
+    (let [type (:type msg)
+          tag (:content-tag msg)]
+      (cond
+        (or (= type :virtual) (= type "virtual") (str/starts-with? (str (:id msg)) "virtual-divider")) :virtual
+        (and tag (not (#{"MsgLike" "Image" "Video" "Sticker" "File" "Text"} tag))) :system-or-state
+        :else :message))))
+
+#+end_src
+
+
+
 **** Reactions
 
 
