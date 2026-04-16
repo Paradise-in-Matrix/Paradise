@@ -573,6 +573,7 @@ enabling the components themselves to provide their estimated heights.
 It isn't quite ready for that yet, but we can get it to a dynamically functional
 state for now.
 
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
  [:div.timeline-avatar-wrapper
   (when (and (= content-tag "MsgLike") (not merge-with-prev?))
@@ -586,6 +587,31 @@ state for now.
     [:span.timeline-sender-name (truncate-name (:display-name popover-member) 32)]]
    [:span.timeline-timestamp (format-time ts)]])
 
+(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
+  (let [is-edited? (:is-edited? content-map)]
+    [:div.message-render-container
+     (when in-reply-to
+       [:div.timeline-reply-banner
+        [:div.reply-indicator [icons/reply]]
+        [:div.reply-content
+         (if reply-msg
+           [:<>
+            [:span.reply-sender (:sender-name reply-msg)]
+            [:span.reply-preview
+             (get-in reply-msg [:content :inner :content :body]
+                     (tr [:container.timeline.status/media-preview]))]]
+           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
+
+     (case msg-type-tag
+       "Text"    [message-text content-map]
+       "Notice"  [message-text content-map]
+       "Image"   [image-message event content-map]
+       "Video"   [video-message event content-map]
+       "Sticker" [sticker-message event content-map]
+       "File"    [file-message event content-map tr]
+       [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
+     (when is-edited?
+       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
 
 (defn timeline-body [item content active-room]
   (let [{:keys [tag inner in-reply-to]} content
