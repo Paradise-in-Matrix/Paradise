@@ -302,7 +302,7 @@ mostly just tweaking.
 
 
           (if (zero? cnt)
-            [timeline-empty-state]
+            [timeline-empty-state room-id]
 
             (let [first-vis  (first visible-window)
                   last-vis   (last visible-window)
