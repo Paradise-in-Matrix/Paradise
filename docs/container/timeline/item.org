@@ -630,8 +630,9 @@ state for now.
      (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
      (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
      (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
-     (= tag "Message") (let [{m-tag :tag m-content :content} inner]
-                         [render-message-content tr m-tag m-content in-reply-to reply-msg item])
+     (or (= tag "Message") (= tag "Notice") (= tag "Emote"))
+     (let [{m-tag :tag m-content :content} (if (= tag "Message") inner content)]
+       [render-message-content tr (or m-tag "Text") m-content in-reply-to reply-msg item])
      :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
 
 (defn event-tile-render [item]
