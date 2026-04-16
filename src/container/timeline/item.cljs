@@ -320,7 +320,7 @@
   [:div.image-attachment-container
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
-      [:img {:src url :alt alt-text :loading "eager"
+      [:img {:src url :alt alt-text :loading "lazy"
 ;;             :decoding "async"
              :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox
                                             {:url url
@@ -345,7 +345,7 @@
 (defn sticker-message [event content]
   [async-media-wrapper event content {:class "media-sticker" :default-ratio 1.0}
    (fn [url alt]
-     [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])])
+     [:img {:src url :alt alt :loading "lazy" :style {:width "100%" :height "100%" :display "block"}} ])])
 
 (defn file-message [event content tr]
   (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
@@ -451,7 +451,7 @@
 (defn timeline-header [ts merge-with-prev? popover-member custom-tags active-room]
   [:div.timeline-header
    [profile-popover-trigger popover-member custom-tags active-room nil
-    [:span.timeline-sender-name (truncate-name (:display-name popover-member) 32)]]
+    [:span.timeline-sender-name (truncate-name (:display-name popover-member) 20)]]
    [:span.timeline-timestamp (format-time ts)]])
 
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
