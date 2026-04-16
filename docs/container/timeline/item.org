@@ -635,6 +635,62 @@ state for now.
        [render-message-content tr (or m-tag "Text") m-content in-reply-to reply-msg item])
      :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
 
+(defn calc-text-height [msg available-w pretext-cache theme-metrics]
+  (let [content (:content msg)
+        raw-txt (or (:body msg)
+                    (:body content)
+                    (get-in content [:inner :content :body])
+                    (:caption content)
+                    (get-in content [:inner :content :caption])
+                    "")
+        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
+
+        is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
+
+        measure-str (if is-edited?
+                      (str txt-str " (edited)")
+                      txt-str)
+
+        html-txt (or (get-in content [:inner :content :html]) "")
+
+        is-quote?       (clojure.string/includes? html-txt "<blockquote")
+
+        has-code-block? (or (clojure.string/includes? measure-str "```")
+                            (clojure.string/includes? html-txt "<pre>"))
+
+        wrap-buffer     (if is-quote?
+                          (:quote-wrap-buffer theme-metrics 19)
+                          (:text-wrap-buffer theme-metrics 4))
+
+        safe-available-w (max 0 (- available-w wrap-buffer))
+
+        font-str (if has-code-block?
+                   (:code-font theme-metrics "13.68px 'fira code', monospace")
+                   (:font theme-metrics "16px sans-serif"))
+
+        lh       (if has-code-block?
+                   (:code-line-height theme-metrics 20.52)
+                   (:line-height theme-metrics 22.8))
+
+        code-padding (if has-code-block? (:code-padding theme-metrics 28) 0)
+
+        cache-key (str (:id msg) "-" safe-available-w "-" has-code-block? "-" is-quote? "-" is-edited?)
+        cached-text-h (get @pretext-cache cache-key)
+        ]
+
+    (or cached-text-h
+        (let [lines   (str/split measure-str #"\n")
+              total-h (reduce (fn [acc line]
+                                (if (empty? (str/trim line))
+                                  (+ acc lh)
+                                  (let [prep (prepare line font-str)
+                                        raw  (try (layout prep safe-available-w lh) (catch js/Error _ nil))
+                                        ]
+                                    (+ acc (if raw (.-height raw) lh)))))
+                              0 lines)
+              final-h (+ total-h code-padding)]
+          (swap! pretext-cache assoc cache-key final-h)
+          final-h))))
 (defn event-tile-render [item]
   (let [{:keys [id sender sender-id sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
         active-room      @(re-frame/subscribe [:rooms/active-id])
