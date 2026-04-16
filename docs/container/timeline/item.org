@@ -768,9 +768,9 @@ state for now.
            [message-hover-toolbar item active-room my-id]
            (when-not merge-with-prev?
              [timeline-header ts merge-with-prev? popover-member custom-tags active-room])
-           [timeline-body item content active-room]
+           [timeline-body item content active-room is-editing-this?]
            ]
-          [sub-virtual-item content-tag item sender-name]
+          [sub-virtual-items content-tag item sender-name]
           )
 
         (when (seq reactions)
