@@ -311,17 +311,18 @@ mostly just tweaking.
               (into [:<>]
                     (concat
                      [^{:key "bottom-gap"}
-                      [:div.virtua-bottom-gap
+                      [:div.timeline-bottom-gap
                        {:style {:height (str bottom-gap "px")
                                 :flex-shrink 0
                                 :width "100%"}}]]
                      (for [{:keys [id height] :as item} visible-window]
                        ^{:key id}
-                       [:div.virtua-item-wrapper
+                       [:div.item-wrapper
                         {:style {:min-height (str height "px")
                                  :width "100%"
                                  :margin "0"
                                  :box-sizing "border-box"}}
+
                         [:div.timeline-item
                          {:data-event-id id
                           :ref (fn [el]
