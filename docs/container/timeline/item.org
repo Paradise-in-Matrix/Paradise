@@ -533,6 +533,9 @@ individual's display name.
    [:span.system-icon icon]
    [:span.system-text text]])
 
+(defmethod calc-item-height :system-or-state [_msg _width _pretext-cache theme-metrics]
+  (:system-event-h theme-metrics 53))
+
 (defn date-divider [ts]
   [:div.timeline-date-separator
    [:div.separator-line]
