@@ -488,64 +488,6 @@ We also don't want to list our own name, so we remove that too.
 
 
 
-Similar to Spaces and RoomLists we do a Virtuoso component here.
-We ensure the array that will compose its table of individual elements
-is a JS array and then we move on with defining the actual
-behavior for the timeline.
-****** TODO Timeline is currently not performant for a few reasons
-We need to button up this better, as this was the most recently added thing
-from the enter refactoring of the "application view"
-
-The table itself asks reframe to trigger the back pagination when the "start"
-is reached. This should probably also have a somewhat automatic trigger until
-size is reached, but the behavior may be impacted by the performant issue
-mentioned above. Should be easily sorted, however.
-
-
-For fleshing out the timeline itself we want to consider a few key details.
-What should happen when the user reaches the top? Back paginate.
-
-The timeline should NEVER shift upon loading more entries.
-
-There isn't inherently just one way to do elegant rendering.
-However, most virtual lists only provide one to us though.
-They pre-calculate the items in the list and then render according
-to those calculations. Really fancy ones opt to even re-calculate
-after loads.
-Done well, this is more or less sufficient
-
-So the most important detail that our timeline should then follow is:
-never change the user's current rendered element's unless it is smoothly
-bringing element's *UP*. One might think this to be the behavior
-for media without size info. In those cases still, we will simply
-use default sizing and just render from that.
-So still we can easily avoid any load issues.
-
-The actual problematic items are edits, reactions, and deletes.
-
-These can immediately change what is on the screen and change the size
-of items that were already calculated. The reaction row itself
-adds an entire row always and deletes will entirely remove a message.
-
-So it'll be important to guard against these cases.
-
-Now the best advice I can give for building out a timeline renderer is
-to ensure that at each step you ensure the components play well with
-whatever you're jamming them into.
-
-Now I tried a number of implementations. Virtuoso for a long while, but
-I could not get it to co-exist calmly with our lovely reframe.
-
-I then toyed with trying to neatly create a simple native rendering
-sliding window. Where we could dispose of the contents as we go.
-This worked for everything... except inertia scrolling.
-
-So... Virtua seems rational. The virtualizer in it seemed perfect.
-I've seen use of it and the mechanism seems thoughtful.
-
-I wasn't a fan of Virtuoso having a paid license for their message
-list for use cases like this either.
-
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (defn timeline-loading-overlay []
   [:div {:style {:position "absolute"
