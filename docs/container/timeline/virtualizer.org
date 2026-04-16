@@ -680,8 +680,9 @@ mostly just tweaking.
 
       background: var(--bg-primary);
       -webkit-overflow-scrolling: touch;
-      perspective: 1000;
-      backface-visibility: hidden;
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+
 
  }
 
@@ -730,6 +731,8 @@ mostly just tweaking.
       padding: 0;
       transform: translateZ(0);
       will-change: transform;
+
+
   }
 
   .timeline-message.is-merged {
