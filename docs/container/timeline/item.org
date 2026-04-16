@@ -616,43 +616,15 @@ individual's display name.
        [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
 
        [:div.timeline-content-wrapper
-        (when (= content-tag "MsgLike")
-          [message-hover-toolbar tr item active-room my-id])
-
-        (cond
-          (= content-tag "MsgLike")
-          (let [{:keys [tag inner in-reply-to]} content
-                reply-id  (:event-id in-reply-to)
-                events-map  @(re-frame/subscribe [:timeline/events-map active-room])
-                reply-msg (get events-map reply-id)
-                ]
-            [:<>
-             (when-not merge-with-prev?
-               [:div.timeline-header
-                [profile-popover-trigger popover-member custom-tags active-room nil
-                 [:span.timeline-sender-name (truncate-name (:display-name popover-member) 32)]]
-                [:span.timeline-timestamp (format-time ts)]])
-             [:div.timeline-body
-              (cond
-                is-editing-this? [inline-editor item active-room]
-                (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
-                (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
-                (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
-                (= tag "Message") (let [{m-tag :tag m-content :content} inner]
-                                    [render-message-content tr m-tag m-content in-reply-to reply-msg item])
-                :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]])
-
-          (= content-tag "RoomMembership")
-          [system-event-view "->" (tr [:container.timeline.status/membership] [sender-name])]
-
-          (= content-tag "ProfileChange")
-          [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
-
-          (= content-tag "State")
-          [state-event-view item]
-
-          :else
-          [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])
+        (if (= content-tag "MsgLike")
+          [:<>
+           [message-hover-toolbar item active-room my-id]
+           (when-not merge-with-prev?
+             [timeline-header ts merge-with-prev? popover-member custom-tags active-room])
+           [timeline-body item content active-room]
+           ]
+          [sub-virtual-item content-tag item sender-name]
+          )
 
         (when (seq reactions)
           [reaction-row {:reactions reactions
