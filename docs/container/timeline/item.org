@@ -584,7 +584,7 @@ state for now.
 (defn timeline-header [ts merge-with-prev? popover-member custom-tags active-room]
   [:div.timeline-header
    [profile-popover-trigger popover-member custom-tags active-room nil
-    [:span.timeline-sender-name (truncate-name (:display-name popover-member) 32)]]
+    [:span.timeline-sender-name (truncate-name (:display-name popover-member) 20)]]
    [:span.timeline-timestamp (format-time ts)]])
 
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
