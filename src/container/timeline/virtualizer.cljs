@@ -53,6 +53,7 @@
      :merged-padding    (get-var "--chat-merged-padding" 0)
      :media-margin      (get-var "--chat-media-margin" 0)
      :reaction-row-h    (get-var "--chat-reaction-row-h" 24)
+     :system-event-h    (get-var "--chat-system-event-h" 52)
      :edited-label-h    (get-var "--chat-edited-label-h" 16)
      :reply-banner-h    (get-var "--chat-reply-banner-h" 32.4)
      :text-wrap-buffer  (get-var "--chat-text-wrap-buffer" 4)
