@@ -416,6 +416,7 @@ mostly just tweaking.
 }
 
 
+
   .timeline-header {
       display: flex;
       align-items: baseline;
@@ -424,22 +425,31 @@ mostly just tweaking.
   }
 
   .timeline-sender-name {
-      font-weight: 600;
-      font-size: 0.95rem;
+      font-weight: var(--chat-sender-font-weight);
+      font-size: var(--chat-sender-font-size);
       color: var(--text-primary);
   }
 
+  .timeline-wrapper {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      opacity: var(--dynamic-opacity);
+  }
+
   .timeline-timestamp {
-      font-size: 0.75rem;
+      font-size: var(--chat-timestamp-font-size);
       color: var(--text-secondary, #888888);
-      font-weight: 400;
+      font-weight: var(--chat-timestamp-font-weight);
   }
 
 
   .timeline-avatar-wrapper {
       flex-shrink: 0;
-      width: 32px;
-      height: 32px;
+      width: var(--chat-avatar-size);
+      height: var(--chat-avatar-size);
   }
 
   .timeline-content-wrapper {
@@ -465,24 +475,37 @@ mostly just tweaking.
   }
 
   .timeline-body {
-      font-size: 0.95rem;
-      line-height: 1.5;
+      font: var(--chat-body-font);
+      line-height: var(--chat-body-line-height);
       color: var(--text-main);
+  }
+
+  .spinner-wrapper {
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-bottom: 20px;
   }
 
   .timeline-loading-overlay {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 40px;
+      top: 20px;
+      width: 100%;
       display: flex;
-      align-items: center;
       justify-content: center;
-      z-index: 10;
-      background: linear-gradient(to bottom, var(--bg-primary) 0%, transparent 100%);
+      z-index: 100;
       pointer-events: none;
   }
+
+  .timeline-loading-spinner-container {
+      background: var(--bg-color, white);
+      padding: 8px;
+      border-radius: 50%;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+
+
 
   .timeline-emotes {
       display: inline-block;
@@ -499,6 +522,8 @@ mostly just tweaking.
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 40px;
+      text-align: center;
       height: 100%;
       color: #6c7086;
   }
@@ -508,6 +533,7 @@ mostly just tweaking.
       align-items: center;
       justify-content: center;
       padding: 16px 0;
+      height: var(--chat-virtual-divider-h);
       width: 100%;
   }
 
@@ -558,7 +584,7 @@ mostly just tweaking.
     width: 100%;
     max-width: 400px;
     max-height: 350px;
-    margin-top: 4px;
+    margin-top: var(--chat-media-margin);
     display: block;
     overflow: hidden;
     border-radius: 8px;
@@ -634,24 +660,27 @@ mostly just tweaking.
   ,*/
   }
 
-
  .timeline-messages {
-      flex: 1;
-      min-height: 0;
+
+     min-height: 0;
       max-width: 100%;
-      height: 100%;
       width: 100%;
-      flex-direction: column;
+
+
+
+      height: 100%;
+      flex: 1;
+      flex-direction: column-reverse;
       display: flex;
       position: relative;
-      overflow-anchor: none !important;
-      overflow: hidden;
+      overflow-y: auto;
+
       background: var(--bg-primary);
       -webkit-overflow-scrolling: touch;
       perspective: 1000;
       backface-visibility: hidden;
 
-  }
+ }
 
   .timeline-messages ul,
   .timeline-messages li {
@@ -664,29 +693,31 @@ mostly just tweaking.
       display: flex;
       position: relative;
       flex-direction: row;
-      gap: 14px;
-      transition: background 0.1s ease;
-      padding-left: 20px;
-      padding-right: 20px;
-      padding-top: 5px;
-      padding-bottom: 5px;
+      gap: var(--chat-avatar-gap);
+      padding-left: calc(var(--chat-padding-x) / 2);
+      padding-right: calc(var(--chat-padding-x) / 2);
+      padding-top: calc(var(--chat-seq-padding) / 2);
+      padding-bottom: calc(var(--chat-seq-padding) / 2);
   }
 
   .timeline-message:hover {
       background-color: var(--surface-hover, rgba(255, 255, 255, 0.04));
   }
 
-  .timeline-row.is-state-event {
-      padding: 12px 0;
+  .timeline-state-event {
+      display: "flex"
+      justify-content: "center"
+      padding: "12px"
+      color: "var(--cp-text-muted, #888)"
+      font-size: "0.85rem"
+      font-style: "italic"
       width: 100%;
   }
 
-  .timeline-row.is-message.is-merged {
-      padding-top: -8px;
-  }
-
-
   .timeline-item {
+/*
+      display: absolute;
+*/
       display: block;
       width: 100%;
       overflow-anchor: none !important;
@@ -700,11 +731,8 @@ mostly just tweaking.
   }
 
   .timeline-message.is-merged {
-
-      padding-top: 0px;
-
-      padding-bottom: 0px;
-
+      padding-top: calc(var(--chat-merged-padding) / 2);
+      padding-bottom: calc(var(--chat-merged-padding) / 2);
   }
 
 
@@ -823,15 +851,14 @@ mostly just tweaking.
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
-      padding-top: 4px;
-      padding: 0 0 0 48px;
+      padding: 0 0 0 calc(var(--chat-avatar-col-w) + 2px);
   }
 
   .reaction-pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      height: 24px;
+      height: var(--chat-reaction-row-h);
       padding: 0 8px;
       background: #2b2d31;
       border: 1px solid transparent;
@@ -970,8 +997,8 @@ mostly just tweaking.
   }
 
   .jump-to-bottom {
-      position: fixed;
-      bottom: 95px;
+      position: absolute;
+      bottom: 20px;
       right: 24px;
       background: var(--brand-color, #5865f2);
       color: white;
@@ -1024,6 +1051,71 @@ mostly just tweaking.
   }
 
 
-
-  
 #+end_src
+
+
+
+
+**** Some old tidbits on our exploration into Virtua and Virtuoso
+
+
+Similar to Spaces and RoomLists we do a Virtuoso component here.
+We ensure the array that will compose its table of individual elements
+is a JS array and then we move on with defining the actual
+behavior for the timeline.
+We need to button up this better, as this was the most recently added thing
+from the enter refactoring of the "application view"
+
+The table itself asks reframe to trigger the back pagination when the "start"
+is reached. This should probably also have a somewhat automatic trigger until
+size is reached, but the behavior may be impacted by the performant issue
+mentioned above. Should be easily sorted, however.
+
+
+For fleshing out the timeline itself we want to consider a few key details.
+What should happen when the user reaches the top? Back paginate.
+
+The timeline should NEVER shift upon loading more entries.
+
+There isn't inherently just one way to do elegant rendering.
+However, most virtual lists only provide one to us though.
+They pre-calculate the items in the list and then render according
+to those calculations. Really fancy ones opt to even re-calculate
+after loads.
+Done well, this is more or less sufficient
+
+So the most important detail that our timeline should then follow is:
+never change the user's current rendered element's unless it is smoothly
+bringing element's *UP*. One might think this to be the behavior
+for media without size info. In those cases still, we will simply
+use default sizing and just render from that.
+So still we can easily avoid any load issues.
+
+The actual problematic items are edits, reactions, and deletes.
+
+These can immediately change what is on the screen and change the size
+of items that were already calculated. The reaction row itself
+adds an entire row always and deletes will entirely remove a message.
+
+So it'll be important to guard against these cases.
+
+Now the best advice I can give for building out a timeline renderer is
+to ensure that at each step you ensure the components play well with
+whatever you're jamming them into.
+
+Now I tried a number of implementations. Virtuoso for a long while, but
+I could not get it to co-exist calmly with our lovely reframe.
+
+I then toyed with trying to neatly create a simple native rendering
+sliding window. Where we could dispose of the contents as we go.
+This worked for everything... except inertia scrolling.
+
+So... Virtua seems rational. The virtualizer in it seemed perfect.
+I've seen use of it and the mechanism seems thoughtful.
+
+I wasn't a fan of Virtuoso having a paid license for their message
+list for use cases like this either.
+
+
+
+
