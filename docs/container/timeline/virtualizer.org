@@ -381,6 +381,41 @@ mostly just tweaking.
       --chat-body-font: 15.2px "Inter", sans-serif;
       --chat-body-line-height: 22.8px;
 }
+
+
+.body.formatted a {
+    color: #58a6ff;
+    text-decoration: none;
+}
+
+.body.formatted p:last-child {
+    display: inline;
+    margin-bottom: 0;
+}
+
+.body.formatted code {
+    background-color: #2d2d2d;
+    color: #f8f8f2;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    font: var(--chat-code-font);
+    font-weight: var(--chat-code-weight);
+    line-height: var(--chat-code-line-height);
+
+}
+
+.body.formatted blockquote {
+    border-left: 4px solid #4a4a4a;
+    margin: 0;
+    padding-left: 1em;
+    color: #a0a0a0;
+}
+
+.body.formatted a:hover {
+    text-decoration: underline;
+}
+
+
   .timeline-header {
       display: flex;
       align-items: baseline;
