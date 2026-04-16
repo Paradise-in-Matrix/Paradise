@@ -613,7 +613,12 @@ state for now.
      (when is-edited?
        [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
 
-(defn timeline-body [item content active-room]
+(defn calc-reply-height [content theme-metrics]
+  (if (:in-reply-to content)
+    (:reply-banner-h theme-metrics 32.4)
+    0))
+
+(defn timeline-body [item content active-room is-editing-this?]
   (let [{:keys [tag inner in-reply-to]} content
         reply-id  (:event-id in-reply-to)
         tr               @(re-frame/subscribe [:i18n/tr])
