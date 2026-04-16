@@ -602,11 +602,7 @@ individual's display name.
                               :items (build-message-actions tr item active-room my-id mx my)}]))]
 
     (if (= type :virtual)
-      [:div.timeline-item-virtual-wrapper
-       {:style {:display "block" :width "100%" :min-height "40px"}}
-       (case (:tag item)
-         "DateDivider" [date-divider (:ts item)]
-           [system-event-view "-" (:tag item)])]
+     [virtual-item item]
 
       [swipe-to-action-wrapper
        {:can-edit? is-own?
