@@ -528,6 +528,56 @@ individual's display name.
    [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
+(defn virtual-item [item]
+ [:div.timeline-item-virtual-wrapper
+       {:style {:display "block" :width "100%" :min-height "40px"}}
+       (case (:tag item)
+         "DateDivider" [date-divider (:ts item)]
+           [system-event-view "-" (:tag item)])])
+
+(defn sub-virtual-items [content-tag item sender-name]
+  (let [tr               @(re-frame/subscribe [:i18n/tr])]
+    (cond
+      (= content-tag "RoomMembership")
+      [system-event-view "->" (tr [:container.timeline.status/membership] [sender-name])]
+      (= content-tag "ProfileChange")
+      [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
+      (= content-tag "State")
+      [state-event-view item]
+      :else
+      [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])))
+
+
+(defn timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
+ [:div.timeline-avatar-wrapper
+  (when (and (= content-tag "MsgLike") (not merge-with-prev?))
+    [profile-popover-trigger popover-member custom-tags active-room nil
+     [avatar {:id (:user-id popover-member) :name (:display-name popover-member)
+              :url (:avatar-url popover-member) :size 32 :status :online :shape :none}]])])
+
+(defn timeline-header [ts merge-with-prev? popover-member custom-tags active-room]
+  [:div.timeline-header
+   [profile-popover-trigger popover-member custom-tags active-room nil
+    [:span.timeline-sender-name (truncate-name (:display-name popover-member) 32)]]
+   [:span.timeline-timestamp (format-time ts)]])
+
+
+(defn timeline-body [item content active-room]
+  (let [{:keys [tag inner in-reply-to]} content
+        reply-id  (:event-id in-reply-to)
+        tr               @(re-frame/subscribe [:i18n/tr])
+        events-map  @(re-frame/subscribe [:timeline/events-map active-room])
+        reply-msg (get events-map reply-id)]
+  [:div.timeline-body
+   (cond
+     is-editing-this? [inline-editor item active-room]
+     (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
+     (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
+     (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
+     (= tag "Message") (let [{m-tag :tag m-content :content} inner]
+                         [render-message-content tr m-tag m-content in-reply-to reply-msg item])
+     :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
+
 (defn event-tile-render [item]
   (let [{:keys [id sender sender-id sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
         tr               @(re-frame/subscribe [:i18n/tr])
