@@ -175,7 +175,6 @@ mostly just tweaking.
                !show-jump?      (r/atom false)
                !initialized?    (r/atom false)
                !scroll-timer    (atom nil)
-
                item-resize-obs  (js/ResizeObserver.
                                  (fn [entries]
                                    (doseq [entry entries]
@@ -197,13 +196,10 @@ mostly just tweaking.
                                    (let [rect (.-contentRect (aget entries 0))]
                                      (reset! !container-width (.-width rect)))))]
     (fn [room-id]
-      (log/info "Rendered")
       (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
-            events-map       @(re-frame/subscribe [:timeline/events-map room-id])
-            
+             events-map       @(re-frame/subscribe [:timeline/events-map room-id])
             _                (reset! !latest-events events-map)
             ordered-events   (keep #(or (get events-map (:id %)) %) (reverse events))
-            
             cnt              (count ordered-events)
             loading?         @(re-frame/subscribe [:timeline/loading-more? room-id])
             loading-forward? @(re-frame/subscribe [:timeline/loading-forward? room-id])
