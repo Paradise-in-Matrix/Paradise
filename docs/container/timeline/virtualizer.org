@@ -113,75 +113,7 @@ elegantly implemented into the overall resulting mathematical product.
         cached-measured (get measured-heights id)]
     (if cached-measured
       cached-measured
-      (let [type (:type msg)
-            content-tag (:content-tag msg)]
-        (cond
-          (or (= type :virtual) (= type "virtual") (str/starts-with? (str id) "virtual-divider")) 49
-          (and content-tag (not (#{"MsgLike" "Image" "Video" "Sticker" "File" "Text"} content-tag))) 53
-          :else
-          (let [is-sequence-start? (not (:merge-with-prev? msg))
-                avatar-h 32
-                avatar-col-w 46
-                header-h 26.8
-                seq-padding 10
-                merged-padding 0
-                message-padding-x 40
-                media-margin 4
-                reaction-h (if (seq (:reactions msg)) 24 0)
-
-                content (:content msg)
-                info (or (:info content) (get-in content [:inner :content :info]))
-                w (js/parseFloat (:w info 0))
-                h (js/parseFloat (:h info 0))
-                available-w (max 0 (- width avatar-col-w message-padding-x))
-                actual-tag (or (get-in content [:inner :tag]) content-tag)
-                is-media? (#{"Image" "Video" "Sticker"} actual-tag)
-
-                final-height
-                (if is-media?
-                  (let [valid-dims? (and (pos? w) (pos? h))
-                        _ (log/warn valid-dims?)
-                        default-ratio (case actual-tag "Video" 1.77 "Sticker" 1.0 1.33)
-                        calc-w (if valid-dims? (min w available-w 400) 300)
-                        calc-h (if valid-dims? (min (* calc-w (/ h w)) 350) (min (/ calc-w default-ratio) 350))
-                        media-h (+ calc-h media-margin)]
-                    (if is-sequence-start?
-                      (+ (max avatar-h (+ header-h media-h)) seq-padding reaction-h)
-                      (max avatar-h (+ media-h merged-padding reaction-h))))
-                  (let [raw-txt (or (:body msg) (:body content) (get-in content [:inner :content :body]) "")
-                        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
-                        html-txt (or (get-in content [:inner :content :html]) "")
-                        has-code-block? (or (clojure.string/includes? txt-str "```")
-                                            (clojure.string/includes? html-txt "<pre>"))
-                        font-str (if has-code-block?
-                                   "13.68px 'fira code', monospace"
-                                   (:font theme-metrics "16px sans-serif"))
-                        lh (if has-code-block?
-                             20.52
-                             (:line-height theme-metrics 22.8))
-                        code-padding (if has-code-block? 28 0)
-
-                        cache-key (str id "-" available-w "-" has-code-block?)
-                        cached-text-h (get @pretext-cache cache-key)
-                        final-text-h
-                        (or cached-text-h
-                            (let [lines (clojure.string/split txt-str #"\n")
-                                  total-h (reduce (fn [acc line]
-                                                    (if (empty? (clojure.string/trim line))
-                                                      (+ acc lh)
-                                                      (let [prep (prepare line font-str)
-                                                            raw (try (layout prep available-w lh) (catch js/Error _ nil))]
-                                                        (+ acc (if raw (.-height raw) lh)))))
-                                                  0
-                                                  lines)]
-                              (swap! pretext-cache assoc cache-key total-h)
-                              total-h))]
-
-                    (if is-sequence-start?
-                      (+ (max avatar-h (+ header-h final-text-h code-padding)) seq-padding reaction-h)
-                      (max avatar-h (+ final-text-h code-padding merged-padding reaction-h)))))]
-            (log/info "Calculated height for ID:" id "->" final-height "| Media?:" is-media?)
-            final-height))))))
+      (item/calc-item-height msg width pretext-cache theme-metrics))))
 #+end_src
 
 
