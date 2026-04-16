@@ -353,6 +353,34 @@ mostly just tweaking.
 ***** CSS
 
 #+begin_src css :tangle ../../../css/virtualizer.css
+
+  :root {
+      --chat-avatar-size: 32px;
+      --chat-avatar-gap: 14px;
+      --chat-avatar-col-w: calc(var(--chat-avatar-size) + var(--chat-avatar-gap));
+      --chat-padding-x: 40px;
+      --chat-seq-padding: 10px;
+      --chat-merged-padding: 0px;
+      --chat-header-h: 26.8px;
+      --chat-reaction-row-h: 24px;
+      --chat-media-margin: 0px;
+      --chat-edited-label-h: 16px;
+      --chat-reply-banner-h: 32.4px;
+      --chat-text-wrap-buffer: 4px;
+      --chat-url-wrap-buffer: 40px;
+      --chat-quote-wrap-buffer: 19px;
+      --chat-code-font: 13.68px "fira code", monospace;
+      --chat-code-font-weight: 500;
+      --chat-code-line-height: 20.52px;
+      --chat-code-padding: 28px;
+      --chat-sender-font-size: 15.2px;
+      --chat-sender-font-weight: 400;
+      --chat-timestamp-font-size: 11.2px;
+      --chat-timestamp-font-weight: 400;
+      --chat-body-font-weight: 400;
+      --chat-body-font: 15.2px "Inter", sans-serif;
+      --chat-body-line-height: 22.8px;
+}
   .timeline-header {
       display: flex;
       align-items: baseline;
