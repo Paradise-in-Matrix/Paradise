@@ -335,6 +335,11 @@ html, body {
     overflow: hidden;
 }
 
+.body.formatted p:last-child {
+    display: inline;
+    margin-bottom: 0;
+}
+
 .body.formatted code {
     background-color: #2d2d2d;
     color: #f8f8f2;
