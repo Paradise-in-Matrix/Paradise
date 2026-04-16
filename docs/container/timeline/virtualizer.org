@@ -42,14 +42,7 @@ So some key aspects to baking a Pretext virtualizer include:
 (defn timeline-jump-button [do-jump! focus-mode?]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:button.jump-to-bottom
-     {:style {:position "absolute"
-              :bottom "20px"
-              :right "24px"
-              :z-index 10
-              :display "flex"
-              :align-items "center"
-              :gap "8px"}
-      :on-click do-jump!}
+     {:on-click do-jump!}
      [:span (if focus-mode?
               (tr [:container.timeline/return-to-live])
               (tr [:container.timeline/jump-to-bottom]))]]))
