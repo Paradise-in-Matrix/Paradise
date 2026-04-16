@@ -328,8 +328,7 @@ mostly just tweaking.
                           :ref (fn [el]
                                  (when el
                                    (.observe item-resize-obs el)))
-                          :class (when (= id jump-target) "is-jump-target")
-                          :style {:margin "0"}}
+                          :class (when (= id jump-target) "is-jump-target")}
                          [connected-event-tile room-id item]]])
                      [^{:key "top-gap"}
                       [:div.virtua-top-gap
@@ -338,11 +337,7 @@ mostly just tweaking.
                                 :width "100%"}}]]))))
 
           (when (and focus-mode? loading-forward?)
-            [:div {:style {:min-height "60px"
-                           :display "flex"
-                           :align-items "center"
-                           :justify-content "center"
-                           :padding-bottom "20px"}}
+            [:div.spinner-wrapper
              [:div.spinner]])]
 
          (when (and @!show-jump? (not @!at-bottom?))
