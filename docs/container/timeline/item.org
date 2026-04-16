@@ -518,6 +518,12 @@ individual's display name.
           [:span.reaction-emoji {:style {:pointer-events "none"}} emoji])
         [:span.reaction-count {:style {:pointer-events "none"}} count]]))])
 
+
+(defn calc-reaction-height [msg theme-metrics]
+  (if (seq (:reactions msg))
+    (:reaction-row-h theme-metrics 24)
+    0))
+
 #+end_src
 
 
