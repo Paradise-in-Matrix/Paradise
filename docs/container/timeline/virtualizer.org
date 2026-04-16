@@ -46,6 +46,11 @@ So some key aspects to baking a Pretext virtualizer include:
      [:span (if focus-mode?
               (tr [:container.timeline/return-to-live])
               (tr [:container.timeline/jump-to-bottom]))]]))
+
+(defn timeline-loading-overlay []
+  [:div.timeline-loading-overlay
+   [:div.timeline-loading-spinner-container
+    [:div.spinner]]])
 #+end_src
 
 
