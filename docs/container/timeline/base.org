@@ -560,25 +560,6 @@ I will segment these another time
   }
 
 
-
-
-  .timeline-reply-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.85rem;
-    color: var(--text-muted, #888);
-    background: rgba(0, 0, 0, 0.03);
-    padding: 6px 10px;
-    padding-bottom: 6px;
-    border-radius: 6px;
-    border-left: 3px solid var(--accent-color, #aaa);
-    cursor: pointer;
-    transition: background 0.15s ease;
-    max-width: 100%;
-  }
-
-
   .message-render-wrapper {
       display: inline;
   }
