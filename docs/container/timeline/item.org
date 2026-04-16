@@ -255,8 +255,9 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn message-hover-toolbar [tr item active-room current-user-id]
-  (let [msg-id   (:id item)
+(defn message-hover-toolbar [item active-room current-user-id]
+  (let [tr               @(re-frame/subscribe [:i18n/tr])
+        msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)]
     [:div.message-hover-toolbar
      [:div.toolbar-btn
