@@ -159,6 +159,17 @@ elegantly implemented into the overall resulting mathematical product.
 #+end_src
 
 
+Now some learnings from the first one there is that this *is* viable. Which means
+the end result of this will be delightfully smooth.
+So our next steps are actually artfully breaking down the math into its
+component parts and enable for more dynamic calculations.
+For example, calculating here is doable, but perhaps not the most optimal.
+Instead we could break the size calculations for each component piece
+where we construct the rendered item as well. Then each component
+is responsible for its calculations.
+
+
+
 
 **** Layout Calculation
 
