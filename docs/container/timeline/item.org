@@ -691,6 +691,40 @@ state for now.
               final-h (+ total-h code-padding)]
           (swap! pretext-cache assoc cache-key final-h)
           final-h))))
+
+(defmethod calc-item-height :message [msg width pretext-cache theme-metrics]
+  (let [is-sequence-start? (not (:merge-with-prev? msg))
+        content            (:content msg)
+        avatar-h          (:avatar-h theme-metrics 32)
+        avatar-col-w      (:avatar-col-w theme-metrics 46)
+        header-h          (:header-h theme-metrics 26.8)
+        seq-padding       (:seq-padding theme-metrics 10)
+        merged-padding    (:merged-padding theme-metrics 0)
+        message-padding-x (:message-padding-x theme-metrics 40)
+        available-w       (max 0 (- width avatar-col-w message-padding-x))
+        reply-h     (calc-reply-height content theme-metrics)
+        reaction-h  (calc-reaction-height msg theme-metrics)
+        tags-present #{(:tag content) (get-in content [:inner :tag]) (:content-tag msg)}
+        actual-tag   (first (filter #{"Image" "Video" "Sticker"} tags-present))
+        is-media?    (boolean actual-tag)
+        body-h      (if is-media?
+                      (let [m-h     (calc-media-height content actual-tag available-w theme-metrics)
+                            raw-txt (or (:body content) (get-in content [:inner :content :body]) (:caption content) (get-in content [:inner :content :caption]))
+                            t-h     (if (seq raw-txt) (calc-text-height msg available-w pretext-cache theme-metrics) 0)]
+                        (+ m-h t-h))
+                      (calc-text-height msg available-w pretext-cache theme-metrics))]
+
+    (if is-sequence-start?
+      (+ (max avatar-h (+ header-h body-h reply-h)) seq-padding reaction-h)
+      (max avatar-h (+ body-h reply-h merged-padding reaction-h)))))
+
+
+
+
+
+
+
+
 (defn event-tile-render [item]
   (let [{:keys [id sender sender-id sender-name sender-avatar content-tag content type reactions read-by ts is-own? merge-with-prev?]} item
         active-room      @(re-frame/subscribe [:rooms/active-id])
