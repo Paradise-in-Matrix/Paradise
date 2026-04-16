@@ -563,7 +563,15 @@ individual's display name.
       [state-event-view item]
       :else
       [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])))
+#+end_src
 
+
+
+It is likely we can better break this up, but for now this will be plenty sufficient.
+The idea is we expand upon the virtualizer concept we tested out and start
+enabling the components themselves to provide their estimated heights.
+It isn't quite ready for that yet, but we can get it to a dynamically functional
+state for now.
 
 (defn timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
  [:div.timeline-avatar-wrapper
