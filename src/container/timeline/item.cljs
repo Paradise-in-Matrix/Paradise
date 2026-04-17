@@ -304,12 +304,15 @@
     (+ calc-h media-margin edited-h)))
 
 
+
+
 (defn image-message [event content]
   [:div.image-attachment-container
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
-      [:img {:src url :alt alt-text :loading "lazy"
+      [:img {:src url :alt alt-text :loading "eager"
 ;;             :decoding "async"
+
              :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox
                                             {:url url
                                              :backdrop-props {:class "lightbox-backdrop"}
@@ -333,7 +336,7 @@
 (defn sticker-message [event content]
   [async-media-wrapper event content {:class "media-sticker" :default-ratio 1.0}
    (fn [url alt]
-     [:img {:src url :alt alt :loading "lazy" :style {:width "100%" :height "100%" :display "block"}} ])])
+     [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])])
 
 (defn file-message [event content tr]
   (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
@@ -548,7 +551,6 @@
                    (:code-line-height theme-metrics 20.52)
                    (:line-height theme-metrics 22.8))
 
-        emote-lh 32.0
 
         code-padding (if has-code-block? (:code-padding theme-metrics 28) 0)
 
@@ -561,14 +563,10 @@
                                 (let [trimmed (str/trim line)]
                                   (if (empty? trimmed)
                                     (+ acc base-lh)
-                                    ;; kinda fudging the emote here, but this'll work for now
-                                    (let [is-emote-heavy? (and (str/includes? line " [e] ")
-                                                               (< (count trimmed) 30))
-                                          active-lh (if is-emote-heavy? emote-lh base-lh)
-                                          prep (prepare line font-str #js {:whiteSpace "pre-wrap"
+                                    (let [prep (prepare line font-str #js {:whiteSpace "pre-wrap"
                                                                            :wordBreak "normal"})
-                                          raw  (try (layout prep safe-available-w active-lh) (catch js/Error _ nil))]
-                                      (+ acc (if raw (.-height raw) active-lh))))))
+                                          raw  (try (layout prep safe-available-w base-lh) (catch js/Error _ nil))]
+                                      (+ acc (if raw (.-height raw) base-lh))))))
                               0 lines)
               final-h (+ total-h code-padding)]
           (swap! pretext-cache assoc cache-key final-h)
