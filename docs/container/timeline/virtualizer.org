@@ -175,7 +175,7 @@ mostly just tweaking.
                !show-jump?      (r/atom false)
                !initialized?    (r/atom false)
                !scroll-timer    (atom nil)
-               item-resize-obs  (js/ResizeObserver.
+               item-resize-obs (js/ResizeObserver.
                                  (fn [entries]
                                    (doseq [entry entries]
                                      (let [el (.-target entry)
@@ -191,6 +191,7 @@ mostly just tweaking.
                                                (log/warn "Layout Correction on" id "| Math:" estimated "| DOM:" dom-h)
                                                (log/warn "Message event: " msg)
                                                (swap! !measured assoc id (js/Math.round dom-h))))))))))
+
                container-obs    (js/ResizeObserver.
                                  (fn [entries]
                                    (let [rect (.-contentRect (aget entries 0))]
@@ -209,6 +210,7 @@ mostly just tweaking.
             metrics          @!theme-metrics
 
             layout-data      @(r/track calculate-layout ordered-events width !prepared-cache @!measured metrics)
+
 
             total-height     (:total layout-data)
             positioned       (:items layout-data)
@@ -335,6 +337,7 @@ mostly just tweaking.
                        {:style {:height (str top-gap "px")
                                 :flex-shrink 0
                                 :width "100%"}}]]))))
+
 
           (when (and focus-mode? loading-forward?)
             [:div.spinner-wrapper
