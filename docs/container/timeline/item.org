@@ -551,6 +551,7 @@ individual's display name.
      [:div.separator-line]
      ]))
 
+
 (defmethod calc-item-height :virtual [_msg _width _pretext-cache theme-metrics]
   (:virtual-divider-h theme-metrics 49))
 
@@ -565,13 +566,13 @@ individual's display name.
   (let [tr               @(re-frame/subscribe [:i18n/tr])]
     (cond
       (= content-tag "RoomMembership")
-      [system-event-view "->" (tr [:container.timeline.status/membership] [sender-name])]
+      [system-event-view (tr [:container.timeline.status/membership] [sender-name])]
       (= content-tag "ProfileChange")
-      [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
+      [system-event-view (tr [:container.timeline.status/profile] [sender-name])]
       (= content-tag "State")
       [state-event-view item]
       :else
-      [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])))
+      [system-event-view (tr [:container.timeline.status/unknown-event] [content-tag])])))
 #+end_src
 
 
