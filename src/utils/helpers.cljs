@@ -159,6 +159,40 @@
                parts))))))
 
 
+
+(def block-level-tags #{:p :div :h1 :h2 :h3 :h4 :h5 :h6 :blockquote :li :tr})
+
+(defn hiccup->text [node]
+  (cond
+    (string? node)
+    node
+
+    (vector? node)
+    (let [tag (first node)
+          has-attrs? (map? (second node))
+          attrs (if has-attrs? (second node) {})
+          children (if has-attrs? (drop 2 node) (drop 1 node))
+          inner-text (clojure.string/join "" (map hiccup->text children))]
+      (cond
+        (= tag :br)
+        "\n"
+
+        (contains? block-level-tags tag)
+        (str inner-text "\n")
+
+        (or (:mxc attrs) (= tag :img) (= tag utils.images/mxc-image))
+        " [e] "
+
+        :else
+        inner-text))
+
+    (sequential? node)
+    (clojure.string/join "" (map hiccup->text node))
+
+    :else
+    ""))
+
+
 (defn format-divider-date [ts]
   (let [date         (js/Date. ts)
         today        (js/Date.)
