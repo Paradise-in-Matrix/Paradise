@@ -19,8 +19,11 @@
 
 (defn get-event-id [e]
   (cond
-    (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Div"))
+    (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Date"))
     (str "virtual-divider-" (format-divider-date (:ts e)) "-" (:ts e))
+
+    (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Read"))
+    "read-marker"
 
     (= (:type e) :virtual)
     (str "virtual-" (:tag e) "-" (:ts e))
@@ -32,27 +35,24 @@
     (:internal-id e)))
 
 (defn enrich-timeline-items [items]
-  (let [clean-items (remove #(and #_(= (:type %) :virtual)
-                                  (= (:tag %) "ReadMarker"))
-                            items)]
-    (loop [remaining clean-items
-           processed []
-           last-msg  nil]
-      (if (empty? remaining)
-        processed
-        (let [curr         (first remaining)
-              curr-is-msg? (= (:content-tag curr) "MsgLike")
-              stable-id    (get-event-id curr)
-              can-merge?   (and curr-is-msg?
-                                last-msg
-                                (= (:sender-id curr) (:sender-id last-msg))
-                                (< (- (:ts curr) (:ts last-msg)) 300000))
-              new-item     (assoc curr
-                                  :id stable-id
-                                  :merge-with-prev? can-merge?)]
-          (recur (rest remaining)
-                 (conj processed new-item)
-                 (if curr-is-msg? new-item nil)))))))
+  (loop [remaining items
+         processed []
+         last-msg  nil]
+    (if (empty? remaining)
+      processed
+      (let [curr         (first remaining)
+            curr-is-msg? (= (:content-tag curr) "MsgLike")
+            stable-id    (get-event-id curr)
+            can-merge?   (and curr-is-msg?
+                              last-msg
+                              (= (:sender-id curr) (:sender-id last-msg))
+                              (< (- (:ts curr) (:ts last-msg)) 300000))
+            new-item     (assoc curr
+                                :id stable-id
+                                :merge-with-prev? can-merge?)]
+        (recur (rest remaining)
+               (conj processed new-item)
+               (if curr-is-msg? new-item nil))))))
 
 
 (re-frame/reg-sub
