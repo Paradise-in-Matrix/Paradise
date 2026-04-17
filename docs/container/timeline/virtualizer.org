@@ -389,6 +389,16 @@ mostly just tweaking.
 }
 
 
+.body {
+    color: #dbdee1;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+
 .body.formatted a {
     color: #58a6ff;
     text-decoration: none;
