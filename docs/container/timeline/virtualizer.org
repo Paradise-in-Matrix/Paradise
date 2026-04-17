@@ -365,6 +365,7 @@ mostly just tweaking.
       --chat-seq-padding: 10px;
       --chat-merged-padding: 0px;
       --chat-header-h: 26.8px;
+      --chat-system-event-h: 42px;
       --chat-reaction-row-h: 24px;
       --chat-media-margin: 0px;
       --chat-edited-label-h: 16px;
