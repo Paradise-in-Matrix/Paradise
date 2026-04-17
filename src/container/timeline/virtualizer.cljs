@@ -139,7 +139,7 @@
             positioned       (:items layout-data)
             visible-window   (let [st @!scroll-top
                                    vh (if-let [el @!scroll-ref] (.-clientHeight el) 800)
-                                   overscan 800
+                                   overscan 2000
                                    max-s (max 0 (- total-height vh))
                                    dist-from-bottom (if (<= st 0)
                                                       (js/Math.abs st)
@@ -213,11 +213,11 @@
                                          (reset! !scroll-timer nil)
                                          (reset! !show-jump? (> dist-from-bottom 600))
 
-                                         (when (and (<= dist-from-top 500) (not loading?))
+                                         (when (and (<= dist-from-top 600) (not loading?))
                                            (re-frame/dispatch [:sdk/back-paginate room-id]))
 
                                          (when (and focus-mode?
-                                                    (<= dist-from-bottom 500)
+                                                    (<= dist-from-bottom 600)
                                                     (not loading-forward?))
                                            (re-frame/dispatch [:sdk/forward-paginate room-id])))
                                        10))))))}
@@ -238,6 +238,9 @@
                      [^{:key "bottom-gap"}
                       [:div.timeline-bottom-gap
                        {:style {:height (str bottom-gap "px")
+                                :overflow-anchor "auto"
+
+
                                 :flex-shrink 0
                                 :width "100%"}}]]
                      (for [{:keys [id height] :as item} visible-window]
@@ -256,7 +259,7 @@
                           :class (when (= id jump-target) "is-jump-target")}
                          [connected-event-tile room-id item]]])
                      [^{:key "top-gap"}
-                      [:div.virtua-top-gap
+                      [:div.timeline-top-gap
                        {:style {:height (str top-gap "px")
                                 :flex-shrink 0
                                 :width "100%"}}]]))))
@@ -271,3 +274,5 @@
     (finally
       (.disconnect container-obs)
       (.disconnect item-resize-obs))))
+
+
