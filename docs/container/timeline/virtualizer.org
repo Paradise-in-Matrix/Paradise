@@ -452,6 +452,7 @@ mostly just tweaking.
       position: relative;
       display: flex;
       flex-direction: column;
+      min-width: 0;
       min-height: 0;
       opacity: var(--dynamic-opacity);
   }
@@ -492,9 +493,15 @@ mostly just tweaking.
   }
 
   .timeline-body {
+      min-width: 0;
+      max-width: 100%;
       font: var(--chat-body-font);
       line-height: var(--chat-body-line-height);
       color: var(--text-main);
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: normal;
+
   }
 
   .spinner-wrapper {
@@ -599,13 +606,16 @@ mostly just tweaking.
   }
 
   .timeline-system-event {
-      height: 28px;
       display: flex;
-      align-items: center;
       justify-content: center;
-      font-size: 0.85rem;
-      color: #7f849c;
-      padding: 4px 0;
+      align-items: center;
+      padding: 0 12px;
+      color: var(--cp-text-muted, #888);
+      font: var(--chat-state-font);
+      width: 100%;
+      height: var(--chat-system-event-h);
+      box-sizing: border-box;
+      margin: 0;
       user-select: none;
   }
 
@@ -696,10 +706,10 @@ mostly just tweaking.
   }
 
  .timeline-messages {
-
+     min-width: 0;
      min-height: 0;
-      max-width: 100%;
-      width: 100%;
+     max-width: 100%;
+     width: 100%;
 
 
 
@@ -715,7 +725,7 @@ mostly just tweaking.
       transform: translate3d(0, 0, 0);
       will-change: transform;
 
-
+      overflow-anchor: none;
  }
 
   .timeline-messages ul,
@@ -726,6 +736,7 @@ mostly just tweaking.
   }
 
   .timeline-message {
+      min-width: 0;
       display: flex;
       position: relative;
       flex-direction: row;
@@ -743,16 +754,23 @@ mostly just tweaking.
   .timeline-state-event {
       display: flex;
       justify-content: center;
-      padding: 12px;
+      align-items: center;
+      padding: 0 12px;
       color: var(--cp-text-muted, #888);
       font: var(--chat-state-font);
       width: 100%;
+      height: var(--chat-system-event-h);
+      box-sizing: border-box;
+      margin: 0;
   }
+
 
   .timeline-item {
 /*
       display: absolute;
 */
+      min-height: 0;
+      min-width: 0;
       display: block;
       width: 100%;
       overflow-anchor: none !important;
@@ -771,7 +789,11 @@ mostly just tweaking.
       padding-top: calc(var(--chat-merged-padding) / 2);
       padding-bottom: calc(var(--chat-merged-padding) / 2);
   }
-
+  .timeline-item-virtual-wrapper {
+      display: block;
+      width: 100%;
+      min-height: 0;
+  }
 
 #+end_src
 
