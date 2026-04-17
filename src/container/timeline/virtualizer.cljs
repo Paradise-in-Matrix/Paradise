@@ -44,7 +44,6 @@
         avatar-gap  (get-var "--chat-avatar-gap" 14)]
     {:font             (get-str-var "--chat-body-font" "15.2px sans-serif")
      :line-height      (get-var "--chat-body-line-height" 22.8)
-
      :avatar-h          avatar-size
      :avatar-col-w      (+ avatar-size avatar-gap)
      :header-h          (get-var "--chat-header-h" 26.8)
@@ -53,10 +52,10 @@
      :merged-padding    (get-var "--chat-merged-padding" 0)
      :media-margin      (get-var "--chat-media-margin" 0)
      :reaction-row-h    (get-var "--chat-reaction-row-h" 24)
-     :system-event-h    (get-var "--chat-system-event-h" 52)
+     :system-event-h    (get-var "--chat-system-event-h" 42)
      :edited-label-h    (get-var "--chat-edited-label-h" 16)
      :reply-banner-h    (get-var "--chat-reply-banner-h" 32.4)
-     :text-wrap-buffer  (get-var "--chat-text-wrap-buffer" 4)
+     :text-wrap-buffer  (get-var "--chat-text-wrap-buffer" 7)
      :quote-wrap-buffer (get-var "--chat-quote-wrap-buffer" 19)
      :url-wrap-buffer   (get-var "--chat-url-wrap-buffer" 40)
      :code-padding      (get-var "--chat-code-padding" 28)
@@ -99,7 +98,7 @@
                !show-jump?      (r/atom false)
                !initialized?    (r/atom false)
                !scroll-timer    (atom nil)
-               item-resize-obs  (js/ResizeObserver.
+               item-resize-obs (js/ResizeObserver.
                                  (fn [entries]
                                    (doseq [entry entries]
                                      (let [el (.-target entry)
@@ -115,6 +114,7 @@
                                                (log/warn "Layout Correction on" id "| Math:" estimated "| DOM:" dom-h)
                                                (log/warn "Message event: " msg)
                                                (swap! !measured assoc id (js/Math.round dom-h))))))))))
+
                container-obs    (js/ResizeObserver.
                                  (fn [entries]
                                    (let [rect (.-contentRect (aget entries 0))]
@@ -133,6 +133,7 @@
             metrics          @!theme-metrics
 
             layout-data      @(r/track calculate-layout ordered-events width !prepared-cache @!measured metrics)
+
 
             total-height     (:total layout-data)
             positioned       (:items layout-data)
@@ -259,6 +260,7 @@
                        {:style {:height (str top-gap "px")
                                 :flex-shrink 0
                                 :width "100%"}}]]))))
+
 
           (when (and focus-mode? loading-forward?)
             [:div.spinner-wrapper
