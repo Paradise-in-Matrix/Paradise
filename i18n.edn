@@ -41,6 +41,7 @@
      :reply-loading "Loading original message..."
      :media-preview "Media message"
      :timeline-separator "Timeline Separator"
+     :new-messages "New Messages"
      :file-download "Download File"
      :typing
      {:one "%1 is typing..."
