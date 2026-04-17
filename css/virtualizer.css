@@ -366,8 +366,9 @@
       -webkit-overflow-scrolling: touch;
       transform: translate3d(0, 0, 0);
       will-change: transform;
+      
+      overflow-anchor: none !important;
 
-      overflow-anchor: none;
  }
 
   .timeline-messages ul,
@@ -415,7 +416,6 @@
       min-width: 0;
       display: block;
       width: 100%;
-      overflow-anchor: none !important;
       contain: layout;
       box-sizing: border-box;
       overflow-x: hidden;
@@ -426,6 +426,14 @@
 
 
   }
+
+  .timeline-top-gap,
+  .spinner-wrapper,
+  .timeline-loading-overlay,
+  .new-messages-separator {
+      overflow-anchor: none !important;
+}
+
 
   .timeline-message.is-merged {
       padding-top: calc(var(--chat-merged-padding) / 2);
