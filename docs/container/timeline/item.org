@@ -542,6 +542,15 @@ individual's display name.
    [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
+
+(defn new-message []
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.new-messages-separator
+     [:div.separator-line]
+     [:span.separator-text (tr [:container.timeline.status/new-messages])]
+     [:div.separator-line]
+     ]))
+
 (defmethod calc-item-height :virtual [_msg _width _pretext-cache theme-metrics]
   (:virtual-divider-h theme-metrics 49))
 
