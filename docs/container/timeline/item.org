@@ -645,32 +645,32 @@ state for now.
        [render-message-content tr (or m-tag "Text") m-content in-reply-to reply-msg item])
      :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
 
+
 (defn calc-text-height [msg available-w pretext-cache theme-metrics]
   (let [content (:content msg)
-        raw-txt (or (:body msg)
-                    (:body content)
-                    (get-in content [:inner :content :body])
-                    (:caption content)
-                    (get-in content [:inner :content :caption])
-                    "")
-        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
-
-        is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
-
-        measure-str (if is-edited?
-                      (str txt-str " (edited)")
-                      txt-str)
-
         html-txt (or (get-in content [:inner :content :html]) "")
 
-        is-quote?       (str/includes? html-txt "<blockquote")
+        raw-txt (if (not-empty html-txt)
+                  (let [sanitized (sanitize-custom-html html-txt)]
+                    (hiccup->text sanitized))
+                  (or (:body msg)
+                      (:body content)
+                      (get-in content [:inner :content :body])
+                      (:caption content)
+                      (get-in content [:inner :content :caption])
+                      ""))
 
+        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
+        is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
+        measure-str (if is-edited? (str txt-str " (edited)") txt-str)
+
+        is-quote?       (str/includes? html-txt "<blockquote")
         has-code-block? (or (str/includes? measure-str "```")
                             (str/includes? html-txt "<pre>"))
 
         wrap-buffer     (if is-quote?
                           (:quote-wrap-buffer theme-metrics 19)
-                          (:text-wrap-buffer theme-metrics 4))
+                          (:text-wrap-buffer theme-metrics 8))
 
         safe-available-w (max 0 (- available-w wrap-buffer))
 
@@ -678,25 +678,31 @@ state for now.
                    (:code-font theme-metrics "13.68px 'fira code', monospace")
                    (:font theme-metrics "16px sans-serif"))
 
-        lh       (if has-code-block?
+        base-lh  (if has-code-block?
                    (:code-line-height theme-metrics 20.52)
                    (:line-height theme-metrics 22.8))
+
+        emote-lh 32.0
 
         code-padding (if has-code-block? (:code-padding theme-metrics 28) 0)
 
         cache-key (str (:id msg) "-" safe-available-w "-" has-code-block? "-" is-quote? "-" is-edited?)
-        cached-text-h (get @pretext-cache cache-key)
-        ]
+        cached-text-h (get @pretext-cache cache-key)]
 
     (or cached-text-h
         (let [lines   (str/split measure-str #"\n")
               total-h (reduce (fn [acc line]
-                                (if (empty? (str/trim line))
-                                  (+ acc lh)
-                                  (let [prep (prepare line font-str)
-                                        raw  (try (layout prep safe-available-w lh) (catch js/Error _ nil))
-                                        ]
-                                    (+ acc (if raw (.-height raw) lh)))))
+                                (let [trimmed (str/trim line)]
+                                  (if (empty? trimmed)
+                                    (+ acc base-lh)
+                                    ;; kinda fudging the emote here, but this'll work for now
+                                    (let [is-emote-heavy? (and (str/includes? line " [e] ")
+                                                               (< (count trimmed) 30))
+                                          active-lh (if is-emote-heavy? emote-lh base-lh)
+                                          prep (prepare line font-str #js {:whiteSpace "pre-wrap"
+                                                                           :wordBreak "normal"})
+                                          raw  (try (layout prep safe-available-w active-lh) (catch js/Error _ nil))]
+                                      (+ acc (if raw (.-height raw) active-lh))))))
                               0 lines)
               final-h (+ total-h code-padding)]
           (swap! pretext-cache assoc cache-key final-h)
