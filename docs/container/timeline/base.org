@@ -45,7 +45,7 @@ each of these later.
 (defn get-event-id [e]
   (cond
     (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Div"))
-    (str "virtual-divider-" (format-divider-date (:ts e)))
+    (str "virtual-divider-" (format-divider-date (:ts e)) "-" (:ts e))
 
     (= (:type e) :virtual)
     (str "virtual-" (:tag e) "-" (:ts e))
