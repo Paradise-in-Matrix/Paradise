@@ -419,6 +419,15 @@
    [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
+
+(defn new-message []
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.new-messages-separator
+     [:div.separator-line]
+     [:span.separator-text (tr [:container.timeline.status/new-messages])]
+     [:div.separator-line]
+     ]))
+
 (defmethod calc-item-height :virtual [_msg _width _pretext-cache theme-metrics]
   (:virtual-divider-h theme-metrics 49))
 
@@ -427,6 +436,7 @@
        {:style {:display "block" :width "100%" :min-height "40px"}}
        (case (:tag item)
          "DateDivider" [date-divider (:ts item)]
+         "ReadMarker" [new-message]
            [system-event-view "-" (:tag item)])])
 
 (defn sub-virtual-items [content-tag item sender-name]
