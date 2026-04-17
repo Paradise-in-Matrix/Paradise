@@ -20,7 +20,7 @@
 (defn get-event-id [e]
   (cond
     (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Div"))
-    (str "virtual-divider-" (format-divider-date (:ts e)))
+    (str "virtual-divider-" (format-divider-date (:ts e)) "-" (:ts e))
 
     (= (:type e) :virtual)
     (str "virtual-" (:tag e) "-" (:ts e))
@@ -32,7 +32,7 @@
     (:internal-id e)))
 
 (defn enrich-timeline-items [items]
-  (let [clean-items (remove #(and (= (:type %) :virtual)
+  (let [clean-items (remove #(and #_(= (:type %) :virtual)
                                   (= (:tag %) "ReadMarker"))
                             items)]
     (loop [remaining clean-items
