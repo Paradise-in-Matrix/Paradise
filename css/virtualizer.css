@@ -7,6 +7,7 @@
       --chat-seq-padding: 10px;
       --chat-merged-padding: 0px;
       --chat-header-h: 26.8px;
+      --chat-system-event-h: 42px;
       --chat-reaction-row-h: 24px;
       --chat-media-margin: 0px;
       --chat-edited-label-h: 16px;
@@ -27,6 +28,16 @@
       --chat-body-font: 15.2px "Inter", sans-serif;
       --chat-body-line-height: 22.8px;
       --chat-new-messages-font: 700 12px "Inter", sans-serif;
+}
+
+
+.body {
+    color: #dbdee1;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 
 
@@ -83,6 +94,7 @@
       position: relative;
       display: flex;
       flex-direction: column;
+      min-width: 0;
       min-height: 0;
       opacity: var(--dynamic-opacity);
   }
@@ -123,9 +135,15 @@
   }
 
   .timeline-body {
+      min-width: 0;
+      max-width: 100%;
       font: var(--chat-body-font);
       line-height: var(--chat-body-line-height);
       color: var(--text-main);
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: normal;
+
   }
 
   .spinner-wrapper {
@@ -230,13 +248,16 @@
   }
 
   .timeline-system-event {
-      height: 28px;
       display: flex;
-      align-items: center;
       justify-content: center;
-      font-size: 0.85rem;
-      color: #7f849c;
-      padding: 4px 0;
+      align-items: center;
+      padding: 0 12px;
+      color: var(--cp-text-muted, #888);
+      font: var(--chat-state-font);
+      width: 100%;
+      height: var(--chat-system-event-h);
+      box-sizing: border-box;
+      margin: 0;
       user-select: none;
   }
 
@@ -327,10 +348,10 @@
   }
 
  .timeline-messages {
-
+     min-width: 0;
      min-height: 0;
-      max-width: 100%;
-      width: 100%;
+     max-width: 100%;
+     width: 100%;
 
 
 
@@ -346,7 +367,7 @@
       transform: translate3d(0, 0, 0);
       will-change: transform;
 
-
+      overflow-anchor: none;
  }
 
   .timeline-messages ul,
@@ -357,6 +378,7 @@
   }
 
   .timeline-message {
+      min-width: 0;
       display: flex;
       position: relative;
       flex-direction: row;
@@ -374,16 +396,23 @@
   .timeline-state-event {
       display: flex;
       justify-content: center;
-      padding: 12px;
+      align-items: center;
+      padding: 0 12px;
       color: var(--cp-text-muted, #888);
       font: var(--chat-state-font);
       width: 100%;
+      height: var(--chat-system-event-h);
+      box-sizing: border-box;
+      margin: 0;
   }
+
 
   .timeline-item {
 /*
       display: absolute;
 */
+      min-height: 0;
+      min-width: 0;
       display: block;
       width: 100%;
       overflow-anchor: none !important;
@@ -402,7 +431,11 @@
       padding-top: calc(var(--chat-merged-padding) / 2);
       padding-bottom: calc(var(--chat-merged-padding) / 2);
   }
-
+  .timeline-item-virtual-wrapper {
+      display: block;
+      width: 100%;
+      min-height: 0;
+  }
 
 
   .emoji-pack-header {
