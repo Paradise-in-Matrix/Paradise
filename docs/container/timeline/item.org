@@ -556,7 +556,6 @@ individual's display name.
 
 (defn virtual-item [item]
  [:div.timeline-item-virtual-wrapper
-       {:style {:display "block" :width "100%" :min-height "40px"}}
        (case (:tag item)
          "DateDivider" [date-divider (:ts item)]
          "ReadMarker" [new-message]
