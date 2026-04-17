@@ -511,6 +511,22 @@ individual's display name.
 #+end_src
 
 
+**** State Event Rendering
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn state-event-view [{:keys [sender-name content]}]
+  (let [{:keys [tag inner]} content]
+    [:div.timeline-state-event
+     [:span
+      (case tag
+        "RoomPinnedEvents" (str sender-name " updated the pinned messages.")
+        "RoomName"         (str sender-name " changed the room name to: " (:name inner))
+        "RoomAvatar"       (str sender-name " changed the room avatar.")
+        (str sender-name " updated " tag))]]))
+
+#+end_src
+
+
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn system-event-view [icon text]
   [:div.timeline-system-event
