@@ -765,36 +765,29 @@ state for now.
                               :items (build-message-actions tr item active-room my-id mx my)}]))]
 
     (if (= type :virtual)
-     [virtual-item item]
-
-      [swipe-to-action-wrapper
-       {:can-edit? is-own?
-        :enabled? is-mobile?
-        :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
-        :wrapper-props (merge (long-press-props open-menu-fn)
-                              {:class (str "timeline-message"
-                                           (if (= content-tag "MsgLike") " is-message" " is-system")
-                                           (when merge-with-prev? " is-merged"))})}
-
-       [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
-
-       [:div.timeline-content-wrapper
-        (if (= content-tag "MsgLike")
-          [:<>
-           [message-hover-toolbar item active-room my-id]
-           (when-not merge-with-prev?
-             [timeline-header ts merge-with-prev? popover-member custom-tags active-room])
-           [timeline-body item content active-room is-editing-this?]
-           ]
-          [sub-virtual-items content-tag item sender-name]
-          )
-
-        (when (seq reactions)
-          [reaction-row {:reactions reactions
-                         :my-id my-id
-                         :members-map members-map
-                         :active-room active-room
-                         :event-id (:event-or-transaction-id item)}])]])))
+      [virtual-item item]
+      (if (= content-tag "MsgLike")
+        [swipe-to-action-wrapper
+         {:can-edit? is-own?
+          :enabled? is-mobile?
+          :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
+          :wrapper-props (merge (long-press-props open-menu-fn)
+                                {:class (str "timeline-message is-message"
+                                             (when merge-with-prev? " is-merged"))})}
+         [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
+         [:div.timeline-content-wrapper
+          [message-hover-toolbar item active-room my-id]
+          (when-not merge-with-prev?
+            [timeline-header ts merge-with-prev? popover-member custom-tags active-room])
+          [timeline-body item content active-room is-editing-this?]
+          (when (seq reactions)
+            [reaction-row {:reactions reactions
+                           :my-id my-id
+                           :members-map members-map
+                           :active-room active-room
+                           :event-id (:event-or-transaction-id item)}])]]
+        [:<>
+         [sub-virtual-items content-tag item sender-name]]))))
 #+end_src
 
 
