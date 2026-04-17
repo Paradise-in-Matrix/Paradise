@@ -7,7 +7,7 @@
             [client.state :as state]
             [cljs.core.async :refer [go <!]]
             ["@chenglou/pretext" :refer [prepare layout]]
-            [utils.helpers :refer [sanitize-custom-html format-divider-date format-time linkify-text truncate-name]]
+            [utils.helpers :refer [sanitize-custom-html hiccup->text format-divider-date format-time linkify-text truncate-name]]
             [utils.images :refer [mxc->url mxc-image]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
@@ -235,18 +235,6 @@
                         :items (build-message-actions tr item active-room current-user-id mx my)}])))}
       [icons/more]]]))
 
-
-(defn state-event-view [{:keys [sender-name content]}]
-  (let [{:keys [tag inner]} content]
-    [:div.timeline-state-event
-     [:span
-      (case tag
-        "RoomPinnedEvents" (str sender-name " updated the pinned messages.")
-        "RoomName"         (str sender-name " changed the room name to: " (:name inner))
-        "RoomAvatar"       (str sender-name " changed the room avatar.")
-        (str sender-name " updated " tag))]]))
-
-
 (defn message-text [{:keys [body html]}]
   (if (seq html)
     (into [:span.body.formatted] (sanitize-custom-html html))
@@ -405,13 +393,24 @@
     0))
 
 
+(defn state-event-view [{:keys [sender-name content]}]
+  (let [{:keys [tag inner]} content]
+    [:div.timeline-state-event
+     [:span
+      (case tag
+        "RoomPinnedEvents" (str sender-name " updated the pinned messages.")
+        "RoomName"         (str sender-name " changed the room name to: " (:name inner))
+        "RoomAvatar"       (str sender-name " changed the room avatar.")
+        (str sender-name " updated " tag))]]))
+
+
 (defn system-event-view [icon text]
   [:div.timeline-system-event
    [:span.system-icon icon]
    [:span.system-text text]])
 
 (defmethod calc-item-height :system-or-state [_msg _width _pretext-cache theme-metrics]
-  (:system-event-h theme-metrics 53))
+  (:system-event-h theme-metrics 52))
 
 (defn date-divider [ts]
   [:div.timeline-date-separator
@@ -428,12 +427,12 @@
      [:div.separator-line]
      ]))
 
+
 (defmethod calc-item-height :virtual [_msg _width _pretext-cache theme-metrics]
   (:virtual-divider-h theme-metrics 49))
 
 (defn virtual-item [item]
  [:div.timeline-item-virtual-wrapper
-       {:style {:display "block" :width "100%" :min-height "40px"}}
        (case (:tag item)
          "DateDivider" [date-divider (:ts item)]
          "ReadMarker" [new-message]
@@ -443,13 +442,13 @@
   (let [tr               @(re-frame/subscribe [:i18n/tr])]
     (cond
       (= content-tag "RoomMembership")
-      [system-event-view "->" (tr [:container.timeline.status/membership] [sender-name])]
+      [system-event-view (tr [:container.timeline.status/membership] [sender-name])]
       (= content-tag "ProfileChange")
-      [system-event-view "@" (tr [:container.timeline.status/profile] [sender-name])]
+      [system-event-view (tr [:container.timeline.status/profile] [sender-name])]
       (= content-tag "State")
       [state-event-view item]
       :else
-      [system-event-view "!" (tr [:container.timeline.status/unknown-event] [content-tag])])))
+      [system-event-view (tr [:container.timeline.status/unknown-event] [content-tag])])))
 
 (defn timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
  [:div.timeline-avatar-wrapper
@@ -512,32 +511,32 @@
        [render-message-content tr (or m-tag "Text") m-content in-reply-to reply-msg item])
      :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
 
+
 (defn calc-text-height [msg available-w pretext-cache theme-metrics]
   (let [content (:content msg)
-        raw-txt (or (:body msg)
-                    (:body content)
-                    (get-in content [:inner :content :body])
-                    (:caption content)
-                    (get-in content [:inner :content :caption])
-                    "")
-        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
-
-        is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
-
-        measure-str (if is-edited?
-                      (str txt-str " (edited)")
-                      txt-str)
-
         html-txt (or (get-in content [:inner :content :html]) "")
 
-        is-quote?       (str/includes? html-txt "<blockquote")
+        raw-txt (if (not-empty html-txt)
+                  (let [sanitized (sanitize-custom-html html-txt)]
+                    (hiccup->text sanitized))
+                  (or (:body msg)
+                      (:body content)
+                      (get-in content [:inner :content :body])
+                      (:caption content)
+                      (get-in content [:inner :content :caption])
+                      ""))
 
+        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
+        is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
+        measure-str (if is-edited? (str txt-str " (edited)") txt-str)
+
+        is-quote?       (str/includes? html-txt "<blockquote")
         has-code-block? (or (str/includes? measure-str "```")
                             (str/includes? html-txt "<pre>"))
 
         wrap-buffer     (if is-quote?
                           (:quote-wrap-buffer theme-metrics 19)
-                          (:text-wrap-buffer theme-metrics 4))
+                          (:text-wrap-buffer theme-metrics 8))
 
         safe-available-w (max 0 (- available-w wrap-buffer))
 
@@ -545,25 +544,31 @@
                    (:code-font theme-metrics "13.68px 'fira code', monospace")
                    (:font theme-metrics "16px sans-serif"))
 
-        lh       (if has-code-block?
+        base-lh  (if has-code-block?
                    (:code-line-height theme-metrics 20.52)
                    (:line-height theme-metrics 22.8))
+
+        emote-lh 32.0
 
         code-padding (if has-code-block? (:code-padding theme-metrics 28) 0)
 
         cache-key (str (:id msg) "-" safe-available-w "-" has-code-block? "-" is-quote? "-" is-edited?)
-        cached-text-h (get @pretext-cache cache-key)
-        ]
+        cached-text-h (get @pretext-cache cache-key)]
 
     (or cached-text-h
         (let [lines   (str/split measure-str #"\n")
               total-h (reduce (fn [acc line]
-                                (if (empty? (str/trim line))
-                                  (+ acc lh)
-                                  (let [prep (prepare line font-str)
-                                        raw  (try (layout prep safe-available-w lh) (catch js/Error _ nil))
-                                        ]
-                                    (+ acc (if raw (.-height raw) lh)))))
+                                (let [trimmed (str/trim line)]
+                                  (if (empty? trimmed)
+                                    (+ acc base-lh)
+                                    ;; kinda fudging the emote here, but this'll work for now
+                                    (let [is-emote-heavy? (and (str/includes? line " [e] ")
+                                                               (< (count trimmed) 30))
+                                          active-lh (if is-emote-heavy? emote-lh base-lh)
+                                          prep (prepare line font-str #js {:whiteSpace "pre-wrap"
+                                                                           :wordBreak "normal"})
+                                          raw  (try (layout prep safe-available-w active-lh) (catch js/Error _ nil))]
+                                      (+ acc (if raw (.-height raw) active-lh))))))
                               0 lines)
               final-h (+ total-h code-padding)]
           (swap! pretext-cache assoc cache-key final-h)
@@ -626,36 +631,29 @@
                               :items (build-message-actions tr item active-room my-id mx my)}]))]
 
     (if (= type :virtual)
-     [virtual-item item]
-
-      [swipe-to-action-wrapper
-       {:can-edit? is-own?
-        :enabled? is-mobile?
-        :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
-        :wrapper-props (merge (long-press-props open-menu-fn)
-                              {:class (str "timeline-message"
-                                           (if (= content-tag "MsgLike") " is-message" " is-system")
-                                           (when merge-with-prev? " is-merged"))})}
-
-       [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
-
-       [:div.timeline-content-wrapper
-        (if (= content-tag "MsgLike")
-          [:<>
-           [message-hover-toolbar item active-room my-id]
-           (when-not merge-with-prev?
-             [timeline-header ts merge-with-prev? popover-member custom-tags active-room])
-           [timeline-body item content active-room is-editing-this?]
-           ]
-          [sub-virtual-items content-tag item sender-name]
-          )
-
-        (when (seq reactions)
-          [reaction-row {:reactions reactions
-                         :my-id my-id
-                         :members-map members-map
-                         :active-room active-room
-                         :event-id (:event-or-transaction-id item)}])]])))
+      [virtual-item item]
+      (if (= content-tag "MsgLike")
+        [swipe-to-action-wrapper
+         {:can-edit? is-own?
+          :enabled? is-mobile?
+          :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
+          :wrapper-props (merge (long-press-props open-menu-fn)
+                                {:class (str "timeline-message is-message"
+                                             (when merge-with-prev? " is-merged"))})}
+         [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
+         [:div.timeline-content-wrapper
+          [message-hover-toolbar item active-room my-id]
+          (when-not merge-with-prev?
+            [timeline-header ts merge-with-prev? popover-member custom-tags active-room])
+          [timeline-body item content active-room is-editing-this?]
+          (when (seq reactions)
+            [reaction-row {:reactions reactions
+                           :my-id my-id
+                           :members-map members-map
+                           :active-room active-room
+                           :event-id (:event-or-transaction-id item)}])]]
+        [:<>
+         [sub-virtual-items content-tag item sender-name]]))))
 
 (defn event-tile [item]
   (let [id (:id item)
