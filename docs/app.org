@@ -328,14 +328,6 @@ html, body {
 }
 
 
-.body {
-    color: #dbdee1;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    overflow: hidden;
-}
-
-
 
 
 [data-virtuoso-scroller="true"]::-webkit-scrollbar-thumb {
