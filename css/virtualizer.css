@@ -26,6 +26,7 @@
       --chat-body-font-weight: 400;
       --chat-body-font: 15.2px "Inter", sans-serif;
       --chat-body-line-height: 22.8px;
+      --chat-new-messages-font: 700 12px "Inter", sans-serif;
 }
 
 
@@ -175,6 +176,7 @@
       color: #6c7086;
   }
 
+  .new-messages-separator,
   .timeline-date-separator {
       display: flex;
       align-items: center;
@@ -182,6 +184,23 @@
       padding: 16px 0;
       height: var(--chat-virtual-divider-h);
       width: 100%;
+  }
+
+  .new-messages-separator {
+      gap: 12px;
+      color: #f04747;
+      font: var(--chat-new-messages-font);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+  }
+
+  .new-messages-separator::before,
+  .new-messages-separator::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background-color: currentColor;
+      opacity: 0.4;
   }
 
   .separator-line {
