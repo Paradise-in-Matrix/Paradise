@@ -164,8 +164,9 @@
                )))))
      #js {:threshold 0.5})))
 
-(defn build-message-actions [tr item active-room current-user-id x y]
-  (let [msg-id   (:id item)
+(defn build-message-actions [item active-room current-user-id x y]
+  (let [tr               @(re-frame/subscribe [:i18n/tr])
+        msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)
         is-mine? (or (:is-own? item)
                      (= (:sender item) current-user-id))]
@@ -232,7 +233,7 @@
                      (re-frame/dispatch
                       [:context-menu/open
                        {:x mx :y my
-                        :items (build-message-actions tr item active-room current-user-id mx my)}])))}
+                        :items (build-message-actions item active-room current-user-id mx my)}])))}
       [icons/more]]]))
 
 (defn message-text [{:keys [body html]}]
@@ -626,7 +627,7 @@
                            (re-frame/dispatch
                             [:context-menu/open
                              {:x mx :y my
-                              :items (build-message-actions tr item active-room my-id mx my)}]))]
+                              :items (build-message-actions item active-room my-id mx my)}]))]
 
     (if (= type :virtual)
       [virtual-item item]
