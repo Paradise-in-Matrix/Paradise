@@ -32,45 +32,49 @@ class NotificationService: UNNotificationServiceExtension {
             return
         }
 
-        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
-        guard let homeserverUrl = sharedDefaults.string(forKey: "homeserver_url") else {
+
+        guard let activeUserId = sharedDefaults.string(forKey: "active_push_user"),
+              let sessions = sharedDefaults.dictionary(forKey: "shadow_sessions") as? [String: [String: String]],
+              let sessionData = sessions[activeUserId],
+              let homeserverUrl = sessionData["homeserver_url"] else {
             contentHandler(bestAttemptContent)
             return
         }
-        
-        let ssStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
+
+        let ssStr = sessionData["sliding_sync_version"] ?? "NONE"
 
         Task {
             do {
                 guard let containerUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else { throw NSError() }
-                let dataPath = containerUrl.appendingPathComponent("matrix-shadow/data").path
-                let cachePath = containerUrl.appendingPathComponent("matrix-shadow/cache").path
-                
+
+                let safeUserId = activeUserId.replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                let dataPath = containerUrl.appendingPathComponent("matrix-shadow/\(safeUserId)/data").path
+                let cachePath = containerUrl.appendingPathComponent("matrix-shadow/\(safeUserId)/cache").path
+
                 let ssBuilder: SlidingSyncVersionBuilder = (ssStr == "NATIVE") ? .native : .none
-                
+
                 let client = try await ClientBuilder()
                     .homeserverUrl(url: homeserverUrl)
                     .sessionPaths(dataPath: dataPath, cachePath: cachePath)
                     .systemIsMemoryConstrained()
                     .slidingSyncVersionBuilder(versionBuilder: ssBuilder)
                     .build()
-                
-                try await restoreShadowSession(client: client, sharedDefaults: sharedDefaults)
-                
+
+                try await restoreShadowSession(client: client, sessionData: sessionData)
+
                 let pushClient = try await client.notificationClient(processSetup: .multipleProcesses)
                 let status = try await pushClient.getNotification(roomId: roomId, eventId: eventId)
-                
+
                 switch status {
                 case .event(let item):
-                    
-                    let senderName = item.senderInfo.displayName
-                     ?? "Unknown Sender"
-                    
+
+                    let senderName = item.senderInfo.displayName ?? "Unknown Sender"
+
                     let rawRoom = item.roomInfo.displayName
                     let roomName = rawRoom.isEmpty ? "Unknown Room" : rawRoom
 
                     var messageBody = "New activity in \(roomName)"
-                    
+
                     switch item.event {
                     case .timeline(let timelineEvent):
                         do {
@@ -108,12 +112,10 @@ class NotificationService: UNNotificationServiceExtension {
                         messageBody = "Unknown event type: \(String(describing: item.event))"
                     }
 
-
-                    
                     bestAttemptContent.title = senderName
                     bestAttemptContent.subtitle = roomName
                     bestAttemptContent.body = messageBody
-                    
+
                 case .eventNotFound:
                     bestAttemptContent.body = "Open Paradise to view."
                 case .eventFilteredOut, .eventRedacted:
@@ -121,30 +123,28 @@ class NotificationService: UNNotificationServiceExtension {
                 @unknown default:
                     break
                 }
-                
+
                 contentHandler(bestAttemptContent)
-                
-            } catch {
+
+                } catch {
                 print("Paradise iOS Decryption Failed: \(error)")
                 bestAttemptContent.body = "Open Paradise to view."
                 contentHandler(bestAttemptContent)
             }
         }
-
-        
     }
-    
-    private func restoreShadowSession(client: Client, sharedDefaults: UserDefaults) async throws {
-        guard let accessToken = sharedDefaults.string(forKey: "access_token"),
-              let userId = sharedDefaults.string(forKey: "user_id"),
-              let deviceId = sharedDefaults.string(forKey: "device_id"),
-              let homeserverUrl = sharedDefaults.string(forKey: "homeserver_url") else {
+
+    private func restoreShadowSession(client: Client, sessionData: [String: String]) async throws {
+        guard let accessToken = sessionData["access_token"],
+              let userId = sessionData["user_id"],
+              let deviceId = sessionData["device_id"],
+              let homeserverUrl = sessionData["homeserver_url"] else {
             throw NSError(domain: "ShadowDevice", code: 2, userInfo: nil)
         }
-        
-        let slidingSyncStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
+
+        let slidingSyncStr = sessionData["sliding_sync_version"] ?? "NONE"
         let ssVersion: SlidingSyncVersion = (slidingSyncStr == "NATIVE") ? .native : .none
-        
+
         let session = Session(
             accessToken: accessToken, refreshToken: nil, userId: userId,
             deviceId: deviceId, homeserverUrl: homeserverUrl, oidcData: nil,
@@ -154,7 +154,7 @@ class NotificationService: UNNotificationServiceExtension {
     }
 
     override func serviceExtensionTimeWillExpire() {
-        if let contentHandler = contentHandler, let bestAttemptContent =  bestAttemptContent {
+        if let contentHandler = contentHandler, let bestAttemptContent = bestAttemptContent {
             bestAttemptContent.body = "Open Paradise to view (Encrypted)"
             contentHandler(bestAttemptContent)
         }
