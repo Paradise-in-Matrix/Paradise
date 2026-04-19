@@ -57,6 +57,39 @@
                         v (if (= c "x") r (bit-or (bit-and r 0x3) 0x8))]
                     (.toString v 16)))))))
 
+(defn- open-settings-db []
+  (p/create
+   (fn [resolve _]
+     (let [req (.open js/indexedDB "paradise-settings" 1)]
+       (set! (.-onupgradeneeded req)
+             #(let [db (.. % -target -result)]
+                (when-not (.contains (.-objectStoreNames db) "settings")
+                  (.createObjectStore db "settings"))))
+       (set! (.-onsuccess req) #(resolve (.. % -target -result)))
+       (set! (.-onerror req) #(resolve nil))))))
+
+(defn get-setting [key]
+  (p/let [db (open-settings-db)]
+    (if-not db nil
+      (p/create
+       (fn [resolve _]
+         (let [tx (try (.transaction db #js ["settings"] "readonly") (catch :default _ nil))]
+           (if-not tx (resolve nil)
+             (let [get-req (.get (.objectStore tx "settings") key)]
+               (set! (.-onsuccess get-req) #(resolve (.. % -target -result)))
+               (set! (.-onerror get-req) #(resolve nil))))))))))
+
+(defn set-setting! [key value]
+  (p/let [db (open-settings-db)]
+    (if-not db false
+      (p/create
+       (fn [resolve _]
+         (let [tx      (.transaction db #js ["settings"] "readwrite")
+               store   (.objectStore tx "settings")
+               put-req (if (some? value) (.put store value key) (.delete store key))]
+           (set! (.-onsuccess put-req) #(resolve true))
+           (set! (.-onerror put-req) #(resolve false))))))))
+
 (defn- delete-store-impl! [store-id]
   (let [store-name (str "paradise-store-" store-id)]
     (js/Promise.
