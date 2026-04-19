@@ -72,6 +72,89 @@
 }
 
 
+.settings-row.toggle-row {
+  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-description {
+  font-size: 0.85em;
+  color: gray;
+}
+
+.custom-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.custom-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  width: 44px;
+  height: 24px;
+  background-color: #E5E5EA;
+  border-radius: 999px;
+  position: relative;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-knob {
+  width: 20px;
+  height: 20px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: left 0.3s ease;
+}
+
+.custom-toggle input:checked + .toggle-track {
+  background-color: #34C759;
+}
+
+.custom-toggle input:checked + .toggle-track .toggle-knob {
+  left: 22px;
+}
+
+
+
+
+.warning-banner {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(255,165,0,0.1);
+    border-left: 4px solid orange;
+}
+
+.warning-title {
+    font-weight: bold;
+    color: orange;
+}
+
+.warning-subtitle {
+    font-size: 0.85em;
+    margin-top: 4px;
+}
+
+.form-button.destructive {
+    margin-top: 12px;
+    background-color: darkred;
+}
+
+.form-button.destructive:hover:not(:disabled) {
+    background-color: #660000;
+}
+
 
 .language-list {
   display: flex;
@@ -180,10 +263,13 @@
 
 .form-button {
     cursor: pointer;
-    padding: 8px 16px;
+    padding: 10px;
     border: none;
+    margin: 10px;
     border-radius: 4px;
     background-color: var(--button-bg, #eeeeee);
+    background: #5865f2;
+    color: #fff;
     transition: background-color 0.2s;
 }
 
@@ -463,18 +549,6 @@
   margin-top: 4px;
 }
 
-
-.form-button {
-  background: #5865f2;
-  color: #fff;
-  padding: 10px;
-  border: none;
-  border-radius: 4px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-top: 12px;
-  transition: background 0.2s;
-}
 
 .form-button:hover:not(:disabled) {
   background: #4752c4;
