@@ -427,5 +427,26 @@ We embed the registration in an easily callable reframe event.
                (log/warn "Notification permission denied.")))
            (p/catch #(log/error "Push setup failed:" %)))))
    {}))
+
+
+(re-frame/reg-event-fx
+ :push/disable
+ (fn [{:keys [db]} _]
+   (if (.isNativePlatform Capacitor)
+     {:dispatch [:push/deactivate-shadow]}
+     (do
+       (when-let [sw (.-serviceWorker js/navigator)]
+         (-> (.-ready sw)
+             (.then (fn [reg]
+                      (-> (.. reg -pushManager getSubscription)
+                          (.then (fn [sub]
+                                   (when sub
+                                     (let [sub-json (.toJSON sub)
+                                           pushkey  (.. sub-json -keys -p256dh)]
+                                       (re-frame/dispatch [:push/remove-hs-pusher pushkey])
+                                       (.unsubscribe sub))))))))))
+       (store/set-setting! "web_push_owner" nil)
+       {:dispatch [:push/hydrate-status nil]}))))
+
 #+end_src
 
