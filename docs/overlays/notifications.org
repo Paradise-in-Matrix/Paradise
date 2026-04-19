@@ -353,6 +353,12 @@ We embed the registration in an easily callable reframe event.
 
 
 #+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+(re-frame/reg-sub
+ :push/status
+ (fn [db _]
+   (:push-status db :disabled)))
+
+
 (re-frame/reg-event-db
  :push/set-status
  (fn [db [_ status]]
