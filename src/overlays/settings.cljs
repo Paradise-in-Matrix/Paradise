@@ -113,7 +113,7 @@
 (def settings-registry
   {;; DB Key                     Hydration Event                     Default Value
    "show_previews"              {:event :push/hydrate-previews-setting :default true}
-   "web_push_owner"             {:event :push/hydrate-status           :default nil}})
+   })
 
 (re-frame/reg-event-fx
  :settings/load
