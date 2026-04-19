@@ -157,6 +157,32 @@ events.
 
 
 
+#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+
+(def settings-registry
+  {;; DB Key                     Hydration Event                     Default Value
+   "show_previews"              {:event :push/hydrate-previews-setting :default true}
+   "web_push_owner"             {:event :push/hydrate-status           :default nil}})
+
+(re-frame/reg-event-fx
+ :settings/load
+ (fn [_ [_ idb-key hydrate-event default-val]]
+   (-> (store/get-setting idb-key)
+       (.then (fn [saved-val]
+                (let [final-val (if (nil? saved-val) default-val saved-val)]
+                  (re-frame/dispatch [hydrate-event final-val])))))
+   {}))
+
+(re-frame/reg-event-fx
+ :app/load-all-settings
+ (fn [_ _]
+   {:fx (mapv (fn [[db-key config]]
+                [:dispatch [:settings/load db-key (:event config) (:default config)]])
+              settings-registry)}))
+
+#+end_src
+
+
 **** Panel
 
 
