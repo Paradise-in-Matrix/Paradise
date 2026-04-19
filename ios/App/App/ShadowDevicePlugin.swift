@@ -115,16 +115,18 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
 
 
     @objc func activateShadow(_ call: CAPPluginCall) {
+
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
+
         guard let pushToken = call.getString("pushToken"),
-              let pushUrl = call.getString("pushUrl") else {
+              let pushUrl = call.getString("pushUrl"),
+              let userId = call.getString("userId") else {
             return call.reject("Missing arguments")
         }
         
-        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
-        guard let homeserver = sharedDefaults.string(forKey: "homeserver_url") else {
-            return call.reject("No homeserver saved")
+        guard let sessionData = getShadowSession(userId: userId) else {
+            return call.reject("No shadow session found for user: \(userId)")
         }
-        let ssStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
 
 
         Task {
