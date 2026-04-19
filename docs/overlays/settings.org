@@ -265,6 +265,61 @@ Moving the CSS to here
 }
 
 
+.settings-row.toggle-row {
+  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-description {
+  font-size: 0.85em;
+  color: gray;
+}
+
+.custom-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.custom-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  width: 44px;
+  height: 24px;
+  background-color: #E5E5EA;
+  border-radius: 999px;
+  position: relative;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-knob {
+  width: 20px;
+  height: 20px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: left 0.3s ease;
+}
+
+.custom-toggle input:checked + .toggle-track {
+  background-color: #34C759;
+}
+
+.custom-toggle input:checked + .toggle-track .toggle-knob {
+  left: 22px;
+}
+
+
 #+end_src
 
 
