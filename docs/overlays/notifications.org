@@ -102,20 +102,9 @@ to the user.
    (:push/previews-enabled? db true)))
 
 (re-frame/reg-event-fx
- :push/activate-shadow
- (fn [_ [_ token]]
-   (log/info "Activating Shadow Device with FCM Token...")
-   (try
-     (-> (.activateShadow shadow-device
-           #js {:pushToken token
-                :pushUrl (:push-url @!config)})
-         (.then (fn [res]
-                  (log/info "Shadow Activated SUCCESS:" (.-status res))
-                  (re-frame/dispatch [:push/set-status :enabled])))
-         (.catch #(log/error "Shadow Activated FAILED:" %)))
-     (catch js/Error e
-       (log/error "Synchronous CLJS Crash in activateShadow:" e)))
-   {}))
+ :push/hydrate-previews-setting
+ (fn [{:keys [db]} [_ enabled?]]
+   {:db (assoc db :push/previews-enabled? (if (nil? enabled?) true enabled?))}))
 
 (re-frame/reg-event-fx
  :push/deactivate-shadow
