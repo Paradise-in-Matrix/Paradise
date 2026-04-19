@@ -24,9 +24,11 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
             throw NSError(domain: "ShadowDevice", code: 1, userInfo: [NSLocalizedDescriptionKey: "App Group container not found!"])
         }
         
-        let dataPath = containerUrl.appendingPathComponent("matrix-shadow/data").path
-        let cachePath = containerUrl.appendingPathComponent("matrix-shadow/cache").path
+        let safeUserId = userId.replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
         
+        let dataPath = containerUrl.appendingPathComponent("matrix-shadow/\(safeUserId)/data").path
+        let cachePath = containerUrl.appendingPathComponent("matrix-shadow/\(safeUserId)/cache").path
+
         let ssBuilder: SlidingSyncVersionBuilder
         switch ssStr {
         case "NATIVE": ssBuilder = .native
