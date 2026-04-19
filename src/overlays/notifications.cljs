@@ -7,6 +7,7 @@
             ["@capacitor/core" :refer [Capacitor registerPlugin]]
             ["@capacitor/push-notifications" :refer [PushNotifications]]
             [client.state :refer [!config] :as state]
+            [client.session-store :as store]
             [cljs-workers.core :as main]))
 
 (def shadow-device (registerPlugin "ShadowDevice"))
@@ -14,48 +15,111 @@
 (re-frame/reg-event-fx
  :push/create-sleepy-shadow
  (fn [_ [_ credentials]]
-   (log/info "1. Creating Sleepy Shadow Device...")
+   (log/info "Creating Sleepy Shadow Device...")
    (try
      (-> (.createSleepyShadow shadow-device
            #js {:homeserverUrl (:homeserver credentials)
                 :username (:username credentials)
-                :password (:password credentials)})
-         (.then #(log/info "2. Sleepy Shadow SUCCESS:" (.-status %)))
-         (.catch #(log/error "2. Sleepy Shadow FAILED:" %)))
+                :password (:password credentials)
+                :userId (:userId credentials)
+                })
+         (.then #(log/info "Sleepy Shadow SUCCESS:" (.-status %)))
+         (.catch #(log/error "Sleepy Shadow FAILED:" %)))
      (catch js/Error e
        (log/error "Synchronous CLJS Crash in createSleepyShadow:" e)))
    {}))
 
+(re-frame/reg-sub
+ :push/active-user
+ (fn [db _] (:active-push-user db)))
+
+(re-frame/reg-event-db
+ :push/set-active-user
+ (fn [db [_ user-id]]
+   (assoc db :active-push-user user-id
+             :push-status (if user-id :enabled :disabled))))
+
+(re-frame/reg-sub
+ :push/previews-enabled?
+ (fn [db _]
+   (:push/previews-enabled? db true)))
+
+(re-frame/reg-event-fx
+ :push/hydrate-previews-setting
+ (fn [{:keys [db]} [_ enabled?]]
+   {:db (assoc db :push/previews-enabled? (if (nil? enabled?) true enabled?))}))
+
+(re-frame/reg-event-fx
+ :push/toggle-previews
+ (fn [{:keys [db]} [_ enabled?]]
+   (store/set-setting! "show_previews" enabled?)
+   (when (.isNativePlatform Capacitor)
+     (-> (.setPreviewPreferences shadow-device #js {:enabled enabled?})
+         (.catch #(log/error "Failed to save native preview prefs:" %))))
+   {:dispatch [:push/hydrate-previews-setting enabled?]}))
+
+
 (re-frame/reg-event-fx
  :push/activate-shadow
- (fn [_ [_ token]]
-   (log/info "Activating Shadow Device with FCM Token...")
-   (try
-     (-> (.activateShadow shadow-device
-           #js {:pushToken token
-                :pushUrl (:push-url @!config)})
-         (.then (fn [res]
-                  (log/info "Shadow Activated SUCCESS:" (.-status res))
-                  (re-frame/dispatch [:push/set-status :enabled])))
-         (.catch #(log/error "Shadow Activated FAILED:" %)))
-     (catch js/Error e
-       (log/error "Synchronous CLJS Crash in activateShadow:" e)))
-   {}))
+ (fn [{:keys [db]} [_ token]]
+   (let [active-user (:active-user-id db)
+         old-user    (:active-push-user db)]
+     (when (and old-user (not= old-user active-user))
+       (.deactivateShadow shadow-device #js {:pushToken token :userId old-user}))
+     (try
+       (-> (.activateShadow shadow-device
+             #js {:pushToken token
+                  :pushUrl (:push-url @!config)
+                  :userId active-user})
+           (.then (fn [res]
+                    (re-frame/dispatch [:push/set-active-user active-user])))
+           (.catch (fn [err]
+                     (log/error "Shadow Activated FAILED:" err)
+                     (re-frame/dispatch [:modal/open-shadow-login]))))
+       (catch js/Error e
+         (log/error "Synchronous CLJS Crash in activateShadow:" e)))
+     {})))
+
 
 (re-frame/reg-event-fx
  :push/deactivate-shadow
  (fn [{:keys [db]} _]
-   (when-let [token (:native-token db)]
-     (try
-       (-> (.deactivateShadow shadow-device
-             #js {:pushToken token})
-           (.then (fn [res]
-                    (log/info "Shadow Deactivated SUCCESS:" (.-status res))
-                    (re-frame/dispatch [:push/set-status :disabled])))
-           (.catch #(log/error "Shadow Deactivated FAILED:" %)))
-       (catch js/Error e
-         (log/error "Synchronous CLJS Crash in deactivateShadow:" e))))
+   (let [token (:native-token db)
+         target-user (:active-push-user db)]
+     (when target-user
+       (try
+         (-> (.deactivateShadow shadow-device
+                                #js {:pushToken (or token "") :userId target-user})
+             (.then (fn [res]
+                      (re-frame/dispatch [:push/hydrate-status nil])))
+             (.catch #(log/error "Shadow Deactivated FAILED:" %)))
+         (catch js/Error e
+           (log/error "Synchronous CLJS Crash in deactivateShadow:" e)))))
    {}))
+
+
+(re-frame/reg-event-fx
+ :push/verify-shadow
+ (fn [_ [_ user-id recovery-key]]
+   (when (.isNativePlatform Capacitor)
+     (-> (.verifyShadow shadow-device #js {:userId user-id :recoveryKey recovery-key})
+         (.catch #(log/error "Shadow verification failed:" %))))
+   {}))
+
+
+(re-frame/reg-event-fx
+ :push/check-verification-status
+ (fn [_ [_ user-id]]
+   (when (.isNativePlatform Capacitor)
+     (-> (.getShadowStatus shadow-device #js {:userId user-id})
+         (.then (fn [res]
+                  (when (.-isVerified res)
+                    (log/info "Shadow client is already verified, skipping prompt.")
+                    (re-frame/dispatch [:sdk/verification-success]))))
+         (.catch #(log/error "Failed to fetch shadow status:" %))))
+   {}))
+
+
 
 
 
@@ -107,11 +171,13 @@
        "/"
        (str/replace path #"^/+" "")))
 
+
 (re-frame/reg-event-fx
  :push/register-pusher
- (fn [_ [_ subscription]]
+ (fn [{:keys [db]} [_ subscription]]
    (if-let [pool @state/!engine-pool]
-     (let [sub-json (.toJSON subscription)
+     (let [user-id  (:active-user-id db)
+           sub-json (.toJSON subscription)
            p256dh   (.. sub-json -keys -p256dh)
            auth     (.. sub-json -keys -auth)
            endpoint (.-endpoint sub-json)
@@ -136,20 +202,100 @@
              (if (= (:status res) "success")
                (do
                  (log/info "Web Pusher registered successfully!")
-                 (re-frame/dispatch [:push/set-status :enabled]))
+                 (store/set-setting! "web_push_owner" user-id)
+                 (re-frame/dispatch [:push/hydrate-status user-id]))
                (log/error "HS Rejected Web Pusher:" (:msg res)))))))
      (log/error "Cannot register pusher: no engine pool"))
    {}))
+
+(re-frame/reg-event-fx
+ :push/remove-pusher
+ (fn [_ [_ pushkey]]
+   (if-let [pool @state/!engine-pool]
+     (let [app-id (:app-id @!config)]
+       (go
+         (let [res (<! (main/do-with-pool! pool
+                                           {:handler :remove-pusher
+                                            :arguments {:pushkey pushkey
+                                                        :app-id app-id}}))]
+           (if (= (:status res) "success")
+             (log/info "Successfully removed Web Pusher from Homeserver.")
+             (log/error "Failed to remove Web Pusher from Homeserver:" (:msg res))))))
+     (log/error "Cannot remove pusher: no engine pool"))
+   {}))
+
+
+(re-frame/reg-event-fx
+ :push/clear-all
+ (fn [{:keys [db]} _]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :clear-all-pushers}))]
+         (if (= (:status res) "success")
+           (do
+             (log/info "Successfully eradicated all pushers from Homeserver.")
+             (when-not (.isNativePlatform Capacitor)
+               (when-let [sw (.-serviceWorker js/navigator)]
+                 (-> (.-ready sw)
+                     (.then (fn [reg]
+                              (-> (.. reg -pushManager getSubscription)
+                                  (.then (fn [sub]
+                                           (when sub (.unsubscribe sub))))))))))
+             (when (.isNativePlatform Capacitor)
+               (let [token (:native-token db)
+                     target-user (:active-push-user db)]
+                 (when target-user
+                   (.deactivateShadow shadow-device
+                                      #js {:pushToken (or token "")
+                                           :userId target-user}))))
+             (store/set-setting! "web_push_owner" nil)
+             (re-frame/dispatch [:push/hydrate-status nil]))
+           (log/error "Failed to clear pushers:" (:msg res)))))
+     (log/error "Cannot clear pushers: no engine pool"))
+   {}))
+
+
+(re-frame/reg-sub
+ :push/status
+ (fn [db _]
+   (:push-status db :disabled)))
+
 
 (re-frame/reg-event-db
  :push/set-status
  (fn [db [_ status]]
    (assoc db :push-status status)))
 
-(re-frame/reg-sub
- :push/status
- (fn [db _]
-   (:push-status db :disabled)))
+(defn check-web-push-status! [dispatch-cb]
+  (if-let [sw (.-serviceWorker js/navigator)]
+    (-> (.-ready sw)
+        (.then (fn [reg]
+                 (-> (.. reg -pushManager getSubscription)
+                     (.then (fn [sub]
+                              (dispatch-cb (some? sub))))))))
+    (dispatch-cb false)))
+
+(re-frame/reg-event-db
+ :push/hydrate-status
+ (fn [db [_ active-push-user]]
+   (assoc db :active-push-user active-push-user
+             :push-status (if active-push-user :enabled :disabled))))
+
+(re-frame/reg-event-fx
+ :push/check-status
+ (fn [_ _]
+   (if (.isNativePlatform Capacitor)
+     (-> (.getActivePushUser shadow-device)
+         (.then #(re-frame/dispatch [:push/hydrate-status (.-activeUser %)]))
+         (.catch #(log/error "Failed to check native push status:" %)))
+     (check-web-push-status!
+      (fn [is-enabled?]
+        (if is-enabled?
+          (-> (store/get-setting "web_push_owner")
+              (.then #(re-frame/dispatch [:push/hydrate-status %])))
+          (re-frame/dispatch [:push/hydrate-status nil])))))
+   {}))
+
 
 (re-frame/reg-event-fx
  :push/enable
@@ -178,3 +324,23 @@
                (log/warn "Notification permission denied.")))
            (p/catch #(log/error "Push setup failed:" %)))))
    {}))
+
+
+(re-frame/reg-event-fx
+ :push/disable
+ (fn [{:keys [db]} _]
+   (if (.isNativePlatform Capacitor)
+     {:dispatch [:push/deactivate-shadow]}
+     (do
+       (when-let [sw (.-serviceWorker js/navigator)]
+         (-> (.-ready sw)
+             (.then (fn [reg]
+                      (-> (.. reg -pushManager getSubscription)
+                          (.then (fn [sub]
+                                   (when sub
+                                     (let [sub-json (.toJSON sub)
+                                           pushkey  (.. sub-json -keys -p256dh)]
+                                       (re-frame/dispatch [:push/remove-hs-pusher pushkey])
+                                       (.unsubscribe sub))))))))))
+       (store/set-setting! "web_push_owner" nil)
+       {:dispatch [:push/hydrate-status nil]}))))
