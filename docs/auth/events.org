@@ -78,15 +78,23 @@ Probably needs a better name (and logical grouping)
      (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data)))
    (log/info "Login successful for:" user-id)
    {:db (cond-> (assoc db :auth-status :logged-in
-                       :active-user-id user-id
-                       :rooms/data {}
-                       :timeline/current-events [])
+                          :active-user-id user-id
+                          :rooms/data {}
+                          :timeline/current-events [])
           hs-url (assoc :homeserver-url hs-url))
+    :fx (cond-> [[:dispatch [:sdk/start-sync]]
+                 [:dispatch [:push/check-status]]
+                 [:dispatch [:app/load-all-settings]]
+                 [:dispatch [:sdk/fetch-all-emotes]]
+                 [:dispatch [:sdk/fetch-own-profile]]]
+          (and credentials session-data)
+          (conj [:dispatch [:push/create-sleepy-shadow
+                            (assoc credentials :homeserver
+                                   (:homeserverUrl session-data)
+                                   :userId user-id
+                                       )]]))}))
 
-    :fx [[:dispatch [:sdk/start-sync]]
-         [:dispatch [:sdk/fetch-all-emotes]]
-         [:dispatch [:sdk/fetch-own-profile]]
-         [:dispatch [:push/create-sleepy-shadow credentials]]]}))
+
 
 
 (re-frame/reg-event-fx
