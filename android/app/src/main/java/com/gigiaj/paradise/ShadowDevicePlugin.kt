@@ -172,4 +172,70 @@ class ShadowDevicePlugin : Plugin() {
             }
         }
     }
+
+    @PluginMethod
+    fun verifyShadow(call: PluginCall) {
+        val userId = call.getString("userId") ?: return call.reject("Missing userId")
+        val recoveryKey = call.getString("recoveryKey") ?: return call.reject("Missing recoveryKey")
+
+        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
+        val sessionData = getShadowSession(sharedPrefs, userId) ?: return call.reject("No shadow session found for user: $userId")
+
+        val homeserver = sessionData.getString("homeserver_url")
+        val ssStr = sessionData.optString("sliding_sync_version", "NONE")
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val client = buildMatrixClient(homeserver, ssStr, userId)
+                restoreShadowSession(client, sessionData)
+                val encryption = client.encryption()
+                encryption.recover(recoveryKey)
+
+                sessionData.put("is_verified", "true")
+                val sessionsStr = sharedPrefs.getString("shadow_sessions", "{}")
+                val sessions = JSONObject(sessionsStr)
+                sessions.put(userId, sessionData)
+                sharedPrefs.edit().putString("shadow_sessions", sessions.toString()).apply()
+
+                val ret = JSObject()
+                ret.put("status", "shadow_verified")
+                call.resolve(ret)
+            } catch (e: Exception) {
+                call.reject("Failed to verify Shadow Device", e)
+            }
+        }
+    }
+
+    @PluginMethod
+    fun getShadowStatus(call: PluginCall) {
+        val userId = call.getString("userId") ?: return call.reject("Missing userId")
+        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
+        val sessionData = getShadowSession(sharedPrefs, userId)
+        val ret = JSObject()
+        if (sessionData != null && sessionData.optString("is_verified") == "true") {
+            ret.put("isVerified", true)
+        } else {
+            ret.put("isVerified", false)
+        }
+        call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun getActivePushUser(call: PluginCall) {
+        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
+        val activeUser = sharedPrefs.getString("active_push_user", null)
+        val ret = JSObject()
+        if (activeUser != null) {
+            ret.put("activeUser", activeUser)
+        }
+        call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun setPreviewPreferences(call: PluginCall) {
+        val isEnabled = call.getBoolean("enabled", true)
+        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("show_previews", isEnabled ?: true).apply()
+        call.resolve()
+    }
 }
