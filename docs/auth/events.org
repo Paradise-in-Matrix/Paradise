@@ -95,6 +95,10 @@ Probably needs a better name (and logical grouping)
                                        )]]))}))
 
 
+(re-frame/reg-sub
+ :auth/active-user-id
+ (fn [db _]
+   (:active-user-id db)))
 
 
 (re-frame/reg-event-fx
