@@ -12,30 +12,29 @@ import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import org.matrix.rustcomponents.sdk.Session
 import org.matrix.rustcomponents.sdk.SlidingSyncVersion
 import org.matrix.rustcomponents.sdk.SlidingSyncVersionBuilder
 import org.matrix.rustcomponents.sdk.Client
-import org.matrix.rustcomponents.sdk.ClientBuilder 
-import org.matrix.rustcomponents.sdk.NotificationProcessSetup 
+import org.matrix.rustcomponents.sdk.ClientBuilder
+import org.matrix.rustcomponents.sdk.NotificationProcessSetup
 import org.matrix.rustcomponents.sdk.NotificationStatus
 import org.matrix.rustcomponents.sdk.NotificationEvent
 import org.matrix.rustcomponents.sdk.TimelineEventContent
 import org.matrix.rustcomponents.sdk.MessageType
 import org.matrix.rustcomponents.sdk.MessageLikeEventContent
 
-
 class ParadiseMessagingService : FirebaseMessagingService() {
 
-    private suspend fun restoreShadowSession(client: Client, sharedPrefs: SharedPreferences) {
-        val accessToken = sharedPrefs.getString("access_token", null)
-        val userId = sharedPrefs.getString("user_id", null)
-        val deviceId = sharedPrefs.getString("device_id", null)
-        val homeserverUrl = sharedPrefs.getString("homeserver_url", null)
-        val slidingSyncStr = sharedPrefs.getString("sliding_sync_version", "NONE")
+    private suspend fun restoreShadowSession(client: Client, sessionData: JSONObject) {
+        val accessToken = sessionData.optString("access_token", null)
+        val userId = sessionData.optString("user_id", null)
+        val deviceId = sessionData.optString("device_id", null)
+        val homeserverUrl = sessionData.optString("homeserver_url", null)
+        val slidingSyncStr = sessionData.optString("sliding_sync_version", "NONE")
 
-        if (accessToken != null && userId != null && deviceId != null && homeserverUrl != null) {
-            
+        if (!accessToken.isNullOrEmpty() && !userId.isNullOrEmpty() && !deviceId.isNullOrEmpty() && !homeserverUrl.isNullOrEmpty()) {
             val ssVersion = when (slidingSyncStr) {
                 "NATIVE" -> SlidingSyncVersion.NATIVE
                 else -> SlidingSyncVersion.NONE
@@ -52,7 +51,7 @@ class ParadiseMessagingService : FirebaseMessagingService() {
             )
             client.restoreSession(session)
         } else {
-            throw Exception("Missing session credentials in SharedPreferences.")
+            throw Exception("Missing session credentials in JSON object.")
         }
     }
 
@@ -61,18 +60,35 @@ class ParadiseMessagingService : FirebaseMessagingService() {
         val roomId = data["room_id"]
         val eventId = data["event_id"]
 
-        val sharedPrefs = applicationContext.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
-        val homeserverUrl = sharedPrefs.getString("homeserver_url", null)
-        val slidingSyncStr = sharedPrefs.getString("sliding_sync_version", "NONE")
+        if (roomId == null || eventId == null) {
+            return
+        }
 
-        if (homeserverUrl == null || roomId == null || eventId == null) {
+        val sharedPrefs = applicationContext.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
+        val showPreviews = sharedPrefs.getBoolean("show_previews", true)
+        if (!showPreviews) {
+            showNotification(roomId, "New Message", "Open Paradise to view.")
+            return
+        }
+
+        val activeUserId = sharedPrefs.getString("active_push_user", null) ?: return
+        val sessionsStr = sharedPrefs.getString("shadow_sessions", "{}")
+        val sessions = JSONObject(sessionsStr)
+        if (!sessions.has(activeUserId)) {
+            return
+        }
+        val sessionData = sessions.getJSONObject(activeUserId)
+        val homeserverUrl = sessionData.optString("homeserver_url", null)
+        val slidingSyncStr = sessionData.optString("sliding_sync_version", "NONE")
+        if (homeserverUrl.isNullOrEmpty()) {
             return
         }
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val dataPath = applicationContext.filesDir.absolutePath + "/matrix-shadow/data"
-                val cachePath = applicationContext.filesDir.absolutePath + "/matrix-shadow/cache"
+                val safeUserId = activeUserId.replace(Regex("[^a-zA-Z0-9]"), "_")
+                val dataPath = applicationContext.filesDir.absolutePath + "/matrix-shadow/$safeUserId/data"
+                val cachePath = applicationContext.filesDir.absolutePath + "/matrix-shadow/$safeUserId/cache"
 
                 val ssBuilder = when (slidingSyncStr) {
                     "NATIVE" -> SlidingSyncVersionBuilder.NATIVE
@@ -87,7 +103,7 @@ class ParadiseMessagingService : FirebaseMessagingService() {
                     .slidingSyncVersionBuilder(ssBuilder)
                     .build()
 
-                restoreShadowSession(client, sharedPrefs)
+                restoreShadowSession(client, sessionData)
 
                 val pushClient = client.notificationClient(NotificationProcessSetup.MultipleProcesses)
                 val status = pushClient.getNotification(roomId, eventId)
@@ -100,45 +116,32 @@ class ParadiseMessagingService : FirebaseMessagingService() {
 
                         val messageBody = when (val notifEvent = item.event) {
                             is NotificationEvent.Timeline -> {
-        
-                when (val eventContent = notifEvent.event.content()) {
-                    is TimelineEventContent.MessageLike -> {
-                
-                  when (val msgLikeContent = eventContent.content) {
-                         is org.matrix.rustcomponents.sdk.MessageLikeEventContent.RoomMessage -> {
-                          when (val msgType = msgLikeContent.messageType) {
-                            is MessageType.Text -> msgType.content.body
-                            is MessageType.Image -> "📸 Sent an image"
-                            is MessageType.Video -> "🎥 Sent a video"
-                            is MessageType.Audio -> "🎵 Sent an audio clip"
-                            is MessageType.File -> "📁 Sent a file"
-                            is MessageType.Emote -> "* $senderName ${msgType.content.body}"
-                            is MessageType.Notice -> msgType.content.body
-                            else -> "Sent a message"
+                                when (val eventContent = notifEvent.event.content()) {
+                                    is TimelineEventContent.MessageLike -> {
+                                      when (val msgLikeContent = eventContent.content) {
+                                          is MessageLikeEventContent.RoomMessage -> {
+                                              when (val msgType = msgLikeContent.messageType) {
+                                                  is MessageType.Text -> msgType.content.body
+                                                  is MessageType.Image -> "📸 Sent an image"
+                                                  is MessageType.Video -> "🎥 Sent a video"
+                                                  is MessageType.Audio -> "🎵 Sent an audio clip"
+                                                  is MessageType.File -> "📁 Sent a file"
+                                                  is MessageType.Emote -> "* $senderName ${msgType.content.body}"
+                                                  is MessageType.Notice -> msgType.content.body
+                                                  else -> "Sent a message"
+                                              }
+                                          }
+                                          is MessageLikeEventContent.ReactionContent -> "Reacted to a message"
+                                          is MessageLikeEventContent.Sticker -> "Sent a sticker"
+                                          is MessageLikeEventContent.CallInvite -> "📞 Incoming call"
+                                          else -> "New activity in $roomName"
+                                      }
+                                    }
+                                    is TimelineEventContent.State -> "Room settings changed"
+                                }
+                            }
+                            is NotificationEvent.Invite -> "Invited you to the room"
                         }
-
-                    }
-                    is MessageLikeEventContent.ReactionContent -> "Reacted to a message"
-                    is MessageLikeEventContent.Sticker -> "Sent a sticker"
-                    is MessageLikeEventContent.CallInvite -> "📞 Incoming call"
-                    else -> "New activity in $roomName"
-                }
-            }
-            is TimelineEventContent.State -> "Room settings changed"
-        }
-    }
-    is NotificationEvent.Invite -> {
-        "Invited you to the room"
-    }
-    }
-
-
-
-
-
-
-
-
 
                         showNotification(roomId, senderName, messageBody)
                     }
