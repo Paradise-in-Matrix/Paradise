@@ -10,9 +10,21 @@ class NotificationService: UNNotificationServiceExtension {
     override func didReceive(_ request: UNNotificationRequest, withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
         self.contentHandler = contentHandler
         bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
-        
+
         guard let bestAttemptContent = bestAttemptContent else { return }
-        
+
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
+
+        let showPreviews = sharedDefaults.object(forKey: "show_previews") as? Bool ?? true
+
+        if !showPreviews {
+            bestAttemptContent.title = "New Message"
+            bestAttemptContent.body = "Open the app to view."
+            contentHandler(bestAttemptContent)
+            return
+        }
+
+
         let userInfo = request.content.userInfo
         guard let roomId = userInfo["room_id"] as? String,
               let eventId = userInfo["event_id"] as? String else {
