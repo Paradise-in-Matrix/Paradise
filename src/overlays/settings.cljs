@@ -6,6 +6,7 @@
    [utils.svg :as icons]
    [overlays.base :refer [modal-component]]
    [utils.global-ui :refer [avatar]]
+   [client.session-store :as store]
    [taoensso.timbre :as log]
    [utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
@@ -57,26 +58,35 @@
  (fn [db _]
    (:settings/active-tab db :my-account)))
 
+(re-frame/reg-event-db
+ :sdk/handle-recovery-stream
+ (fn [db [_ state-kw]]
+   (assoc db :verification/status state-kw
+             :verification/error nil)))
+
+
 (re-frame/reg-event-fx
  :sdk/submit-verification
  (fn [{:keys [db]} [_ recovery-key]]
-   (if-let [pool @state/!engine-pool]
-     (do
-       (go
-         (let [res (<! (main/do-with-pool! pool {:handler :recover-session
-                                                 :arguments {:recovery-key recovery-key}}))]
-           (if (= (:status res) "success")
-             (do
-               (log/info "Session successfully verified and recovered!")
-               (re-frame/dispatch [:sdk/verification-success]))
-             (do
-               (log/error "Verification failed:" (:msg res))
-               (re-frame/dispatch [:sdk/verification-error (:msg res)])))))
-       {:db (assoc db :verification/status :verifying
-                      :verification/error nil)})
-     (do
-       (log/error "Cannot verify: No engine pool active")
-       {}))))
+   (let [user-id (:active-user-id db)]
+     (if-let [pool @state/!engine-pool]
+       (do
+         (go
+           (let [res (<! (main/do-with-pool! pool {:handler :recover-session
+                                                   :arguments {:recovery-key recovery-key}}))]
+             (if (= (:status res) "success")
+               (do
+                 (log/info "Session successfully verified and recovered!")
+                 (re-frame/dispatch [:push/verify-shadow user-id recovery-key])
+                 (re-frame/dispatch [:sdk/verification-success]))
+               (do
+                 (log/error "Verification failed:" (:msg res))
+                 (re-frame/dispatch [:sdk/verification-error (:msg res)])))))
+         {:db (assoc db :verification/status :verifying
+                        :verification/error nil)})
+       (do
+         (log/error "Cannot verify: No engine pool active")
+         {})))))
 
 (re-frame/reg-event-db
  :sdk/verification-success
@@ -97,6 +107,29 @@
 (re-frame/reg-sub
  :verification/error
  (fn [db _] (:verification/error db)))
+
+
+
+(def settings-registry
+  {;; DB Key                     Hydration Event                     Default Value
+   "show_previews"              {:event :push/hydrate-previews-setting :default true}
+   "web_push_owner"             {:event :push/hydrate-status           :default nil}})
+
+(re-frame/reg-event-fx
+ :settings/load
+ (fn [_ [_ idb-key hydrate-event default-val]]
+   (-> (store/get-setting idb-key)
+       (.then (fn [saved-val]
+                (let [final-val (if (nil? saved-val) default-val saved-val)]
+                  (re-frame/dispatch [hydrate-event final-val])))))
+   {}))
+
+(re-frame/reg-event-fx
+ :app/load-all-settings
+ (fn [_ _]
+   {:fx (mapv (fn [[db-key config]]
+                [:dispatch [:settings/load db-key (:event config) (:default config)]])
+              settings-registry)}))
 
 
 (defn sidebar-profile-mini []
@@ -133,30 +166,32 @@
 
 (defn verification-tab []
   (r/with-let [!passphrase (r/atom "")]
-    (let [tr             @(re-frame/subscribe [:i18n/tr])
-          status         @(re-frame/subscribe [:verification/status])
-          error          @(re-frame/subscribe [:verification/error])
-          is-verifying?  (= status :verifying)
-          is-empty?      (empty? @!passphrase)]
+    (let [tr              @(re-frame/subscribe [:i18n/tr])
+          status          @(re-frame/subscribe [:verification/status])
+          error           @(re-frame/subscribe [:verification/error])
+          is-verifying?   (= status :verifying)
+          is-empty?       (empty? @!passphrase)]
       [:div.settings-section
        [:h2.verification-title (tr [:settings.verification/title])]
-       (if (= status :verified)
+       (cond
+         (= status :enabled)
          [:div.success-banner
           [:div.success-icon [icons/check-circle-green]]
           [:div
            [:div.success-title (tr [:settings.verification.status/success-title])]
            [:div.success-subtitle (tr [:settings.verification.status/success-subtitle])]]]
+
+         (or (= status :incomplete) (= status :verifying) (= status :error))
          [:<>
-          [:p.verification-description
-           (tr [:settings.verification/description])]
+          [:p.verification-description (tr [:settings.verification/description])]
           [:div.verification-form
            [:label.form-label (tr [:settings.verification.form/label])]
            [:input.form-input
-            {:class     (when error "is-invalid")
-             :type      "password"
-             :value     @!passphrase
-             :on-change #(reset! !passphrase (.. % -target -value))
-             :disabled  is-verifying?
+            {:class      (when error "is-invalid")
+             :type       "password"
+             :value      @!passphrase
+             :on-change  #(reset! !passphrase (.. % -target -value))
+             :disabled   is-verifying?
              :placeholder (tr [:settings.verification.form/placeholder])}]
            (when error
              [:div.form-error (str (tr [:settings.verification.form/error-prefix]) error)])
@@ -166,7 +201,16 @@
              :disabled (or is-empty? is-verifying?)}
             (if is-verifying?
               (tr [:settings.verification.status/is-verifying])
-              (tr [:settings.verification.status/verify-action]))]]])])))
+              (tr [:settings.verification.status/verify-action]))]]]
+
+         (= status :disabled)
+         [:div.warning-banner
+          [:div.warning-title (tr [:settings.verification.status/warning-title])]
+          [:div.warning-subtitle (tr [:settings.verification.status/warning-subtitle])]]
+
+         :else
+         [:div.loading-state
+          [:span (tr [:settings.verification.status/checking])]])])))
 
 
 (defn my-account-tab [profile]
@@ -185,22 +229,60 @@
        [:div.profile-id (:user-id profile)]]]]))
 
 (defn notifications-tab []
-  (let [tr     @(re-frame/subscribe [:i18n/tr])
-        status @(re-frame/subscribe [:push/status])]
+  (let [tr              @(re-frame/subscribe [:i18n/tr])
+        status          @(re-frame/subscribe [:push/status])
+        current-user    @(re-frame/subscribe [:auth/active-user-id])
+        push-owner      @(re-frame/subscribe [:push/active-user])
+        is-active-here? (and (= status :enabled) (= current-user push-owner))]
     [:div.settings-tab-content
      [:h2.settings-heading (tr [:settings.notifications/title])]
      [:div.settings-section
       [:p.verification-description
        (tr [:settings.notifications/description])]
-      (if (= status :enabled)
+      (cond
+        is-active-here?
         [:div.success-banner
          [:div.success-icon [icons/check-circle-green]]
          [:div.success-text-wrapper
           [:div.success-title (tr [:settings.notifications.status/active-title])]
           [:div.success-subtitle (tr [:settings.notifications.status/active-subtitle])]]]
-        [:button.form-button
-         {:on-click #(re-frame/dispatch [:push/enable])}
-         (tr [:settings.notifications/enable-btn])])]]))
+
+        (and push-owner (not= current-user push-owner))
+        [:div.warning-banner
+         [:div.warning-title
+          (tr [:settings.notifications.warning/another-active])]
+         [:div.warning-subtitle
+          (tr [:settings.notifications.warning/swap-active] [push-owner])]]
+        :else nil)
+
+      [:div.settings-actions-container
+       (when-not is-active-here?
+         [:button.form-button
+          {:on-click #(re-frame/dispatch [:push/enable])}
+          (if push-owner
+            (tr [:settings.notifications.warning/confirm-swap])
+            (tr [:settings.notifications/enable-btn]))])
+
+       (when push-owner
+         [:button.form-button.destructive
+          {:on-click #(re-frame/dispatch [:push/disable])}
+          (tr [:settings.notifications/disable-btn])])
+       [:button.form-button.destructive
+        {:on-click #(re-frame/dispatch [:push/clear-all])}
+        (tr [:settings.notifications/clear-btn])]]
+      (let [enabled? @(re-frame/subscribe [:push/previews-enabled?])]
+        [:div.settings-row.toggle-row
+         [:div.setting-text
+          [:div.setting-title (tr [:settings.notifications/show-previews])]
+          [:div.setting-description (tr [:settings.notifications/show-previews-description])]]
+         [:label.custom-toggle
+          [:input {:type "checkbox"
+                   :checked enabled?
+                   :on-change #(re-frame/dispatch [:push/toggle-previews (.. % -target -checked)])}]
+          [:div.toggle-track
+           [:div.toggle-knob]]]])]]))
+
+
 
 
 
