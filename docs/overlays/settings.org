@@ -94,6 +94,13 @@ scaffolding.
  (fn [db _]
    (:settings/active-tab db :my-account)))
 
+(re-frame/reg-event-db
+ :sdk/handle-recovery-stream
+ (fn [db [_ state-kw]]
+   (assoc db :verification/status state-kw
+             :verification/error nil)))
+
+
 (re-frame/reg-event-fx
  :sdk/submit-verification
  (fn [{:keys [db]} [_ recovery-key]]
