@@ -147,6 +147,16 @@ scaffolding.
 #+end_src
 
 
+
+**** Settings Registry
+
+We need an organized spot to collect all the potential settings
+for the application. Nothing wrong with a straightforward approach
+where we simply hydrate on start up using the respective hydration
+events.
+
+
+
 **** Panel
 
 
