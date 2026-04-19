@@ -317,6 +317,35 @@ We embed the registration in an easily callable reframe event.
    {}))
 
 
+(re-frame/reg-event-fx
+ :push/clear-all
+ (fn [{:keys [db]} _]
+   (if-let [pool @state/!engine-pool]
+     (go
+       (let [res (<! (main/do-with-pool! pool {:handler :clear-all-pushers}))]
+         (if (= (:status res) "success")
+           (do
+             (log/info "Successfully eradicated all pushers from Homeserver.")
+             (when-not (.isNativePlatform Capacitor)
+               (when-let [sw (.-serviceWorker js/navigator)]
+                 (-> (.-ready sw)
+                     (.then (fn [reg]
+                              (-> (.. reg -pushManager getSubscription)
+                                  (.then (fn [sub]
+                                           (when sub (.unsubscribe sub))))))))))
+             (when (.isNativePlatform Capacitor)
+               (let [token (:native-token db)
+                     target-user (:active-push-user db)]
+                 (when target-user
+                   (.deactivateShadow shadow-device
+                                      #js {:pushToken (or token "")
+                                           :userId target-user}))))
+             (store/set-setting! "web_push_owner" nil)
+             (re-frame/dispatch [:push/hydrate-status nil]))
+           (log/error "Failed to clear pushers:" (:msg res)))))
+     (log/error "Cannot clear pushers: no engine pool"))
+   {}))
+
 #+end_src
 
 
