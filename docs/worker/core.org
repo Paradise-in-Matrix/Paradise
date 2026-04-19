@@ -26,6 +26,7 @@ if applicable.
    [utils.net :refer [set-auth-context!] :as net]
    [worker.state :as state]
    [worker.spaces :as spaces]
+   [worker.settings :as settings :refer [setup-encryption-listeners!]]
    [worker.timeline]
    [worker.members]
    [worker.composer]
