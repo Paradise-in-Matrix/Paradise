@@ -44,15 +44,22 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
             .build()
     }
     
-    private func restoreShadowSession(client: Client, sharedDefaults: UserDefaults) async throws {
-        guard let accessToken = sharedDefaults.string(forKey: "access_token"),
-              let userId = sharedDefaults.string(forKey: "user_id"),
-              let deviceId = sharedDefaults.string(forKey: "device_id"),
-              let homeserverUrl = sharedDefaults.string(forKey: "homeserver_url") else {
-            throw NSError(domain: "ShadowDevice", code: 2, userInfo: [NSLocalizedDescriptionKey: "Missing session in UserDefaults"])
+
+    private func getShadowSession(userId: String) -> [String: String]? {
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
+        let sessions = sharedDefaults.dictionary(forKey: "shadow_sessions") as? [String: [String: String]] ?? [:]
+        return sessions[userId]
+    }
+
+    private func restoreShadowSession(client: Client, sessionData: [String: String]) async throws {
+        guard let accessToken = sessionData["access_token"],
+              let userId = sessionData["user_id"],
+              let deviceId = sessionData["device_id"],
+              let homeserverUrl = sessionData["homeserver_url"] else {
+            throw NSError(domain: "ShadowDevice", code: 2, userInfo: [NSLocalizedDescriptionKey: "Missing session data in dictionary"])
         }
         
-        let slidingSyncStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
+        let slidingSyncStr = sessionData["sliding_sync_version"] ?? "NONE"
         let ssVersion: SlidingSyncVersion = (slidingSyncStr == "NATIVE") ? .native : .none
         
         let session = Session(
