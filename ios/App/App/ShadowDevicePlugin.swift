@@ -75,40 +75,35 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
         try await client.restoreSession(session: session)
     }
 
-
-@objc func createSleepyShadow(_ call: CAPPluginCall) {
+    @objc func createSleepyShadow(_ call: CAPPluginCall) {
         let sharedDefaults = UserDefaults(suiteName: appGroupId)!
-        
-        if call.getString("password") == nil {
-            if sharedDefaults.string(forKey: "access_token") != nil {
-                call.resolve(["status": "sleepy_shadow_already_exists"])
-                return
-            } else {
-                call.reject("Missing password and no existing shadow session.")
-                return
-            }
-        }
         
         guard let homeserver = call.getString("homeserverUrl"),
               let username = call.getString("username"),
-              let password = call.getString("password") else {
-            return call.reject("Missing arguments")
-        }
-        
-        sharedDefaults.set(homeserver, forKey: "homeserver_url")
-        
+              let password = call.getString("password"),
+              let userId = call.getString("userId")
+
+              else {
+                    return call.reject("Missing arguments")
+              }
+
         Task {
             do {
-                let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: "DISCOVER")
+                let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: "DISCOVER", userId: userId)
                 try await client.login(username: username, password: password, initialDeviceName: "Paradise Background Sync", deviceId: nil)
                 
                 let session = try client.session()
-                sharedDefaults.set(session.accessToken, forKey: "access_token")
-                sharedDefaults.set(session.userId, forKey: "user_id")
-                sharedDefaults.set(session.deviceId, forKey: "device_id")
-                
                 let ssName = (session.slidingSyncVersion == .native) ? "NATIVE" : "NONE"
-                sharedDefaults.set(ssName, forKey: "sliding_sync_version")
+                
+                var sessions = sharedDefaults.dictionary(forKey: "shadow_sessions") as? [String: [String: String]] ?? [:]
+                sessions[session.userId] = [
+                    "access_token": session.accessToken,
+                    "user_id": session.userId,
+                    "device_id": session.deviceId,
+                    "homeserver_url": homeserver,
+                    "sliding_sync_version": ssName
+                ]
+                sharedDefaults.set(sessions, forKey: "shadow_sessions")
                 
                 call.resolve(["status": "sleepy_shadow_created"])
             } catch {
