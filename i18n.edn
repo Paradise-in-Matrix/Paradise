@@ -152,6 +152,9 @@
     :description "Enter your Security Key or Recovery Passphrase to verify this session and unlock encrypted messages."
     :status {:success-title "Session Verified"
              :success-subtitle "Your end-to-end encrypted messages are now unlocked."
+             :warning-title "Secure Backup Disabled"
+             :warning-subtitle "You have not set up a secure backup for your cryptographic keys. You will need to set this up on a verified desktop client to secure your account."
+             :checking "Checking status..."
              :is-verifying "Verifying..."
              :verify-action "Verify Session"}
     :form {:label "Security Phrase / Key"
@@ -184,8 +187,19 @@
    {:title "Push Notifications"
     :description "Enable push notifications to receive alerts for new messages and mentions even when the app is in the background."
     :status {:active-title "Notifications Active"
-             :active-subtitle "You are receiving push alerts on this device."}
-    :enable-btn "Enable Push Notifications"}
+             :active-subtitle "You are receiving push alerts on this device."
+             }
+    :warning {
+              :another-active "Push routed to another account"
+              :swap-active "Notifications are currently active for %1. Activating them here will disable them for the other account."
+              :confirm-swap "Swap Notifications to This Account"
+              }
+    :enable-btn "Enable Push Notifications"
+    :disable-btn "Disable Push Notifications"
+    :clear-btn "Clear All Pushers Everywhere"
+    :show-previews "Show Previews"
+    :show-previews-description "Display message content within the notifications."
+    }
    :profile
    {:title "My Account"
     :unknown-user "Unknown User"}}}
