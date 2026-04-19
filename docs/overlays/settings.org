@@ -794,10 +794,13 @@ You want to ensure the language options are easy to find for the user.
 
 .form-button {
     cursor: pointer;
-    padding: 8px 16px;
+    padding: 10px;
     border: none;
+    margin: 10px;
     border-radius: 4px;
     background-color: var(--button-bg, #eeeeee);
+    background: #5865f2;
+    color: #fff;
     transition: background-color 0.2s;
 }
 
@@ -1182,18 +1185,6 @@ I should clean this up, but at least it is grouped with the code for now
   margin-top: 4px;
 }
 
-
-.form-button {
-  background: #5865f2;
-  color: #fff;
-  padding: 10px;
-  border: none;
-  border-radius: 4px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-top: 12px;
-  transition: background 0.2s;
-}
 
 .form-button:hover:not(:disabled) {
   background: #4752c4;
