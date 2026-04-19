@@ -27,6 +27,7 @@ Not entirely important to read, but certainly interesting.
    [utils.svg :as icons]
    [overlays.base :refer [modal-component]]
    [utils.global-ui :refer [avatar]]
+   [client.session-store :as store]
    [taoensso.timbre :as log]
    [utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
