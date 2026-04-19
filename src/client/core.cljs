@@ -27,6 +27,7 @@
         (re-frame/dispatch [:sdk/update-timeline (:room-id data) source events]))
 
       "widget-message"    (re-frame/dispatch [:call/recv-widget-message (:data data)])
+      "recovery-state-update"  (re-frame/dispatch [:sdk/handle-recovery-stream (keyword (:state data))])
       "timeline-loading"  (re-frame/dispatch [:timeline/set-loading (:room-id data) (:loading? data)])
       "typing-update"     (re-frame/dispatch [:sdk/update-typing-users (:room-id data) (:users data)])
       "pagination-status" (re-frame/dispatch [:sdk/update-pagination-status (:room-id data) (:status data)])
