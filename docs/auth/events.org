@@ -74,7 +74,6 @@ Probably needs a better name (and logical grouping)
  :auth/login-success
  (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials]}]]
    (when session-data
-     (log/info session-data)
      (register-sw!)
      (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data)))
    (log/info "Login successful for:" user-id)
