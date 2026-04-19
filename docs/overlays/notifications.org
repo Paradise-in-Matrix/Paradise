@@ -299,6 +299,24 @@ We embed the registration in an easily callable reframe event.
                (log/error "HS Rejected Web Pusher:" (:msg res)))))))
      (log/error "Cannot register pusher: no engine pool"))
    {}))
+
+(re-frame/reg-event-fx
+ :push/remove-pusher
+ (fn [_ [_ pushkey]]
+   (if-let [pool @state/!engine-pool]
+     (let [app-id (:app-id @!config)]
+       (go
+         (let [res (<! (main/do-with-pool! pool
+                                           {:handler :remove-pusher
+                                            :arguments {:pushkey pushkey
+                                                        :app-id app-id}}))]
+           (if (= (:status res) "success")
+             (log/info "Successfully removed Web Pusher from Homeserver.")
+             (log/error "Failed to remove Web Pusher from Homeserver:" (:msg res))))))
+     (log/error "Cannot remove pusher: no engine pool"))
+   {}))
+
+
 #+end_src
 
 
