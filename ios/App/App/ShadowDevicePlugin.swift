@@ -255,6 +255,16 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+  @objc func getActivePushUser(_ call: CAPPluginCall) {
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
+
+        if let activePushUser = sharedDefaults.string(forKey: "active_push_user") {
+            call.resolve(["activeUser": activePushUser])
+        } else {
+            call.resolve([:])
+        }
+    }
+
     }
 }
 
