@@ -364,10 +364,36 @@ We embed the registration in an easily callable reframe event.
  (fn [db [_ status]]
    (assoc db :push-status status)))
 
-(re-frame/reg-sub
- :push/status
- (fn [db _]
-   (:push-status db :disabled)))
+(defn check-web-push-status! [dispatch-cb]
+  (if-let [sw (.-serviceWorker js/navigator)]
+    (-> (.-ready sw)
+        (.then (fn [reg]
+                 (-> (.. reg -pushManager getSubscription)
+                     (.then (fn [sub]
+                              (dispatch-cb (some? sub))))))))
+    (dispatch-cb false)))
+
+(re-frame/reg-event-db
+ :push/hydrate-status
+ (fn [db [_ active-push-user]]
+   (assoc db :active-push-user active-push-user
+             :push-status (if active-push-user :enabled :disabled))))
+
+(re-frame/reg-event-fx
+ :push/check-status
+ (fn [_ _]
+   (if (.isNativePlatform Capacitor)
+     (-> (.getActivePushUser shadow-device)
+         (.then #(re-frame/dispatch [:push/hydrate-status (.-activeUser %)]))
+         (.catch #(log/error "Failed to check native push status:" %)))
+     (check-web-push-status!
+      (fn [is-enabled?]
+        (if is-enabled?
+          (-> (store/get-setting "web_push_owner")
+              (.then #(re-frame/dispatch [:push/hydrate-status %])))
+          (re-frame/dispatch [:push/hydrate-status nil])))))
+   {}))
+
 #+end_src
 
 
