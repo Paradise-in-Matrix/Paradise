@@ -10,7 +10,11 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "createSleepyShadow", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "activateShadow", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "deactivateShadow", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "deactivateShadow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "verifyShadow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getShadowStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getActivePushUser", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setPreviewPreferences", returnType: CAPPluginReturnPromise)
     ]
 
     let appGroupId = "group.com.gigiaj.paradise"
