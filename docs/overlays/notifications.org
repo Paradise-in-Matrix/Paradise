@@ -397,7 +397,7 @@ We embed the registration in an easily callable reframe event.
 #+end_src
 
 
-***** Push Enable (Prompt User)
+***** Push Enable (Prompt User) / Disable
 
 #+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
 (re-frame/reg-event-fx
