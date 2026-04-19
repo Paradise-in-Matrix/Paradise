@@ -265,6 +265,12 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+
+  @objc func setPreviewPreferences(_ call: CAPPluginCall) {
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
+        let isEnabled = call.getBool("enabled", true)
+        sharedDefaults.set(isEnabled, forKey: "show_previews")
+        call.resolve()
     }
 }
 
