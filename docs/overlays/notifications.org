@@ -154,6 +154,16 @@ to the user.
            (log/error "Synchronous CLJS Crash in deactivateShadow:" e)))))
    {}))
 
+
+(re-frame/reg-event-fx
+ :push/verify-shadow
+ (fn [_ [_ user-id recovery-key]]
+   (when (.isNativePlatform Capacitor)
+     (-> (.verifyShadow shadow-device #js {:userId user-id :recoveryKey recovery-key})
+         (.catch #(log/error "Shadow verification failed:" %))))
+   {}))
+
+
    {}))
 
 
