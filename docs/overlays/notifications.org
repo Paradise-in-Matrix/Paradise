@@ -107,9 +107,15 @@ to the user.
    {:db (assoc db :push/previews-enabled? (if (nil? enabled?) true enabled?))}))
 
 (re-frame/reg-event-fx
- :push/deactivate-shadow
- (fn [{:keys [db]} _]
-   (when-let [token (:native-token db)]
+ :push/toggle-previews
+ (fn [{:keys [db]} [_ enabled?]]
+   (store/set-setting! "show_previews" enabled?)
+   (when (.isNativePlatform Capacitor)
+     (-> (.setPreviewPreferences shadow-device #js {:enabled enabled?})
+         (.catch #(log/error "Failed to save native preview prefs:" %))))
+   {:dispatch [:push/hydrate-previews-setting enabled?]}))
+
+
      (try
        (-> (.deactivateShadow shadow-device
              #js {:pushToken token})
