@@ -205,7 +205,42 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
          }
         
         }
+
+
+        @objc func verifyShadow(_ call: CAPPluginCall) {
+        let sharedDefaults = UserDefaults(suiteName: appGroupId)!
+
+        guard let userId = call.getString("userId"),
+              let recoveryKey = call.getString("recoveryKey") else {
+            return call.reject("Missing arguments")
         }
+
+        guard var sessionData = getShadowSession(userId: userId) else {
+            return call.reject("No shadow session found for user: \(userId)")
+        }
+
+        let homeserver = sessionData["homeserver_url"]!
+        let ssStr = sessionData["sliding_sync_version"] ?? "NONE"
+
+        Task {
+            do {
+                let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: ssStr, userId: userId)
+                try await restoreShadowSession(client: client, sessionData: sessionData)
+                
+                let encryption = client.encryption()
+                try await encryption.recover(recoveryKey: recoveryKey) 
+
+                sessionData["is_verified"] = "true"
+                var sessions = sharedDefaults.dictionary(forKey: "shadow_sessions") as? [String: [String: String]] ?? [:]
+                sessions[userId] = sessionData
+                sharedDefaults.set(sessions, forKey: "shadow_sessions")
+
+                call.resolve(["status": "shadow_verified"])
+            } catch {
+                call.reject("Failed to verify Shadow Device", nil, error)
+            }
+        }
+    }
     }
 }
 
