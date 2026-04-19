@@ -56,6 +56,16 @@ Even if it changes, the plugin work for Capacitor is still needed anyway,
 so it isn't as though this portion was exactly the tedious part.
 
 
+A further consideration might be storing the client info in the same style we do
+in the main application. So we wat to store them in a user-id key and activate
+them using the user-id.
+I don't know that we can easily allow multiple account notifications just due
+to the expensive nature of the DBs in memory. It'll need some investgating
+before implementation.
+So we need to ensure there is visible clarity to this shortcoming provided
+to the user.
+
+
 #+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
 (def shadow-device (registerPlugin "ShadowDevice"))
 
