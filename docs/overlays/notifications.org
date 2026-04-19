@@ -177,6 +177,8 @@ to the user.
    {}))
 
 
+
+
 #+end_src
 
 
@@ -254,7 +256,6 @@ Just some helper functions
 
 **** Registers
 
-
 We embed the registration in an easily callable reframe event.
 
 
@@ -262,11 +263,13 @@ We embed the registration in an easily callable reframe event.
 
 
 #+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+
 (re-frame/reg-event-fx
  :push/register-pusher
- (fn [_ [_ subscription]]
+ (fn [{:keys [db]} [_ subscription]]
    (if-let [pool @state/!engine-pool]
-     (let [sub-json (.toJSON subscription)
+     (let [user-id  (:active-user-id db)
+           sub-json (.toJSON subscription)
            p256dh   (.. sub-json -keys -p256dh)
            auth     (.. sub-json -keys -auth)
            endpoint (.-endpoint sub-json)
@@ -291,7 +294,8 @@ We embed the registration in an easily callable reframe event.
              (if (= (:status res) "success")
                (do
                  (log/info "Web Pusher registered successfully!")
-                 (re-frame/dispatch [:push/set-status :enabled]))
+                 (store/set-setting! "web_push_owner" user-id)
+                 (re-frame/dispatch [:push/hydrate-status user-id]))
                (log/error "HS Rejected Web Pusher:" (:msg res)))))))
      (log/error "Cannot register pusher: no engine pool"))
    {}))
