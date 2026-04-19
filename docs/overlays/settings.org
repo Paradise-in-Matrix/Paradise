@@ -449,22 +449,60 @@ Simple verification tab for now
 
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
 (defn notifications-tab []
-  (let [tr     @(re-frame/subscribe [:i18n/tr])
-        status @(re-frame/subscribe [:push/status])]
+  (let [tr              @(re-frame/subscribe [:i18n/tr])
+        status          @(re-frame/subscribe [:push/status])
+        current-user    @(re-frame/subscribe [:auth/active-user-id])
+        push-owner      @(re-frame/subscribe [:push/active-user])
+        is-active-here? (and (= status :enabled) (= current-user push-owner))]
     [:div.settings-tab-content
      [:h2.settings-heading (tr [:settings.notifications/title])]
      [:div.settings-section
       [:p.verification-description
        (tr [:settings.notifications/description])]
-      (if (= status :enabled)
+      (cond
+        is-active-here?
         [:div.success-banner
          [:div.success-icon [icons/check-circle-green]]
          [:div.success-text-wrapper
           [:div.success-title (tr [:settings.notifications.status/active-title])]
           [:div.success-subtitle (tr [:settings.notifications.status/active-subtitle])]]]
-        [:button.form-button
-         {:on-click #(re-frame/dispatch [:push/enable])}
-         (tr [:settings.notifications/enable-btn])])]]))
+
+        (and push-owner (not= current-user push-owner))
+        [:div.warning-banner
+         [:div.warning-title
+          (tr [:settings.notifications.warning/another-active])]
+         [:div.warning-subtitle
+          (tr [:settings.notifications.warning/swap-active] [push-owner])]]
+        :else nil)
+
+      [:div.settings-actions-container
+       (when-not is-active-here?
+         [:button.form-button
+          {:on-click #(re-frame/dispatch [:push/enable])}
+          (if push-owner
+            (tr [:settings.notifications.warning/confirm-swap])
+            (tr [:settings.notifications/enable-btn]))])
+
+       (when push-owner
+         [:button.form-button.destructive
+          {:on-click #(re-frame/dispatch [:push/disable])}
+          (tr [:settings.notifications/disable-btn])])
+       [:button.form-button.destructive
+        {:on-click #(re-frame/dispatch [:push/clear-all])}
+        (tr [:settings.notifications/clear-btn])]]
+      (let [enabled? @(re-frame/subscribe [:push/previews-enabled?])]
+        [:div.settings-row.toggle-row
+         [:div.setting-text
+          [:div.setting-title (tr [:settings.notifications/show-previews])]
+          [:div.setting-description (tr [:settings.notifications/show-previews-description])]]
+         [:label.custom-toggle
+          [:input {:type "checkbox"
+                   :checked enabled?
+                   :on-change #(re-frame/dispatch [:push/toggle-previews (.. % -target -checked)])}]
+          [:div.toggle-track
+           [:div.toggle-knob]]]])]]))
+
+
 #+end_src
 
 
