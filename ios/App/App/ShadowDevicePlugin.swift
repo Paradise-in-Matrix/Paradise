@@ -113,7 +113,6 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
 
-
     @objc func activateShadow(_ call: CAPPluginCall) {
 
         let sharedDefaults = UserDefaults(suiteName: appGroupId)!
@@ -127,12 +126,16 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
         guard let sessionData = getShadowSession(userId: userId) else {
             return call.reject("No shadow session found for user: \(userId)")
         }
+        
+        let homeserver = sessionData["homeserver_url"]!
+        let ssStr = sessionData["sliding_sync_version"] ?? "NONE"
 
 
         Task {
             do {
-                let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: ssStr)
-                try await restoreShadowSession(client: client, sharedDefaults: sharedDefaults)
+                let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: ssStr, userId: userId)
+                try await restoreShadowSession(client: client, sessionData: sessionData)
+                
                 let payloadDict: [String: Any] = [
                     "aps": [
                         "mutable-content": 1,
@@ -151,7 +154,6 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
                 let identifiers = PusherIdentifiers(pushkey: pushToken, appId: "moi.paradise.ios")
                 let httpData = HttpPusherData(url: pushUrl, format: .eventIdOnly, defaultPayload: payloadString)
 
-
                 try await client.setPusher(
                     identifiers: identifiers,
                     kind: PusherKind.http(data: httpData),
@@ -160,7 +162,9 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
                     profileTag: "primary",
                     lang: "en"
                 )
-                
+
+                sharedDefaults.set(userId, forKey: "active_push_user")
+
                 call.resolve(["status": "shadow_activated"])
             } catch {
                 call.reject("Failed to activate Shadow Device", nil, error)
@@ -168,28 +172,39 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
     
-    
     @objc func deactivateShadow(_ call: CAPPluginCall) {
-        guard let pushToken = call.getString("pushToken") else { return call.reject("Missing token") }
-        
         let sharedDefaults = UserDefaults(suiteName: appGroupId)!
-        guard let homeserver = sharedDefaults.string(forKey: "homeserver_url") else {
-            return call.reject("No homeserver saved")
+
+
+        guard let pushToken = call.getString("pushToken"),
+              let userId = call.getString("userId") else {
+            return call.reject("Missing arguments")
         }
-        let ssStr = sharedDefaults.string(forKey: "sliding_sync_version") ?? "NONE"
+        
+        guard let sessionData = getShadowSession(userId: userId) else {
+            return call.reject("No shadow session found for user: \(userId)")
+        }
+
+        let homeserver = sessionData["homeserver_url"]!
+        let ssStr = sessionData["sliding_sync_version"] ?? "NONE"
         
         Task {
             do {
-                let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: ssStr)
-                try await restoreShadowSession(client: client, sharedDefaults: sharedDefaults)
+                let client = try await buildMatrixClient(homeserverUrl: homeserver, ssStr: ssStr, userId: userId)
+                try await restoreShadowSession(client: client, sessionData: sessionData)
                 
                 let identifiers = PusherIdentifiers(pushkey: pushToken, appId: "moi.paradise.ios")
                 try await client.deletePusher(identifiers: identifiers)
-                
+
+                sharedDefaults.removeObject(forKey: "active_push_user")
+
                 call.resolve(["status": "shadow_deactivated"])
             } catch {
                 call.reject("Failed to deactivate Shadow Device", nil, error)
             }
+         }
+        
+        }
         }
     }
 }
