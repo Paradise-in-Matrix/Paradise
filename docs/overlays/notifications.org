@@ -138,6 +138,22 @@ to the user.
      {})))
 
 
+(re-frame/reg-event-fx
+ :push/deactivate-shadow
+ (fn [{:keys [db]} _]
+   (let [token (:native-token db)
+         target-user (:active-push-user db)]
+     (when target-user
+       (try
+         (-> (.deactivateShadow shadow-device
+                                #js {:pushToken (or token "") :userId target-user})
+             (.then (fn [res]
+                      (re-frame/dispatch [:push/hydrate-status nil])))
+             (.catch #(log/error "Shadow Deactivated FAILED:" %)))
+         (catch js/Error e
+           (log/error "Synchronous CLJS Crash in deactivateShadow:" e)))))
+   {}))
+
    {}))
 
 
