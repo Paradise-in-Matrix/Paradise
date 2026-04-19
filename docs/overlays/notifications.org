@@ -72,14 +72,16 @@ to the user.
 (re-frame/reg-event-fx
  :push/create-sleepy-shadow
  (fn [_ [_ credentials]]
-   (log/info "1. Creating Sleepy Shadow Device...")
+   (log/info "Creating Sleepy Shadow Device...")
    (try
      (-> (.createSleepyShadow shadow-device
            #js {:homeserverUrl (:homeserver credentials)
                 :username (:username credentials)
-                :password (:password credentials)})
-         (.then #(log/info "2. Sleepy Shadow SUCCESS:" (.-status %)))
-         (.catch #(log/error "2. Sleepy Shadow FAILED:" %)))
+                :password (:password credentials)
+                :userId (:userId credentials)
+                })
+         (.then #(log/info "Sleepy Shadow SUCCESS:" (.-status %)))
+         (.catch #(log/error "Sleepy Shadow FAILED:" %)))
      (catch js/Error e
        (log/error "Synchronous CLJS Crash in createSleepyShadow:" e)))
    {}))
