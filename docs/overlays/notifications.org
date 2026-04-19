@@ -164,6 +164,16 @@ to the user.
    {}))
 
 
+(re-frame/reg-event-fx
+ :push/check-verification-status
+ (fn [_ [_ user-id]]
+   (when (.isNativePlatform Capacitor)
+     (-> (.getShadowStatus shadow-device #js {:userId user-id})
+         (.then (fn [res]
+                  (when (.-isVerified res)
+                    (log/info "Shadow client is already verified, skipping prompt.")
+                    (re-frame/dispatch [:sdk/verification-success]))))
+         (.catch #(log/error "Failed to fetch shadow status:" %))))
    {}))
 
 
