@@ -241,6 +241,20 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
     }
+
+    @objc func getShadowStatus(_ call: CAPPluginCall) {
+        guard let userId = call.getString("userId") else {
+            return call.reject("Missing arguments")
+        }
+        
+        if let sessionData = getShadowSession(userId: userId),
+           let isVerified = sessionData["is_verified"], isVerified == "true" {
+            call.resolve(["isVerified": true])
+        } else {
+            call.resolve(["isVerified": false])
+        }
+    }
+
     }
 }
 
