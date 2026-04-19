@@ -104,23 +104,25 @@ scaffolding.
 (re-frame/reg-event-fx
  :sdk/submit-verification
  (fn [{:keys [db]} [_ recovery-key]]
-   (if-let [pool @state/!engine-pool]
-     (do
-       (go
-         (let [res (<! (main/do-with-pool! pool {:handler :recover-session
-                                                 :arguments {:recovery-key recovery-key}}))]
-           (if (= (:status res) "success")
-             (do
-               (log/info "Session successfully verified and recovered!")
-               (re-frame/dispatch [:sdk/verification-success]))
-             (do
-               (log/error "Verification failed:" (:msg res))
-               (re-frame/dispatch [:sdk/verification-error (:msg res)])))))
-       {:db (assoc db :verification/status :verifying
-                      :verification/error nil)})
-     (do
-       (log/error "Cannot verify: No engine pool active")
-       {}))))
+   (let [user-id (:active-user-id db)]
+     (if-let [pool @state/!engine-pool]
+       (do
+         (go
+           (let [res (<! (main/do-with-pool! pool {:handler :recover-session
+                                                   :arguments {:recovery-key recovery-key}}))]
+             (if (= (:status res) "success")
+               (do
+                 (log/info "Session successfully verified and recovered!")
+                 (re-frame/dispatch [:push/verify-shadow user-id recovery-key])
+                 (re-frame/dispatch [:sdk/verification-success]))
+               (do
+                 (log/error "Verification failed:" (:msg res))
+                 (re-frame/dispatch [:sdk/verification-error (:msg res)])))))
+         {:db (assoc db :verification/status :verifying
+                        :verification/error nil)})
+       (do
+         (log/error "Cannot verify: No engine pool active")
+         {})))))
 
 (re-frame/reg-event-db
  :sdk/verification-success
