@@ -116,15 +116,28 @@ to the user.
    {:dispatch [:push/hydrate-previews-setting enabled?]}))
 
 
+(re-frame/reg-event-fx
+ :push/activate-shadow
+ (fn [{:keys [db]} [_ token]]
+   (let [active-user (:active-user-id db)
+         old-user    (:active-push-user db)]
+     (when (and old-user (not= old-user active-user))
+       (.deactivateShadow shadow-device #js {:pushToken token :userId old-user}))
      (try
-       (-> (.deactivateShadow shadow-device
-             #js {:pushToken token})
+       (-> (.activateShadow shadow-device
+             #js {:pushToken token
+                  :pushUrl (:push-url @!config)
+                  :userId active-user})
            (.then (fn [res]
-                    (log/info "Shadow Deactivated SUCCESS:" (.-status res))
-                    (re-frame/dispatch [:push/set-status :disabled])))
-           (.catch #(log/error "Shadow Deactivated FAILED:" %)))
+                    (re-frame/dispatch [:push/set-active-user active-user])))
+           (.catch (fn [err]
+                     (log/error "Shadow Activated FAILED:" err)
+                     (re-frame/dispatch [:modal/open-shadow-login]))))
        (catch js/Error e
-         (log/error "Synchronous CLJS Crash in deactivateShadow:" e))))
+         (log/error "Synchronous CLJS Crash in activateShadow:" e)))
+     {})))
+
+
    {}))
 
 
