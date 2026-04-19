@@ -86,6 +86,13 @@ The Rust SDK uses this passphrase to encrypt the IndexedDB where the actual keys
 #+end_src
 
 
+****** Settings IndexedDB
+
+ We will need to persist settings for the applications usage.
+Webviews or browsers, IndexedDB will work just fine for this.
+OPFS is unideal for the main thread to use and we don't really
+*need* it.
+
 
 *** IndexedDB Management
 
