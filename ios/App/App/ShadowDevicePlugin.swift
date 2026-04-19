@@ -18,8 +18,8 @@ public class ShadowDevicePlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     let appGroupId = "group.com.gigiaj.paradise"
-    
-    private func buildMatrixClient(homeserverUrl: String, ssStr: String) async throws -> Client {
+
+    private func buildMatrixClient(homeserverUrl: String, ssStr: String, userId: String) async throws -> Client {
         guard let containerUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else {
             throw NSError(domain: "ShadowDevice", code: 1, userInfo: [NSLocalizedDescriptionKey: "App Group container not found!"])
         }
