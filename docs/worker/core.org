@@ -55,6 +55,10 @@ operations.
 #+end_src
 
 
+Honestly forgot to expand on these, but longer term plans would be
+creating a nice binding layer and keeping the syntax just as fluid.
+So we'll likely need to expand on our cljs-worker library for that.
+
 #+begin_src clojurescript
 
 #+end_src
