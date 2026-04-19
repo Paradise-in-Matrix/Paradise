@@ -23,6 +23,7 @@ They are technically an overlay, so we'll group them here also.
             ["@capacitor/core" :refer [Capacitor registerPlugin]]
             ["@capacitor/push-notifications" :refer [PushNotifications]]
             [client.state :refer [!config] :as state]
+            [client.session-store :as store]
             [cljs-workers.core :as main]))
 #+end_src
 
