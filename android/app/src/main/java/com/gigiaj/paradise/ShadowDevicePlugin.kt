@@ -1,6 +1,8 @@
 package com.gigiaj.paradise
 
+import android.content.Context
 import android.content.SharedPreferences
+import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
@@ -8,6 +10,7 @@ import com.getcapacitor.annotation.CapacitorPlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import org.matrix.rustcomponents.sdk.ClientBuilder
 import org.matrix.rustcomponents.sdk.PusherIdentifiers
 import org.matrix.rustcomponents.sdk.PusherKind
@@ -18,13 +21,13 @@ import org.matrix.rustcomponents.sdk.SlidingSyncVersion
 import org.matrix.rustcomponents.sdk.SlidingSyncVersionBuilder
 import org.matrix.rustcomponents.sdk.Client
 
-
 @CapacitorPlugin(name = "ShadowDevice")
 class ShadowDevicePlugin : Plugin() {
 
-    private suspend fun buildMatrixClient(homeserverUrl: String, ssStr: String?): Client {
-        val dataPath = context.filesDir.absolutePath + "/matrix-shadow/data"
-        val cachePath = context.filesDir.absolutePath + "/matrix-shadow/cache"
+    private suspend fun buildMatrixClient(homeserverUrl: String, ssStr: String?, userId: String): Client {
+        val safeUserId = userId.replace(Regex("[^a-zA-Z0-9]"), "_")
+        val dataPath = context.filesDir.absolutePath + "/matrix-shadow/$safeUserId/data"
+        val cachePath = context.filesDir.absolutePath + "/matrix-shadow/$safeUserId/cache"
 
         val ssBuilder = when (ssStr) {
             "NATIVE" -> SlidingSyncVersionBuilder.NATIVE
@@ -36,19 +39,24 @@ class ShadowDevicePlugin : Plugin() {
             .homeserverUrl(homeserverUrl)
             .sessionPaths(dataPath, cachePath)
             .systemIsMemoryConstrained()
-            .slidingSyncVersionBuilder(ssBuilder) 
+            .slidingSyncVersionBuilder(ssBuilder)
             .build()
     }
 
-    private suspend fun restoreShadowSession(client: Client, sharedPrefs: SharedPreferences) {
-        val accessToken = sharedPrefs.getString("access_token", null)
-        val userId = sharedPrefs.getString("user_id", null)
-        val deviceId = sharedPrefs.getString("device_id", null)
-        val homeserverUrl = sharedPrefs.getString("homeserver_url", null)
-        val slidingSyncStr = sharedPrefs.getString("sliding_sync_version", "NONE")
+    private fun getShadowSession(sharedPrefs: SharedPreferences, userId: String): JSONObject? {
+        val sessionsStr = sharedPrefs.getString("shadow_sessions", "{}")
+        val sessions = JSONObject(sessionsStr)
+        return if (sessions.has(userId)) sessions.getJSONObject(userId) else null
+    }
 
-        if (accessToken != null && userId != null && deviceId != null && homeserverUrl != null) {
-            
+    private suspend fun restoreShadowSession(client: Client, sessionData: JSONObject) {
+        val accessToken = sessionData.optString("access_token", null)
+        val userId = sessionData.optString("user_id", null)
+        val deviceId = sessionData.optString("device_id", null)
+        val homeserverUrl = sessionData.optString("homeserver_url", null)
+        val slidingSyncStr = sessionData.optString("sliding_sync_version", "NONE")
+
+        if (!accessToken.isNullOrEmpty() && !userId.isNullOrEmpty() && !deviceId.isNullOrEmpty() && !homeserverUrl.isNullOrEmpty()) {
             val ssVersion = when (slidingSyncStr) {
                 "NATIVE" -> SlidingSyncVersion.NATIVE
                 else -> SlidingSyncVersion.NONE
@@ -65,7 +73,7 @@ class ShadowDevicePlugin : Plugin() {
             )
             client.restoreSession(session)
         } else {
-            throw Exception("Missing session credentials in SharedPreferences.")
+            throw Exception("Missing session credentials in JSON object.")
         }
     }
 
@@ -74,26 +82,32 @@ class ShadowDevicePlugin : Plugin() {
         val homeserver = call.getString("homeserverUrl") ?: return call.reject("Missing homeserverUrl")
         val username = call.getString("username") ?: return call.reject("Missing username")
         val password = call.getString("password") ?: return call.reject("Missing password")
+        val userId = call.getString("userId") ?: return call.reject("Missing userId")
 
-        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", android.content.Context.MODE_PRIVATE)
-        sharedPrefs.edit().putString("homeserver_url", homeserver).apply()
+        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val client = buildMatrixClient(homeserver, null)
+                val client = buildMatrixClient(homeserver, "DISCOVER", userId)
                 client.login(username, password, "Paradise Background Sync", null)
-                
                 val session = client.session()
                 if (session != null) {
-                    sharedPrefs.edit()
-                        .putString("access_token", session.accessToken)
-                        .putString("user_id", session.userId)
-                        .putString("device_id", session.deviceId)
-                        .putString("sliding_sync_version", session.slidingSyncVersion.name)
-                        .apply()
+                    val ssName = if (session.slidingSyncVersion == SlidingSyncVersion.NATIVE) "NATIVE" else "NONE"
+                    val sessionData = JSONObject().apply {
+                        put("access_token", session.accessToken)
+                        put("user_id", session.userId)
+                        put("device_id", session.deviceId)
+                        put("homeserver_url", homeserver)
+                        put("sliding_sync_version", ssName)
+                    }
+
+                    val sessionsStr = sharedPrefs.getString("shadow_sessions", "{}")
+                    val sessions = JSONObject(sessionsStr)
+                    sessions.put(session.userId, sessionData)
+
+                    sharedPrefs.edit().putString("shadow_sessions", sessions.toString()).apply()
                 }
-                
-                val ret = com.getcapacitor.JSObject()
+                val ret = JSObject()
                 ret.put("status", "sleepy_shadow_created")
                 call.resolve(ret)
             } catch (e: Exception) {
@@ -106,16 +120,17 @@ class ShadowDevicePlugin : Plugin() {
     fun activateShadow(call: PluginCall) {
         val fcmToken = call.getString("pushToken") ?: return call.reject("Missing pushToken")
         val pushUrl = call.getString("pushUrl") ?: return call.reject("Missing pushUrl")
-        
-        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", android.content.Context.MODE_PRIVATE)
-        val homeserver = sharedPrefs.getString("homeserver_url", null) ?: return call.reject("No homeserver saved")
-        val ssStr = sharedPrefs.getString("sliding_sync_version", "NONE")
+        val userId = call.getString("userId") ?: return call.reject("Missing userId")
+        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
+        val sessionData = getShadowSession(sharedPrefs, userId) ?: return call.reject("No shadow session found for user: $userId")
+
+        val homeserver = sessionData.getString("homeserver_url")
+        val ssStr = sessionData.optString("sliding_sync_version", "NONE")
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val client = buildMatrixClient(homeserver, ssStr)
-                restoreShadowSession(client, sharedPrefs)
-                
+                val client = buildMatrixClient(homeserver, ssStr, userId)
+                restoreShadowSession(client, sessionData)
                 val identifiers = PusherIdentifiers(
                     pushkey = fcmToken,
                     appId = "moi.paradise.android"
@@ -136,7 +151,9 @@ class ShadowDevicePlugin : Plugin() {
                     lang = "en"
                 )
 
-                val ret = com.getcapacitor.JSObject()
+                sharedPrefs.edit().putString("active_push_user", userId).apply()
+
+                val ret = JSObject()
                 ret.put("status", "shadow_activated")
                 call.resolve(ret)
             } catch (e: Exception) {
@@ -148,23 +165,25 @@ class ShadowDevicePlugin : Plugin() {
     @PluginMethod
     fun deactivateShadow(call: PluginCall) {
         val fcmToken = call.getString("pushToken") ?: return call.reject("Missing pushToken")
-        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", android.content.Context.MODE_PRIVATE)
-        val homeserver = sharedPrefs.getString("homeserver_url", null) ?: return call.reject("No homeserver saved")
-        val ssStr = sharedPrefs.getString("sliding_sync_version", "NONE")
+        val userId = call.getString("userId") ?: return call.reject("Missing userId")
+        val sharedPrefs = context.getSharedPreferences("ParadiseShadow", Context.MODE_PRIVATE)
+        val sessionData = getShadowSession(sharedPrefs, userId) ?: return call.reject("No shadow session found for user: $userId")
+
+        val homeserver = sessionData.getString("homeserver_url")
+        val ssStr = sessionData.optString("sliding_sync_version", "NONE")
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val client = buildMatrixClient(homeserver, ssStr)
-                restoreShadowSession(client, sharedPrefs)
-                
+                val client = buildMatrixClient(homeserver, ssStr, userId)
+                restoreShadowSession(client, sessionData)
                 val identifiers = PusherIdentifiers(
                     pushkey = fcmToken,
                     appId = "moi.paradise.android"
                 )
-                
                 client.deletePusher(identifiers)
-                
-                val ret = com.getcapacitor.JSObject()
+                sharedPrefs.edit().remove("active_push_user").apply()
+
+                val ret = JSObject()
                 ret.put("status", "shadow_deactivated")
                 call.resolve(ret)
             } catch (e: Exception) {
