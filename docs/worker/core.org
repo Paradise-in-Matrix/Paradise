@@ -254,7 +254,11 @@ The sync service is the actual service that tries to sync with the home server.
                                     space-service (.spaceService client)]
                               (rooms/start-room-list-sync! client room-list space-service)
                               (.start sync-service)
-                              (spaces/init-space-service! client)))
+                              (spaces/init-space-service! client)
+                              (setup-encryption-listeners! client)
+                              )
+
+                            )
                        {:status :success}
                        (catch :default e
                          {:status :error :msg (str e)})))))
