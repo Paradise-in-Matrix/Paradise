@@ -86,6 +86,21 @@ to the user.
        (log/error "Synchronous CLJS Crash in createSleepyShadow:" e)))
    {}))
 
+(re-frame/reg-sub
+ :push/active-user
+ (fn [db _] (:active-push-user db)))
+
+(re-frame/reg-event-db
+ :push/set-active-user
+ (fn [db [_ user-id]]
+   (assoc db :active-push-user user-id
+             :push-status (if user-id :enabled :disabled))))
+
+(re-frame/reg-sub
+ :push/previews-enabled?
+ (fn [db _]
+   (:push/previews-enabled? db true)))
+
 (re-frame/reg-event-fx
  :push/activate-shadow
  (fn [_ [_ token]]
