@@ -11,6 +11,7 @@
    [utils.net :refer [set-auth-context!] :as net]
    [worker.state :as state]
    [worker.spaces :as spaces]
+   [worker.settings :as settings :refer [setup-encryption-listeners!]]
    [worker.timeline]
    [worker.members]
    [worker.composer]
@@ -127,7 +128,11 @@
                                     space-service (.spaceService client)]
                               (rooms/start-room-list-sync! client room-list space-service)
                               (.start sync-service)
-                              (spaces/init-space-service! client)))
+                              (spaces/init-space-service! client)
+                              (setup-encryption-listeners! client)
+                              )
+
+                            )
                        {:status :success}
                        (catch :default e
                          {:status :error :msg (str e)})))))
@@ -157,108 +162,6 @@
                                       :deviceId      (.-deviceId session)
                                       :accessToken   (.-accessToken session)
                                       :homeserverUrl (.-homeserverUrl session)}})
-                         {:status :error :msg "No active client"})
-                       (catch :default e
-                         {:status :error :msg (str e)})))))
-
-(worker/register :register-pusher
-  (fn [{:keys [p256dh auth endpoint app-id push-url app-name lang pushkey is-native platform]}]
-    (go
-      (try
-        (let [client     @state/!client
-              hs-url     (.homeserver client)
-              token      (.-accessToken (.session client))
-              clean-base (str/replace hs-url #"/+$" "")
-              url        (str clean-base "/_matrix/client/v3/pushers/set")
-              payload    (cond
-                           (and is-native (= platform "ios"))
-                           {:kind "http"
-                            :app_id app-id
-                            :pushkey pushkey
-                            :app_display_name app-name
-                            :device_display_name "iOS Device"
-                            :lang lang
-                            :append false
-                            :data {:url push-url
-                                   :format "event_id_only"
-                                   :default_payload {:aps {:alert {:loc-key "New Message"}
-                                                           :sound "default"
-                                                           :badge 1
-                                                           :content-available 1}}}}
-                           (and is-native (= platform "android"))
-                           {:kind "http"
-                            :app_id app-id
-                            :pushkey pushkey
-                            :app_display_name app-name
-                            :device_display_name "Android Device"
-                            :lang lang
-                            :append false
-                            :data {:url push-url
-                                   :format "event_id_only"
-                                   }}
-                           :else
-                           {:kind "http"
-                            :app_id app-id
-                            :pushkey p256dh
-                            :app_display_name app-name
-                            :device_display_name "Web Browser"
-                            :lang lang
-                            :append false
-                            :data {:url push-url
-                                   :events_only true
-                                   :endpoint endpoint
-                                   :p256dh p256dh
-                                   :auth auth}})
-              resp       (<p! (net/fetch url #js {:method "POST"
-                                                  :headers #js {"Authorization" (str "Bearer " token)
-                                                                "Content-Type" "application/json"}
-                                                  :body (js/JSON.stringify (clj->js payload))}))]
-          (if (.-ok resp)
-            {:status "success"}
-            (let [err-body (<p! (.json resp))]
-              {:status "error" :msg err-body})))
-        (catch :default e
-          {:status "error" :msg (str e)})))))
-
-
-(worker/register :recover-session
-                 (fn [{:keys [recovery-key]}]
-                   (go
-                     (try
-                       (if-let [client @state/!client]
-                         (let [encryption-module (.encryption client)]
-                           (log/info "Attempting session recovery with key length:" (count recovery-key))
-                           (<p! (.recover encryption-module recovery-key))
-                           (log/info "Session recovery successful!")
-                           {:status :success})
-                         {:status :error :msg "No active client"})
-                       (catch :default e
-                         (let [err-str (or (.-message e) (str e))]
-                           (log/error "Recovery FFI Panic:" err-str)
-                           {:status :error :msg err-str}))))))
-
-(worker/register :get-available-accounts
-                 (fn [_]
-                   (go
-                     (try
-                       (<p! (p/let [store (SessionStore.)
-                                    sessions (.loadSessions store)]
-                              (let [accs (for [uid (js/Object.keys sessions)
-                                               :let [data (aget sessions uid)
-                                                     session (.-session data)]]
-                                           {:userId uid
-                                            :hs_url (.-homeserverUrl session)})]
-                                {:status :success :accounts (vec accs)})))
-                       (catch :default e
-                         {:status :error :msg (str e)})))))
-
-(worker/register :get-account-data
-                 (fn [{:keys [event-type]}]
-                   (go
-                     (try
-                       (if-let [client @state/!client]
-                         (let [data (<p! (.accountData client event-type))]
-                           {:status :success :data data})
                          {:status :error :msg "No active client"})
                        (catch :default e
                          {:status :error :msg (str e)})))))
