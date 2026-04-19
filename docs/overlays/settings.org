@@ -506,6 +506,39 @@ Simple verification tab for now
 #+end_src
 
 
+***** CSS
+
+#+begin_src css :tangle ../../css/settings.css
+
+.warning-banner {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(255,165,0,0.1);
+    border-left: 4px solid orange;
+}
+
+.warning-title {
+    font-weight: bold;
+    color: orange;
+}
+
+.warning-subtitle {
+    font-size: 0.85em;
+    margin-top: 4px;
+}
+
+.form-button.destructive {
+    margin-top: 12px;
+    background-color: darkred;
+}
+
+.form-button.destructive:hover:not(:disabled) {
+    background-color: #660000;
+}
+
+#+end_src
+
+
 **** Account Switcher Tab
 
 
