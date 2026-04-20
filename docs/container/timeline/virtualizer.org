@@ -438,6 +438,17 @@ mostly just tweaking.
 }
 
 
+  .timeline-wrapper {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      opacity: var(--dynamic-opacity);
+  }
+
+
 
   .timeline-header {
       display: flex;
