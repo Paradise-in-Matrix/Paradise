@@ -55,7 +55,7 @@
      :system-event-h    (get-var "--chat-system-event-h" 42)
      :edited-label-h    (get-var "--chat-edited-label-h" 16)
      :reply-banner-h    (get-var "--chat-reply-banner-h" 32.4)
-     :text-wrap-buffer  (get-var "--chat-text-wrap-buffer" 7)
+     :text-wrap-buffer  (get-var "--chat-text-wrap-buffer" 4)
      :quote-wrap-buffer (get-var "--chat-quote-wrap-buffer" 19)
      :url-wrap-buffer   (get-var "--chat-url-wrap-buffer" 40)
      :code-padding      (get-var "--chat-code-padding" 28)
@@ -225,7 +225,6 @@
           (when loading?
             [timeline-loading-overlay])
 
-
           (if (zero? cnt)
             [timeline-empty-state room-id]
 
@@ -268,11 +267,8 @@
           (when (and focus-mode? loading-forward?)
             [:div.spinner-wrapper
              [:div.spinner]])]
-
          (when (and @!show-jump? (not @!at-bottom?))
            [timeline-jump-button do-jump! focus-mode?])]))
     (finally
       (.disconnect container-obs)
       (.disconnect item-resize-obs))))
-
-
