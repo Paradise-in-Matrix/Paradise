@@ -225,7 +225,7 @@ to utilize the nice features inside of Capacitor.
               room-id (.-room_id data)]
           (when room-id
             (log/info "User tapped notification for room:" room-id)
-            (re-frame/dispatch [:space/select-room room-id])))))))
+            (re-frame/dispatch [:nav/route-from-push room-id])))))))
 #+end_src
 
 
