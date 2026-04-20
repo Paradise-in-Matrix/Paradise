@@ -59,43 +59,44 @@
    {:dispatch [:push/hydrate-previews-setting enabled?]}))
 
 
+
 (re-frame/reg-event-fx
  :push/activate-shadow
  (fn [{:keys [db]} [_ token]]
    (let [active-user (:active-user-id db)
          old-user    (:active-push-user db)]
-     (when (and old-user (not= old-user active-user))
-       (.deactivateShadow shadow-device #js {:pushToken token :userId old-user}))
-     (try
-       (-> (.activateShadow shadow-device
-             #js {:pushToken token
-                  :pushUrl (:push-url @!config)
-                  :userId active-user})
-           (.then (fn [res]
-                    (re-frame/dispatch [:push/set-active-user active-user])))
-           (.catch (fn [err]
-                     (log/error "Shadow Activated FAILED:" err)
-                     (re-frame/dispatch [:modal/open-shadow-login]))))
-       (catch js/Error e
-         (log/error "Synchronous CLJS Crash in activateShadow:" e)))
-     {})))
+     (go
+       (try
+         (when (and old-user (string? old-user) (not= old-user active-user))
+           (try
+             (<p! (.deactivateShadow shadow-device #js {:pushToken token :userId old-user}))
+             (catch js/Error e
+               (log/warn "Silent deactivate cleanup error:" e))))
+         (<p! (.activateShadow shadow-device
+                               #js {:pushToken token
+                                    :pushUrl (:push-url @!config)
+                                    :userId active-user}))
+         (re-frame/dispatch [:push/set-active-user active-user])
 
+         (catch js/Error err
+           (log/error "Shadow Activated FAILED:" err)
+           (re-frame/dispatch [:modal/open-shadow-login]))))
+     {})))
 
 (re-frame/reg-event-fx
  :push/deactivate-shadow
  (fn [{:keys [db]} _]
    (let [token (:native-token db)
          target-user (:active-push-user db)]
-     (when target-user
-       (try
-         (-> (.deactivateShadow shadow-device
-                                #js {:pushToken (or token "") :userId target-user})
-             (.then (fn [res]
-                      (re-frame/dispatch [:push/hydrate-status nil])))
-             (.catch #(log/error "Shadow Deactivated FAILED:" %)))
-         (catch js/Error e
-           (log/error "Synchronous CLJS Crash in deactivateShadow:" e)))))
-   {}))
+     (when (and target-user (string? target-user))
+       (go
+         (try
+           (<p! (.deactivateShadow shadow-device
+                                   #js {:pushToken (or token "") :userId target-user}))
+           (catch js/Error e
+             (log/error "Shadow Deactivated FAILED:" e)))
+         (re-frame/dispatch [:push/hydrate-status nil])))
+     {})))
 
 
 (re-frame/reg-event-fx
@@ -153,7 +154,7 @@
               room-id (.-room_id data)]
           (when room-id
             (log/info "User tapped notification for room:" room-id)
-            (re-frame/dispatch [:space/select-room room-id])))))))
+            (re-frame/dispatch [:nav/route-from-push room-id])))))))
 
 (defn url-base64->uint8-array [base64-string]
   (let [padding (.repeat "=" (mod (- 4 (mod (.-length base64-string) 4)) 4))
@@ -285,9 +286,14 @@
  :push/check-status
  (fn [_ _]
    (if (.isNativePlatform Capacitor)
-     (-> (.getActivePushUser shadow-device)
-         (.then #(re-frame/dispatch [:push/hydrate-status (.-activeUser %)]))
-         (.catch #(log/error "Failed to check native push status:" %)))
+     (go
+       (try
+         (let [res       (<p! (.getActivePushUser shadow-device))
+               user      (.-activeUser res)
+               safe-user (if (identical? user js/undefined) nil user)]
+           (re-frame/dispatch [:push/hydrate-status safe-user]))
+         (catch js/Error e
+           (log/error "Failed to check native push status:" e))))
      (check-web-push-status!
       (fn [is-enabled?]
         (if is-enabled?
@@ -299,13 +305,15 @@
 
 (re-frame/reg-event-fx
  :push/enable
- (fn [_ _]
+ (fn [{:keys [db]} _]
    (if (.isNativePlatform Capacitor)
      (go
        (try
          (let [perm (<p! (.requestPermissions PushNotifications))]
            (if (= (.-receive perm) "granted")
-             (.register PushNotifications)
+             (if-let [token (:native-token db)]
+               (re-frame/dispatch [:push/activate-shadow token])
+               (.register PushNotifications))
              (log/warn "Native notification permission denied.")))
          (catch js/Error e
            (log/error "Native Push setup failed:" e))))
