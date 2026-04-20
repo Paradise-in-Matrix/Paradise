@@ -932,6 +932,7 @@ I should clean this up, but at least it is grouped with the code for now
   background: #23a55a;
   border: 3px solid #1e1f22;
   border-radius: 50%;
+  z-index: 2;
 }
 
 .profile-popover {
