@@ -608,6 +608,16 @@ state for now.
     [:span.timeline-sender-name (truncate-name (:display-name popover-member) 20)]]
    [:span.timeline-timestamp (format-time ts)]])
 
+#+end_src
+
+
+#+begin_src :tangle ../../../css/timeline-item.css
+
+
+
+#+end_src
+
+
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
