@@ -160,7 +160,7 @@ events.
 #+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
 
 (def settings-registry
-  {;; DB Key                     Hydration Event                     Default Value
+  {;; DB Key                     Hydration Event                        Default Value
    "show_previews"              {:event :push/hydrate-previews-setting :default true}
    })
 
@@ -201,32 +201,11 @@ Moving the CSS to here
   position: relative;
 }
 
-.profile-trigger {
-  cursor: pointer;
-  position: relative;
-  transition: transform 0.1s ease;
-}
-
-.profile-trigger:active {
-  transform: scale(0.92);
-}
-
 .profile-avatar, .avatar-placeholder {
   width: 48px;
   height: 48px;
   border-radius: 50%;
   object-fit: cover;
-}
-
-.status-dot {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
-  background: #23a55a;
-  border: 3px solid #1e1f22;
-  border-radius: 50%;
 }
 
 .profile-popover {
