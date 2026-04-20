@@ -85,10 +85,19 @@ not (among many other indicators).
          (re-frame/dispatch [:space/process-hierarchy space-id (:rooms res)]))))
    {}))
 
+(re-frame/reg-event-db
+ :space/hydrate-space
+ (fn [db [_ space-id]]
+   (if (:push-routed? db)
+     db
+     (assoc db :active-space-id space-id))))
+
 (re-frame/reg-event-fx
  :space/select
  (fn [{:keys [db]} [_ space-id]]
-   (let [current-space (:active-space-id db)]
+   (let [current-space (:active-space-id db)
+         current-user       (:active-user-id db)]
+     (store/set-setting! (str "last_space_" current-user) space-id)
      (if (= current-space space-id)
        {}
        {:db (-> db
