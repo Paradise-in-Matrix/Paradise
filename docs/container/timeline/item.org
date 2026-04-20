@@ -796,6 +796,7 @@ state for now.
           :wrapper-props (merge (long-press-props open-menu-fn)
                                 {:class (str "timeline-message is-message"
                                              (when merge-with-prev? " is-merged"))})}
+
          [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
          [:div.timeline-content-wrapper
           [message-hover-toolbar item active-room my-id]
@@ -807,7 +808,9 @@ state for now.
                            :my-id my-id
                            :members-map members-map
                            :active-room active-room
-                           :event-id (:event-or-transaction-id item)}])]]
+                           :event-id (:event-or-transaction-id item)}])
+
+          ]]
         [:<>
          [sub-virtual-items content-tag item sender-name]]))))
 #+end_src
