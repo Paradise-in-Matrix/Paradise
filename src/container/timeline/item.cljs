@@ -455,17 +455,20 @@
       [system-event-view (tr [:container.timeline.status/unknown-event] [content-tag])])))
 
 (defn timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
- [:div.timeline-avatar-wrapper
+  [:div.timeline-avatar-wrapper
+   {:class (when merge-with-prev? "is-merged")}
   (when (and (= content-tag "MsgLike") (not merge-with-prev?))
     [profile-popover-trigger popover-member custom-tags active-room nil
      [avatar {:id (:user-id popover-member) :name (:display-name popover-member)
-              :url (:avatar-url popover-member) :size 32 :status :online :shape :none}]])])
+              :url (:avatar-url popover-member) :size 36 :status :online :shape :circle}]])])
+
 
 (defn timeline-header [ts merge-with-prev? popover-member custom-tags active-room]
   [:div.timeline-header
    [profile-popover-trigger popover-member custom-tags active-room nil
     [:span.timeline-sender-name (truncate-name (:display-name popover-member) 20)]]
    [:span.timeline-timestamp (format-time ts)]])
+
 
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)]
@@ -576,7 +579,7 @@
 (defmethod calc-item-height :message [msg width pretext-cache theme-metrics]
   (let [is-sequence-start? (not (:merge-with-prev? msg))
         content            (:content msg)
-        avatar-h          (:avatar-h theme-metrics 32)
+        avatar-h          (:avatar-h theme-metrics 36)
         avatar-col-w      (:avatar-col-w theme-metrics 46)
         header-h          (:header-h theme-metrics 26.8)
         seq-padding       (:seq-padding theme-metrics 10)
@@ -597,7 +600,12 @@
 
     (if is-sequence-start?
       (+ (max avatar-h (+ header-h body-h reply-h)) seq-padding reaction-h)
-      (max avatar-h (+ body-h reply-h merged-padding reaction-h)))))
+
+      (+ body-h reply-h merged-padding reaction-h)
+      #_
+
+      (max avatar-h (+ body-h reply-h merged-padding reaction-h))
+      )))
 
 
 
@@ -639,6 +647,7 @@
           :wrapper-props (merge (long-press-props open-menu-fn)
                                 {:class (str "timeline-message is-message"
                                              (when merge-with-prev? " is-merged"))})}
+
          [timeline-avatar content-tag merge-with-prev? popover-member custom-tags active-room]
          [:div.timeline-content-wrapper
           [message-hover-toolbar item active-room my-id]
@@ -650,7 +659,9 @@
                            :my-id my-id
                            :members-map members-map
                            :active-room active-room
-                           :event-id (:event-or-transaction-id item)}])]]
+                           :event-id (:event-or-transaction-id item)}])
+
+          ]]
         [:<>
          [sub-virtual-items content-tag item sender-name]]))))
 
