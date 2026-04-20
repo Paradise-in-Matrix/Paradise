@@ -4,6 +4,7 @@
    [taoensso.timbre :as log]
    [cljs-workers.core :as main]
    [client.state :as state]
+   [client.session-store :as store]
    ["react-virtuoso" :refer [Virtuoso]]
    [navigation.rooms.entry :refer [render-room-item active-call-panel]]
    [cljs.core.async :refer [go <!]]))
@@ -227,12 +228,19 @@
 (defn- is-call-room? [db room-id]
   (get-in db [:room-previews room-id :is-call?] false))
 
+(re-frame/reg-event-fx
+ :rooms/hydrate-room
+     (fn [{:keys [db]} [_ room-id]]
+      (if (:push-routed? db)
+          {}
+       {:dispatch [:rooms/select room-id]})))
 
 
 (re-frame/reg-event-fx
  :rooms/select
  (fn [{:keys [db]} [_ room-id opts]]
    (let [current-room-id (:active-room-id db)
+         current-user (:active-user-id db)
          active-call-id  (get-in db [:call :active-room-id])
          already-loaded? (get-in db [:room-members room-id :data])
          loading?        (get-in db [:room-members room-id :loading?])
@@ -247,8 +255,9 @@
          swapping-calls? (and active-call-id (not= active-call-id room-id) is-call-room?)
          current-side-panel (get-in db [:ui :side-panel])
          side-panel-update  (if (and (= current-side-panel :timeline) (not focus-override)) nil current-side-panel)]
+    (store/set-setting! (str "last_room_" current-user) room-id)
 
-     (if (= current-room-id room-id)
+    (if (= current-room-id room-id)
        {:db (assoc-in db [:ui :sidebar-open?] false) }
        (let [new-focus (if is-call-room? :call :timeline)
              base-db   (-> db
@@ -268,6 +277,7 @@
                                  (when is-call-room? [:call/init-widget room-id {:join-directly? join-directly?}])])]
          {:db base-db
           :dispatch-n dispatches})))))
+
 
 (defn filter-toggle-bar []
   (let [tr            @(re-frame/subscribe [:i18n/tr])
