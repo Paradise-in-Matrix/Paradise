@@ -76,7 +76,9 @@ Probably needs a better name (and logical grouping)
  (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials]}]]
    (when session-data
      (register-sw!)
-     (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data)))
+     (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data))
+     (store/set-setting! "last_active_user" user-id)
+     )
    (log/info "Login successful for:" user-id)
    {:db (cond-> (assoc db :auth-status :logged-in
                           :active-user-id user-id
