@@ -13,6 +13,7 @@
    [taoensso.timbre :as log]
    [cljs-workers.core :as main]
    [client.state :as state]
+   [client.session-store :as store]
    ["react-virtuoso" :refer [Virtuoso]]
    [navigation.rooms.entry :refer [render-room-item active-call-panel]]
    [cljs.core.async :refer [go <!]]))
