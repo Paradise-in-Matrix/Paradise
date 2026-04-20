@@ -14,6 +14,7 @@ Probably needs a better name (and logical grouping)
             [client.state :as state]
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
+            [client.session-store :as store]
             [utils.svg :as icons]
             [utils.net :refer [set-auth-context!]]
             [service-worker-handler :refer [register-sw!]]
