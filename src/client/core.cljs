@@ -3,7 +3,9 @@
    [utils.logger :as logger]
    [re-frame.core :as re-frame]
    [app :as app]
+   [promesa.core :as p]
    [client.state :as state]
+   [client.session-store :as store]
    [cljs-workers.core :as main]
    [cljs.core.async :refer [go <!]]
    [taoensso.timbre :as log]))
@@ -69,7 +71,12 @@
          (log/error "Failed to start sync:" (:msg res)))))
    {}))
 
-
+(re-frame/reg-event-fx
+ :sdk/ignite-session
+ (fn [_ _]
+   {:fx [[:dispatch [:sdk/start-sync]]
+         [:dispatch [:sdk/fetch-own-profile]]
+         [:dispatch [:sdk/fetch-all-emotes]]]}))
 
 (defn ^:export init []
   (app/init)
