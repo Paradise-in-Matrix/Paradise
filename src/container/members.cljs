@@ -210,7 +210,7 @@
     :class-name "text-danger"
     :action #(js/console.log "Kick:" user-id)}])
 
-(defn profile-popover-trigger [member custom-tags active-room pos & children]
+(defn profile-popover-trigger [member custom-tags active-room pos child]
   (let [open-popover! (fn [current-target]
                         (let [rect (.getBoundingClientRect current-target)
                               px (if (= pos :left)
@@ -219,28 +219,31 @@
                               py (.-top rect)]
                           (re-frame/dispatch
                            [:ui/open-popover :profile-preview
-                            {:x         px
-                             :y         py
-                             :width     265
-                             :height    150
-                             :backdrop? true
-                             :member    member
-                             :tags      custom-tags}])))]
-    (into [:div
-           {:style {:display "inline-block" :cursor "pointer"}
-            :on-click (fn [e]
-                        (.stopPropagation e)
-                        (open-popover! (.-currentTarget e)))
-            :on-context-menu (fn [e]
-                               (.preventDefault e)
-                               (.stopPropagation e)
-                               (re-frame/dispatch [:ui/close-popover])
-                               (re-frame/dispatch
-                                [:context-menu/open
-                                 {:x (.-clientX e)
-                                  :y (.-clientY e)
-                                  :items (build-member-actions tr member active-room)}]))}]
-          children)))
+                            {:x          px
+                             :y          py
+                             :width      265
+                             :height     150
+                             :backdrop?  true
+                             :member     member
+                             :tags       custom-tags}])))]
+    (let [trigger-props {:on-click (fn [e]
+                                     (.stopPropagation e)
+                                     (open-popover! (.-currentTarget e)))
+                         :on-context-menu (fn [e]
+                                            (.preventDefault e)
+                                            (.stopPropagation e)
+                                            (re-frame/dispatch [:ui/close-popover])
+                                            (re-frame/dispatch
+                                             [:context-menu/open
+                                              {:x (.-clientX e)
+                                               :y (.-clientY e)
+                                               :items (build-member-actions tr member active-room)}]))}
+
+          [tag & xs] child
+          has-props? (map? (first xs))
+          old-props  (if has-props? (first xs) {})
+          body       (if has-props? (rest xs) xs)]
+      (into [tag (merge old-props trigger-props)] body))))
 
 (defn member-item [m custom-tags active-room]
   (let [pl         (:power-level m)
