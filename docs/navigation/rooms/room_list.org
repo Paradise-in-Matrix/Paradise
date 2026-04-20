@@ -352,6 +352,12 @@ and file structures.
 (defn- is-call-room? [db room-id]
   (get-in db [:room-previews room-id :is-call?] false))
 
+(re-frame/reg-event-fx
+ :rooms/hydrate-room
+     (fn [{:keys [db]} [_ room-id]]
+      (if (:push-routed? db)
+          {}
+       {:dispatch [:rooms/select room-id]})))
 
 
 (re-frame/reg-event-fx
