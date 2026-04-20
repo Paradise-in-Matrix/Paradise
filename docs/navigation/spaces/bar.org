@@ -17,6 +17,7 @@ not (among many other indicators).
    ["react-virtuoso" :refer [Virtuoso]]
    [cljs-workers.core :as main]
    [client.state :as state]
+   [client.session-store :as store]
    [cljs.core.async :refer [go <!]]
    [overlays.settings :refer [sidebar-profile-mini]]
    [utils.svg :as icons]
