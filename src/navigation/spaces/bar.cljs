@@ -5,6 +5,7 @@
    ["react-virtuoso" :refer [Virtuoso]]
    [cljs-workers.core :as main]
    [client.state :as state]
+   [client.session-store :as store]
    [cljs.core.async :refer [go <!]]
    [overlays.settings :refer [sidebar-profile-mini]]
    [utils.svg :as icons]
@@ -67,10 +68,19 @@
          (re-frame/dispatch [:space/process-hierarchy space-id (:rooms res)]))))
    {}))
 
+(re-frame/reg-event-db
+ :space/hydrate-space
+ (fn [db [_ space-id]]
+   (if (:push-routed? db)
+     db
+     (assoc db :active-space-id space-id))))
+
 (re-frame/reg-event-fx
  :space/select
  (fn [{:keys [db]} [_ space-id]]
-   (let [current-space (:active-space-id db)]
+   (let [current-space (:active-space-id db)
+         current-user       (:active-user-id db)]
+     (store/set-setting! (str "last_space_" current-user) space-id)
      (if (= current-space space-id)
        {}
        {:db (-> db
