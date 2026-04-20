@@ -463,6 +463,13 @@ mostly just tweaking.
       font-weight: var(--chat-sender-font-weight);
       font-size: var(--chat-sender-font-size);
       color: var(--text-primary);
+      cursor: pointer;
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+      max-width: 100%;
   }
 
   .timeline-wrapper {
