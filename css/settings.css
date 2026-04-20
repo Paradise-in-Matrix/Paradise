@@ -8,32 +8,11 @@
   position: relative;
 }
 
-.profile-trigger {
-  cursor: pointer;
-  position: relative;
-  transition: transform 0.1s ease;
-}
-
-.profile-trigger:active {
-  transform: scale(0.92);
-}
-
 .profile-avatar, .avatar-placeholder {
   width: 48px;
   height: 48px;
   border-radius: 50%;
   object-fit: cover;
-}
-
-.status-dot {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
-  background: #23a55a;
-  border: 3px solid #1e1f22;
-  border-radius: 50%;
 }
 
 .profile-popover {
@@ -317,6 +296,7 @@
   background: #23a55a;
   border: 3px solid #1e1f22;
   border-radius: 50%;
+  z-index: 2;
 }
 
 .profile-popover {
