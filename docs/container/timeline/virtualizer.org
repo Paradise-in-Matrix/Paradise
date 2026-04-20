@@ -472,6 +472,8 @@ mostly just tweaking.
       max-width: 100%;
   }
 
+  .timeline-sender-name:hover {
+      text-decoration: underline;
   }
 
   .timeline-timestamp {
