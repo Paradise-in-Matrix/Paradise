@@ -344,39 +344,38 @@
 (defn kname [arg]
   (name arg))
 
-(defn avatar [{:keys [id name url size status shape] :or {size 32 shape :circle}}]
-  (r/with-let [!broken? (r/atom false)]
+(defn avatar [{:keys [id name url size status shape] :as props :or {size 32 shape :circle}}]
+  (r/with-let [!broken? (r/atom false)
+               !last-url (r/atom url)]
+    (when (not= url @!last-url)
+      (reset! !last-url url)
+      (reset! !broken? false))
+
     (let [show-image? (and url (not @!broken?))
           len         (count name)
           target      (if (#{:space :squircle :square} shape) 2 1)
           initials    (if (> len 0) (subs name 0 (min len target)) "?")
           bg-color    (if (= shape :none) "transparent" (get-avatar-color id name))
-          is-mxc?     (and url (str/starts-with? url "mxc://"))]
-      [:div.avatar-wrapper
-       {:class (kname shape)
-        :style {:width size :height size}}
-       (when-not show-image?
-         [:div.avatar-placeholder-layer
-          {:style {:background-color bg-color}}
-          (when-not (= shape :none)
-            [:span.avatar-text
-             {:style {:font-size (str (/ size (if (= shape :circle) 2.2 2.5)) "px")}}
-             initials])])
+          is-mxc?     (and url (str/starts-with? url "mxc://"))
+          dom-props   (dissoc props :id :name :url :size :status :shape)]
+      (into [:div.avatar-wrapper
+             (merge dom-props
+                    {:class (kname shape)
+                     :style (merge (:style dom-props) {:width size :height size})})]
+            [(when-not show-image?
+               [:div.avatar-placeholder-layer
+                {:style {:background-color bg-color}}
+                (when-not (= shape :none)
+                  [:span.avatar-text
+                   {:style {:font-size (str (/ size (if (= shape :circle) 2.2 2.5)) "px")}}
+                   initials])])
 
-       (when show-image?
-         (if is-mxc?
-           [mxc-image {:mxc      url
-                       :class    "avatar-img-layer"
-                       :alt      ""
-                       :on-error #(reset! !broken? true)}]
-           [:img.avatar-img-layer
-            {:src      url
-             :alt      ""
-             :on-error #(reset! !broken? true)}]))])))
-
-
-
-
+             (when show-image?
+               (if is-mxc?
+                 [mxc-image {:mxc url :class "avatar-img-layer" :alt "" :on-error #(reset! !broken? true)}]
+                 [:img.avatar-img-layer {:src url :alt "" :on-error #(reset! !broken? true)}]))
+             (when status
+               [:div.avatar-status {:class (kname status)}])]))))
 
 (defn make-swipe-handlers
   "Abstracts pointer event tracking for horizontal swipes.
