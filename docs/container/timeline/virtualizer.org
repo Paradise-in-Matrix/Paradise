@@ -476,6 +476,7 @@ mostly just tweaking.
       text-decoration: underline;
   }
 
+
   .timeline-timestamp {
       font-size: var(--chat-timestamp-font-size);
       color: var(--text-secondary, #888888);
@@ -489,27 +490,15 @@ mostly just tweaking.
       height: var(--chat-avatar-size);
   }
 
+  .timeline-avatar-wrapper.is-merged {
+      height: 0px;
+   }
+
   .timeline-content-wrapper {
       flex: 1;
       min-width: 0;
-      min-height: 25px;
-  }
-
-  .timeline-sender-name {
-      font-weight: 700;
-      color: var(--text-highlight);
-      cursor: pointer;
-      display: inline-block;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      vertical-align: bottom;
-      max-width: 100%;
-  }
-
-  .timeline-sender-name:hover {
-      text-decoration: underline;
-  }
+      min-height: 0;
+      }
 
   .timeline-body {
       min-width: 0;
@@ -760,6 +749,7 @@ mostly just tweaking.
       display: flex;
       position: relative;
       flex-direction: row;
+      align-items: flex-start;
       gap: var(--chat-avatar-gap);
       padding-left: calc(var(--chat-padding-x) / 2);
       padding-right: calc(var(--chat-padding-x) / 2);
@@ -795,7 +785,9 @@ mostly just tweaking.
       width: 100%;
       contain: layout;
       box-sizing: border-box;
+/*
       overflow-x: hidden;
+*/
       max-width: 100%;
       padding: 0;
       transform: translateZ(0);
@@ -813,8 +805,13 @@ mostly just tweaking.
 
 
   .timeline-message.is-merged {
+
+      padding-top: 0;
+      padding-bottom: calc(var(--chat-merged-padding));
+      /*
       padding-top: calc(var(--chat-merged-padding) / 2);
       padding-bottom: calc(var(--chat-merged-padding) / 2);
+     */
   }
   .timeline-item-virtual-wrapper {
       display: block;
@@ -937,7 +934,9 @@ mostly just tweaking.
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
+/*
       padding: 0 0 0 calc(var(--chat-avatar-col-w) + 2px);
+*/
   }
 
   .reaction-pill {
