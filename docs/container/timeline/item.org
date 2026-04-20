@@ -471,6 +471,8 @@ individual's display name.
 
 ***** Reaction Row
 
+****** TODO Need to calculate the height (because they can wrap)
+
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn reaction-row [{:keys [reactions my-id members-map active-room event-id]}]
   [:div.reactions-row
