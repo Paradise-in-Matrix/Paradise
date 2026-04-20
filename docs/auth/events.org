@@ -85,11 +85,10 @@ Probably needs a better name (and logical grouping)
                           :rooms/data {}
                           :timeline/current-events [])
           hs-url (assoc :homeserver-url hs-url))
-    :fx (cond-> [[:dispatch [:sdk/start-sync]]
+    :fx (cond-> [[:dispatch [:app/load-all-settings]]
+                 [:dispatch [:app/restore-user-session user-id]]
                  [:dispatch [:push/check-status]]
-                 [:dispatch [:app/load-all-settings]]
-                 [:dispatch [:sdk/fetch-all-emotes]]
-                 [:dispatch [:sdk/fetch-own-profile]]]
+                 ]
           (and credentials session-data)
           (conj [:dispatch [:push/create-sleepy-shadow
                             (assoc credentials :homeserver
