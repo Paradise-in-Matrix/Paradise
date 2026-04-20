@@ -4,6 +4,7 @@
             [client.state :as state]
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
+            [client.session-store :as store]
             [utils.svg :as icons]
             [utils.net :refer [set-auth-context!]]
             [service-worker-handler :refer [register-sw!]]
@@ -61,18 +62,19 @@
  (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials]}]]
    (when session-data
      (register-sw!)
-     (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data)))
+     (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data))
+     (store/set-setting! "last_active_user" user-id)
+     )
    (log/info "Login successful for:" user-id)
    {:db (cond-> (assoc db :auth-status :logged-in
                           :active-user-id user-id
                           :rooms/data {}
                           :timeline/current-events [])
           hs-url (assoc :homeserver-url hs-url))
-    :fx (cond-> [[:dispatch [:sdk/start-sync]]
+    :fx (cond-> [[:dispatch [:app/load-all-settings]]
+                 [:dispatch [:app/restore-user-session user-id]]
                  [:dispatch [:push/check-status]]
-                 [:dispatch [:app/load-all-settings]]
-                 [:dispatch [:sdk/fetch-all-emotes]]
-                 [:dispatch [:sdk/fetch-own-profile]]]
+                 ]
           (and credentials session-data)
           (conj [:dispatch [:push/create-sleepy-shadow
                             (assoc credentials :homeserver
@@ -86,10 +88,10 @@
  (fn [db _]
    (:active-user-id db)))
 
-
 (re-frame/reg-event-fx
  :auth/switch-account
  (fn [{:keys [db]} [_ target-user-id]]
+   (store/set-setting! "last_active_user" target-user-id)
    {:db (assoc db :auth-status :checking
                   :settings/open? false
                   :active-user-id nil
