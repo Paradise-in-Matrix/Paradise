@@ -14,7 +14,9 @@ pieces.
    [utils.logger :as logger]
    [re-frame.core :as re-frame]
    [app :as app]
+   [promesa.core :as p]
    [client.state :as state]
+   [client.session-store :as store]
    [cljs-workers.core :as main]
    [cljs.core.async :refer [go <!]]
    [taoensso.timbre :as log]))
