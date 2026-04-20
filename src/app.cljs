@@ -15,6 +15,7 @@
    [container.call.call-container :refer [persistent-call-container]]
    [client.config :refer [load-config check-remote-version load-i18n]]
    [client.state :refer [!config]]
+   [client.session-store :as store]
    [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay make-swipe-handlers]]
    ["@capacitor/status-bar" :refer [StatusBar]]
@@ -257,26 +258,70 @@
 
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
-  (-> (load-config)
-      (p/then (fn [config]
-                (reset! !config config)
-                (re-frame/dispatch-sync [:app/config-loaded config])
-                (log/info "Config loaded:" config)
-                (load-i18n)))
-      (p/then (fn [_]
-                (let [params  (js/URLSearchParams. js/window.location.search)
-                      room-id (.get params "room")]
-                  (re-frame/dispatch [:app/bootstrap])
-                  (notifications/init!)
-                  (when room-id
-                    (log/info "App started with room-id:" room-id)
-                    (re-frame/dispatch [:rooms/select room-id])
-                    (let [new-url (.. js/window -location -pathname)]
-                      (.replaceState js/window.history #js {} "" new-url))))
-                (mount-root)
-                (js/setInterval #(re-frame/dispatch [:app/poll-version false]) (* 1000 60 15))))
-      (p/catch #(log/error "App initialization failed:" %))))
+  (re-frame/dispatch [:app/start-boot-sequence])
+  (mount-root))
 
+
+(re-frame/reg-event-fx
+ :app/start-boot-sequence
+ (fn [_ _]
+   (-> (load-config)
+       (p/then (fn [config]
+                 (reset! !config config)
+                 (re-frame/dispatch-sync [:app/config-loaded config])
+                 (log/info "Config loaded:" config)
+                 (load-i18n)))
+       (p/then (fn [_]
+                 (let [params  (js/URLSearchParams. js/window.location.search)
+                       room-id (.get params "room")]
+                   (when room-id
+                     (log/info "Deep link detected on boot:" room-id)
+                     (re-frame/dispatch [:nav/lock-deep-link room-id])
+                     (.replaceState js/window.history #js {} "" (.. js/window -location -pathname)))
+
+                   (p/let [saved-user (store/get-setting "last_active_user")]
+                     (re-frame/dispatch [:app/bootstrap saved-user]))
+
+                   (notifications/init!)
+                   (js/setInterval #(re-frame/dispatch [:app/poll-version false]) (* 1000 60 15)))))
+       (p/catch #(log/error "App initialization failed:" %)))
+   {}))
+
+(re-frame/reg-event-db
+ :nav/lock-deep-link
+ (fn [db [_ room-id]]
+   (assoc db :deep-link-room room-id)))
+
+(re-frame/reg-event-fx
+ :nav/route-from-push
+ (fn [{:keys [db]} [_ room-id]]
+   (if (= (:auth-status db) :logged-in)
+     {:dispatch [:rooms/select room-id]}
+     {:dispatch [:nav/lock-deep-link room-id]})))
+
+(re-frame/reg-event-fx
+ :app/restore-user-session
+ (fn [{:keys [db]} [_ user-id]]
+   (let [deep-room (:deep-link-room db)]
+     (if deep-room
+       {:dispatch-n [[:auth/set-status :logged-in]
+                     [:rooms/select deep-room]
+                     [:sdk/ignite-session]]}
+       (do
+         (p/let [[room-id space-id] (p/all [(store/get-setting (str "last_room_" user-id))
+                                            (store/get-setting (str "last_space_" user-id))])]
+           (if room-id
+             (do
+               (log/info "Restoring session for" user-id "-> Space:" space-id "| Room:" room-id)
+               (when space-id
+                 (re-frame/dispatch [:space/select-space space-id]))
+               (re-frame/dispatch [:auth/set-status :logged-in])
+               (re-frame/dispatch [:rooms/select room-id])
+               (re-frame/dispatch [:sdk/ignite-session]))
+             (do
+               (re-frame/dispatch [:auth/set-status :logged-in])
+               (re-frame/dispatch [:sdk/ignite-session]))))
+         {})))))
 
 
 
