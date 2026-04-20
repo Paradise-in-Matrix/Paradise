@@ -618,6 +618,7 @@ state for now.
 #+end_src
 
 
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)]
     [:div.message-render-container
@@ -727,7 +728,7 @@ state for now.
 (defmethod calc-item-height :message [msg width pretext-cache theme-metrics]
   (let [is-sequence-start? (not (:merge-with-prev? msg))
         content            (:content msg)
-        avatar-h          (:avatar-h theme-metrics 32)
+        avatar-h          (:avatar-h theme-metrics 36)
         avatar-col-w      (:avatar-col-w theme-metrics 46)
         header-h          (:header-h theme-metrics 26.8)
         seq-padding       (:seq-padding theme-metrics 10)
@@ -748,7 +749,12 @@ state for now.
 
     (if is-sequence-start?
       (+ (max avatar-h (+ header-h body-h reply-h)) seq-padding reaction-h)
-      (max avatar-h (+ body-h reply-h merged-padding reaction-h)))))
+
+      (+ body-h reply-h merged-padding reaction-h)
+      #_
+
+      (max avatar-h (+ body-h reply-h merged-padding reaction-h))
+      )))
 
 
 
