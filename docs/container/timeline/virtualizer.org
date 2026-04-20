@@ -453,9 +453,10 @@ mostly just tweaking.
   .timeline-header {
       display: flex;
       height: var(--chat-header-h);
-      align-items: baseline;
-      gap: 8px;
-      padding-bottom: 4px;
+      flex-wrap: wrap;
+      align-content: flex-end;
+      align-items: center;
+      gap: 5px;
   }
 
   .timeline-sender-name {
