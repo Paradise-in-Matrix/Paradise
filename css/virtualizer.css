@@ -5,22 +5,22 @@
       --chat-avatar-col-w: calc(var(--chat-avatar-size) + var(--chat-avatar-gap));
       --chat-padding-x: 40px;
       --chat-seq-padding: 10px;
-      --chat-merged-padding: 0px;
-      --chat-header-h: 26.8px;
+      --chat-merged-padding: 5px;
+      --chat-header-h: 19px;
       --chat-system-event-h: 42px;
       --chat-reaction-row-h: 24px;
       --chat-media-margin: 0px;
       --chat-edited-label-h: 16px;
       --chat-reply-banner-h: 32.4px;
-      --chat-text-wrap-buffer: 4px;
+      --chat-text-wrap-buffer: 8px;
       --chat-url-wrap-buffer: 40px;
       --chat-quote-wrap-buffer: 19px;
       --chat-code-font: 13.68px "fira code", monospace;
       --chat-code-font-weight: 500;
       --chat-code-line-height: 20.52px;
       --chat-code-padding: 28px;
-      --chat-sender-font-size: 15.2px;
-      --chat-sender-font-weight: 400;
+      --chat-sender-font-size: 16px;
+      --chat-sender-font-weight: 600;
       --chat-timestamp-font-size: 11.2px;
       --chat-timestamp-font-weight: 400;
       --chat-state-font: italic 400 13.6px sans-serif;
@@ -74,21 +74,6 @@
 }
 
 
-
-  .timeline-header {
-      display: flex;
-      height: var(--chat-header-h);
-      align-items: baseline;
-      gap: 8px;
-      padding-bottom: 4px;
-  }
-
-  .timeline-sender-name {
-      font-weight: var(--chat-sender-font-weight);
-      font-size: var(--chat-sender-font-size);
-      color: var(--text-primary);
-  }
-
   .timeline-wrapper {
       flex: 1;
       position: relative;
@@ -98,6 +83,35 @@
       min-height: 0;
       opacity: var(--dynamic-opacity);
   }
+
+
+
+  .timeline-header {
+      display: flex;
+      height: var(--chat-header-h);
+      flex-wrap: wrap;
+      align-content: flex-end;
+      align-items: center;
+      gap: 5px;
+  }
+
+  .timeline-sender-name {
+      font-weight: var(--chat-sender-font-weight);
+      font-size: var(--chat-sender-font-size);
+      color: var(--text-primary);
+      cursor: pointer;
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+      max-width: 100%;
+  }
+
+  .timeline-sender-name:hover {
+      text-decoration: underline;
+  }
+
 
   .timeline-timestamp {
       font-size: var(--chat-timestamp-font-size);
@@ -112,27 +126,15 @@
       height: var(--chat-avatar-size);
   }
 
+  .timeline-avatar-wrapper.is-merged {
+      height: 0px;
+   }
+
   .timeline-content-wrapper {
       flex: 1;
       min-width: 0;
-      min-height: 25px;
-  }
-
-  .timeline-sender-name {
-      font-weight: 700;
-      color: var(--text-highlight);
-      cursor: pointer;
-      display: inline-block;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      vertical-align: bottom;
-      max-width: 100%;
-  }
-
-  .timeline-sender-name:hover {
-      text-decoration: underline;
-  }
+      min-height: 0;
+      }
 
   .timeline-body {
       min-width: 0;
@@ -383,6 +385,7 @@
       display: flex;
       position: relative;
       flex-direction: row;
+      align-items: flex-start;
       gap: var(--chat-avatar-gap);
       padding-left: calc(var(--chat-padding-x) / 2);
       padding-right: calc(var(--chat-padding-x) / 2);
@@ -418,7 +421,9 @@
       width: 100%;
       contain: layout;
       box-sizing: border-box;
+/*
       overflow-x: hidden;
+*/
       max-width: 100%;
       padding: 0;
       transform: translateZ(0);
@@ -436,8 +441,13 @@
 
 
   .timeline-message.is-merged {
+
+      padding-top: 0;
+      padding-bottom: calc(var(--chat-merged-padding));
+      /*
       padding-top: calc(var(--chat-merged-padding) / 2);
       padding-bottom: calc(var(--chat-merged-padding) / 2);
+     */
   }
   .timeline-item-virtual-wrapper {
       display: block;
@@ -557,7 +567,9 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
+/*
       padding: 0 0 0 calc(var(--chat-avatar-col-w) + 2px);
+*/
   }
 
   .reaction-pill {
