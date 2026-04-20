@@ -111,7 +111,7 @@
 
 
 (def settings-registry
-  {;; DB Key                     Hydration Event                     Default Value
+  {;; DB Key                     Hydration Event                        Default Value
    "show_previews"              {:event :push/hydrate-previews-setting :default true}
    })
 
