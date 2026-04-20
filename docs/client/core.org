@@ -101,7 +101,12 @@ operations here up until the point in which the client is 'started'.
          (log/error "Failed to start sync:" (:msg res)))))
    {}))
 
-
+(re-frame/reg-event-fx
+ :sdk/ignite-session
+ (fn [_ _]
+   {:fx [[:dispatch [:sdk/start-sync]]
+         [:dispatch [:sdk/fetch-own-profile]]
+         [:dispatch [:sdk/fetch-all-emotes]]]}))
 #+end_src
 
 **** Initialize the application!
