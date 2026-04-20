@@ -384,9 +384,14 @@ We embed the registration in an easily callable reframe event.
  :push/check-status
  (fn [_ _]
    (if (.isNativePlatform Capacitor)
-     (-> (.getActivePushUser shadow-device)
-         (.then #(re-frame/dispatch [:push/hydrate-status (.-activeUser %)]))
-         (.catch #(log/error "Failed to check native push status:" %)))
+     (go
+       (try
+         (let [res       (<p! (.getActivePushUser shadow-device))
+               user      (.-activeUser res)
+               safe-user (if (identical? user js/undefined) nil user)]
+           (re-frame/dispatch [:push/hydrate-status safe-user]))
+         (catch js/Error e
+           (log/error "Failed to check native push status:" e))))
      (check-web-push-status!
       (fn [is-enabled?]
         (if is-enabled?
@@ -403,13 +408,15 @@ We embed the registration in an easily callable reframe event.
 #+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
 (re-frame/reg-event-fx
  :push/enable
- (fn [_ _]
+ (fn [{:keys [db]} _]
    (if (.isNativePlatform Capacitor)
      (go
        (try
          (let [perm (<p! (.requestPermissions PushNotifications))]
            (if (= (.-receive perm) "granted")
-             (.register PushNotifications)
+             (if-let [token (:native-token db)]
+               (re-frame/dispatch [:push/activate-shadow token])
+               (.register PushNotifications))
              (log/warn "Native notification permission denied.")))
          (catch js/Error e
            (log/error "Native Push setup failed:" e))))
