@@ -18,7 +18,8 @@ aspect.
    [overlays.base :refer [popover-component]]
    [utils.global-ui :refer [avatar]]
    [utils.images :refer [mxc-image]]
-   ))
+   [plugins :as plugins]
+   [utils.macros :refer [defui]]))
 #+end_src
 
 
