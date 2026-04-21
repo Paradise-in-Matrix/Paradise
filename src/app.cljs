@@ -3,6 +3,7 @@
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [promesa.core :as p]
+   [clojure.string :as str]
    [reagent.core :as r]
    [reagent.dom.client :as rdom]
    [navigation.spaces.bar :refer [spaces-sidebar]]
@@ -156,27 +157,50 @@
 
 
 
+(re-frame/reg-event-fx
+ :ui/hydrate-theme
+ (fn [{:keys [db]} [_ theme-val]]
+   {:dispatch [:ui/switch-theme theme-val]}))
+
+(re-frame/reg-sub
+ :ui/current-theme
+ (fn [db _]
+   (:ui/current-theme db "default")))
+
+(re-frame/reg-event-fx
+ :ui/reset-theme
+ (fn [{:keys [db]} _]
+   {:db (assoc db :ui/current-theme "default")
+    :settings/save ["theme" "default"]
+    :ui/hotswap-css "css/app.css"}))
+
+
 (re-frame/reg-fx
  :ui/hotswap-css
- (fn [new-filename]
-   (let [links (.querySelectorAll js/document "link[rel='stylesheet']")
-         link (aget links 0)]
-     (if link
-       (do
-         (set! (.-href link) new-filename)
-         (log/info "Swapped CSS to:" new-filename))
-       (log/error "No stylesheet links found in document")))))
+ (fn [new-href]
+   (if-let [link (.getElementById js/document "app-theme")]
+     (do
+       (set! (.-href link) new-href)
+       (log/info "Swapped CSS to:" new-href))
+     (log/error "Theme stylesheet link #app-theme not found!"))))
 
 (re-frame/reg-event-fx
  :ui/switch-theme
- (fn [{:keys [db]} [_ theme-name]]
-   (let [filename (case theme-name
-                    :discord "cordlike.css"
-                    :matrix  "matrix.css"
-                    :retro   "retro.css"
-                    "app.css")]
-     {:db (assoc db :ui/current-theme theme-name)
-      :ui/hotswap-css (str "css/" filename)})))
+ (fn [{:keys [db]} [_ theme-val]]
+   (let [safe-theme (or theme-val "default")
+         theme-str  (if (keyword? safe-theme) (name safe-theme) safe-theme)
+         is-url?    (str/starts-with? theme-str "http")
+         href       (if is-url?
+                      theme-str
+                      (str "css/" (case (keyword theme-str)
+                                    :discord "cordlike.css"
+                                    :matrix  "matrix.css"
+                                    :retro   "retro.css"
+                                    "app.css")))]
+     {:db (assoc db :ui/current-theme theme-str)
+      :settings/save ["theme" theme-str]
+      :ui/hotswap-css href})))
+
 
 (defn booting-screen []
   (let [tr @(re-frame/subscribe [:i18n/tr])]
@@ -258,6 +282,7 @@
 
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
+  (re-frame/dispatch [:app/load-settings-by-stage :boot])
   (re-frame/dispatch [:app/start-boot-sequence])
   (mount-root))
 
@@ -314,7 +339,7 @@
              (do
                (log/info "Restoring session for" user-id "-> Space:" space-id "| Room:" room-id)
                (when space-id
-                 (re-frame/dispatch [:space/select-space space-id]))
+                 (re-frame/dispatch [:space/select space-id]))
                (re-frame/dispatch [:auth/set-status :logged-in])
                (re-frame/dispatch [:rooms/select room-id])
                (re-frame/dispatch [:sdk/ignite-session]))
