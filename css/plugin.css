@@ -1,0 +1,114 @@
+.plugin-installer-panel {
+  border: 1px solid #36393f;
+  padding: 20px;
+  border-radius: 8px;
+  background: #2f3136;
+}
+
+.theme-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #404249;
+}
+
+.plugin-installer-panel h3 {
+  color: white;
+  margin-bottom: 12px;
+}
+
+.plugin-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.theme-section .plugin-input-row {
+  margin-bottom: 16px;
+}
+
+.plugin-input {
+  flex: 1;
+}
+
+.plugin-action-btn {
+  background: #5865F2;
+  min-width: 80px;
+}
+
+.active-theme-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #202225;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #5865F2;
+}
+
+.active-theme-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.active-theme-label {
+  color: #43b581;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.active-theme-value {
+  color: #dcddde;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+.reset-theme-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.active-plugins-header {
+  color: #b5bac1;
+  margin-bottom: 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.active-plugins-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.active-plugin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #202225;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.active-plugin-url {
+  color: #dcddde;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+}
+
+.uninstall-plugin-btn {
+  background: transparent;
+  border: none;
+  color: #ed4245;
+  cursor: pointer;
+  padding: 4px;
+}
