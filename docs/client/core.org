@@ -76,7 +76,6 @@ operations here up until the point in which the client is 'started'.
  :app/bootstrap
  (fn [_ [_ target-user-id]]
    (log/debug "Bootstrapping:" target-user-id)
-   (init-worker!)
    (go
      (let [pool @state/!engine-pool
            init-res (<! (main/do-with-pool! pool {:handler :init-wasm}))]
