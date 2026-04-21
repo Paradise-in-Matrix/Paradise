@@ -332,11 +332,15 @@
     (go
       (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
         (try
-          (<p! (.sendReadReceipt tl (.-Read ReceiptType) event-id))
-          {:status :success}
-          (catch :default e {:status :error :msg (str e)}))
+          (if (str/starts-with? event-id "$")
+            (do
+              (<p! (.sendReadReceipt tl (.-Read ReceiptType) event-id))
+              {:status :success})
+            {:status :error :msg "Invalid event ID format sent to worker"})
+          (catch :default e
+            (log/error "Rust SDK rejected read receipt for ID:" event-id)
+            {:status :error :msg (str e)}))
         {:status :error :msg "Timeline not found"}))))
-
 
 (worker/register :redact-event
   (fn [{:keys [room-id msg-id]}]
