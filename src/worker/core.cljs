@@ -16,7 +16,8 @@
    [worker.members]
    [worker.composer]
    [worker.call]
-   [worker.rooms :as rooms]))
+   [worker.rooms :as rooms]
+   [sci.core :as sci]))
 
 (worker/register :init-wasm
                  (fn [_]
@@ -165,5 +166,18 @@
                          {:status :error :msg "No active client"})
                        (catch :default e
                          {:status :error :msg (str e)})))))
+
+(def worker-context
+  (sci/init
+   {:namespaces
+    {'worker {'register worker/register}}}))
+
+(worker/register :evaluate-worker-form
+  (fn [{:keys [form-str]}]
+    (try
+      (sci/eval-string form-str worker-context)
+      {:status "success"}
+      (catch :default e
+        {:status "error" :msg (str e)}))))
 
 (worker/bootstrap)
