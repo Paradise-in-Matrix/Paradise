@@ -313,8 +313,26 @@ of locations.
 #+end_src
 
 
+**** SCI Runner (not walker)
+
+This just exposes the method to SCI so we can register
+functions in the web worker from a plugin context.
 
 
+#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+(def worker-context
+  (sci/init
+   {:namespaces
+    {'worker {'register worker/register}}}))
+
+(worker/register :evaluate-worker-form
+  (fn [{:keys [form-str]}]
+    (try
+      (sci/eval-string form-str worker-context)
+      {:status "success"}
+      (catch :default e
+        {:status "error" :msg (str e)}))))
+#+end_src
 
 **** Kickoff
 
