@@ -7,6 +7,7 @@
    [overlays.base :refer [modal-component]]
    [utils.global-ui :refer [avatar]]
    [client.session-store :as store]
+   [plugins :as plugins]
    [taoensso.timbre :as log]
    [utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
@@ -109,11 +110,22 @@
  (fn [db _] (:verification/error db)))
 
 
+(defn advanced-tab []
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.settings-tab-content
+     [:h2.settings-heading (tr [:settings.advanced/title])]
+     [:div.settings-section
+      [:p.verification-description
+       (tr [:settings.advanced/description])]
+      [plugins/plugins-installer]]]))
+
 
 (def settings-registry
-  {;; DB Key                     Hydration Event                        Default Value
-   "show_previews"              {:event :push/hydrate-previews-setting :default true}
-   })
+  {;; DB Key           Hydration Event                       Default Value
+   "show_previews"  {:event :push/hydrate-previews-setting :default true      :stage  :login }
+   "theme"          {:event :ui/hydrate-theme              :default :default  :stage  :boot  }
+   "plugin_urls"    {:event :plugins/hydrate-urls          :default []        :stage  :boot  }})
+
 
 (re-frame/reg-event-fx
  :settings/load
@@ -124,12 +136,21 @@
                   (re-frame/dispatch [hydrate-event final-val])))))
    {}))
 
+(re-frame/reg-fx
+ :settings/save
+ (fn [[k v]]
+   (store/set-setting! k v)))
+
 (re-frame/reg-event-fx
- :app/load-all-settings
- (fn [_ _]
-   {:fx (mapv (fn [[db-key config]]
-                [:dispatch [:settings/load db-key (:event config) (:default config)]])
-              settings-registry)}))
+ :app/load-settings-by-stage
+ (fn [_ [_ target-stage]]
+   (let [staged-settings (filter (fn [[_ config]]
+                                   (= (:stage config) target-stage))
+                                 settings-registry)]
+     {:fx (mapv (fn [[db-key config]]
+                  [:dispatch [:settings/load db-key (:event config) (:default config)]])
+                staged-settings)})))
+
 
 
 (defn sidebar-profile-mini []
@@ -441,7 +462,12 @@
      [:div.settings-tab
       {:class (when (= active-tab :about) "is-active")
        :on-click #(re-frame/dispatch [:settings/set-tab :about])}
-      (tr [:settings.tabs/about])]]))
+      (tr [:settings.tabs/about])]
+     [:div.settings-tab
+      {:class (when (= active-tab :advanced) "is-active")
+       :on-click #(re-frame/dispatch [:settings/set-tab :advanced])}
+      (tr [:settings.tabs/advanced "Advanced"])]]))
+
 
 (defn settings-content [_props]
   (let [tr         @(re-frame/subscribe [:i18n/tr])
@@ -461,6 +487,7 @@
         :notifications [notifications-tab]
         :language-time [language-time-tab]
         :about         [about-tab]
+        :advanced      [advanced-tab]
         [:div {:style {:color "#fff"}} (tr [:settings.modal/not-found])])]]))
 
 (defmethod modal-component :settings [_]
