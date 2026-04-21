@@ -84,7 +84,7 @@ Probably needs a better name (and logical grouping)
                           :rooms/data {}
                           :timeline/current-events [])
           hs-url (assoc :homeserver-url hs-url))
-    :fx (cond-> [[:dispatch [:app/load-all-settings]]
+    :fx (cond-> [[:dispatch [:app/load-settings-by-stage :login]]
                  [:dispatch [:app/restore-user-session user-id]]
                  [:dispatch [:push/check-status]]
                  ]
