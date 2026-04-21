@@ -41,7 +41,8 @@ aspect.
 
 
 #+begin_src clojurescript :tangle ../../src/overlays/profiles.cljs
-(defn profile-preview-content [{:keys [member tags]}]
+
+(defui profile-preview-content [{:keys [member tags]}]
   (let [pl         (:power-level member)
         tag-data   (get tags (keyword (str pl)))
         role-name  (:name tag-data)
