@@ -632,7 +632,7 @@ when we detatch and reload (basically when you hit control + s to save).
              (do
                (log/info "Restoring session for" user-id "-> Space:" space-id "| Room:" room-id)
                (when space-id
-                 (re-frame/dispatch [:space/select-space space-id]))
+                 (re-frame/dispatch [:space/select space-id]))
                (re-frame/dispatch [:auth/set-status :logged-in])
                (re-frame/dispatch [:rooms/select room-id])
                (re-frame/dispatch [:sdk/ignite-session]))
