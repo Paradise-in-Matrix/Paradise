@@ -14,7 +14,6 @@
    (fn [_form _env comp-name args & body]
      (list 'do
            (list* 'defn comp-name args body)
-           (list 'js/console.log "PLUGIN OVERWRITING REGISTRY FOR:" (keyword comp-name))
            (list 'swap! 'client.state/!components 'assoc (keyword comp-name) comp-name)))))
 
 (def plugin-context
@@ -32,6 +31,5 @@
 
 
 (defn evaluate-ui-form [form-str]
-  (js/console.log "SCI RECEIVED THIS STRING TO EVALUATE:" form-str)
   (sci/eval-string form-str plugin-context))
 
