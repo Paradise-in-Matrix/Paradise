@@ -875,7 +875,12 @@ Inside the modal this is our sidebar options.
      [:div.settings-tab
       {:class (when (= active-tab :about) "is-active")
        :on-click #(re-frame/dispatch [:settings/set-tab :about])}
-      (tr [:settings.tabs/about])]]))
+      (tr [:settings.tabs/about])]
+     [:div.settings-tab
+      {:class (when (= active-tab :advanced) "is-active")
+       :on-click #(re-frame/dispatch [:settings/set-tab :advanced])}
+      (tr [:settings.tabs/advanced "Advanced"])]]))
+
 #+end_src
 
 
@@ -900,6 +905,7 @@ Inside the modal this is our sidebar options.
         :notifications [notifications-tab]
         :language-time [language-time-tab]
         :about         [about-tab]
+        :advanced      [advanced-tab]
         [:div {:style {:color "#fff"}} (tr [:settings.modal/not-found])])]]))
 #+end_src
 
