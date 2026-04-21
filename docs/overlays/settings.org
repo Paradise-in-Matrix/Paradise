@@ -28,6 +28,7 @@ Not entirely important to read, but certainly interesting.
    [overlays.base :refer [modal-component]]
    [utils.global-ui :refer [avatar]]
    [client.session-store :as store]
+   [plugins :as plugins]
    [taoensso.timbre :as log]
    [utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
