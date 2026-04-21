@@ -41,6 +41,39 @@ outputs them.
 #+end_src
 
 
+**** Plugin Macros
+
+Plugins need some macros for compile time behavior adjustments.
+The main two being providing namespaces to plugins to consume
+in their code for more idiomatic code and a macro to declare
+a UI component. Elegently written we can create a coherent
+registry of components instead of manually aggregating them.
+
+#+begin_src clojurescript :tangle ../../src/utils/macros.cljc
+
+(defmacro expose-ns [ns-sym]
+  (let [public-vars (keys (cljs.analyzer.api/ns-publics &env ns-sym))]
+    (into {}
+          (map (fn [v]
+                 [`(quote ~v) (symbol (str ns-sym "/" v))])
+               public-vars))))
+
+(defmacro defui [comp-name args & body]
+  (let [kw           (keyword comp-name)
+        default-name (symbol (str comp-name "-default"))]
+    `(do
+       (defn ~default-name ~args ~@body)
+       (swap! client.state/!components #(if (contains? % ~kw) % (assoc % ~kw ~default-name)))
+       (defn ~comp-name [& args#]
+         (let [live# (get @client.state/!components ~kw)]
+           (into [live#] args#))))))
+
+#+end_src
+
+
+
+
+
 
 **** Generating Translation map (Depreciated)
 
