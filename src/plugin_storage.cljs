@@ -31,7 +31,9 @@
        (set! (.-onerror script) #(reject (str "Failed to load script: " url)))
        (.appendChild js/document.head script)))))
 
-
+(defn remove-css! [id]
+  (when-let [link (.getElementById js/document id)]
+    (.remove link)))
 
 (rf/reg-event-fx
  :plugins/hydrate-urls
