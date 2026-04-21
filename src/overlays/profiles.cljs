@@ -3,11 +3,13 @@
    [overlays.base :refer [popover-component]]
    [utils.global-ui :refer [avatar]]
    [utils.images :refer [mxc-image]]
-   ))
+   [plugins :as plugins]
+   [utils.macros :refer [defui]]))
 
 
 
-(defn profile-preview-content [{:keys [member tags]}]
+
+(defui profile-preview-content [{:keys [member tags]}]
   (let [pl         (:power-level member)
         tag-data   (get tags (keyword (str pl)))
         role-name  (:name tag-data)
@@ -33,8 +35,8 @@
                        :class "member-item-role-icon"
                        :alt role-name}])
          [:span.profile-preview-role-text {:style {:color role-color}}
-          role-name]])]]))
-
+          role-name]])
+      [plugins/plugin-slot :profile-actions {:member member}]]]))
 
 (defmethod popover-component :profile-preview [_]
   profile-preview-content)
