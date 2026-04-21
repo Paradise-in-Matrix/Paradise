@@ -176,12 +176,21 @@ events.
                   (re-frame/dispatch [hydrate-event final-val])))))
    {}))
 
+(re-frame/reg-fx
+ :settings/save
+ (fn [[k v]]
+   (store/set-setting! k v)))
+
 (re-frame/reg-event-fx
- :app/load-all-settings
- (fn [_ _]
-   {:fx (mapv (fn [[db-key config]]
-                [:dispatch [:settings/load db-key (:event config) (:default config)]])
-              settings-registry)}))
+ :app/load-settings-by-stage
+ (fn [_ [_ target-stage]]
+   (let [staged-settings (filter (fn [[_ config]]
+                                   (= (:stage config) target-stage))
+                                 settings-registry)]
+     {:fx (mapv (fn [[db-key config]]
+                  [:dispatch [:settings/load db-key (:event config) (:default config)]])
+                staged-settings)})))
+
 
 #+end_src
 
