@@ -438,7 +438,6 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
             {:status :error :msg (str e)}))
         {:status :error :msg "Timeline not found"}))))
 
-
 (worker/register :redact-event
   (fn [{:keys [room-id msg-id]}]
     (go
