@@ -86,15 +86,12 @@ Probably needs a better name (and logical grouping)
           hs-url (assoc :homeserver-url hs-url))
     :fx (cond-> [[:dispatch [:app/load-settings-by-stage :login]]
                  [:dispatch [:app/restore-user-session user-id]]
-                 [:dispatch [:push/check-status]]
-                 ]
+                 [:dispatch [:push/check-status]]]
           (and credentials session-data)
           (conj [:dispatch [:push/create-sleepy-shadow
                             (assoc credentials :homeserver
                                    (:homeserverUrl session-data)
-                                   :userId user-id
-                                       )]]))}))
-
+                                   :userId user-id)]]))}))
 
 (re-frame/reg-sub
  :auth/active-user-id
