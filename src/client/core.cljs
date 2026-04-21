@@ -46,7 +46,6 @@
  :app/bootstrap
  (fn [_ [_ target-user-id]]
    (log/debug "Bootstrapping:" target-user-id)
-   (init-worker!)
    (go
      (let [pool @state/!engine-pool
            init-res (<! (main/do-with-pool! pool {:handler :init-wasm}))]
@@ -79,6 +78,7 @@
          [:dispatch [:sdk/fetch-all-emotes]]]}))
 
 (defn ^:export init []
+  (init-worker!)
   (app/init)
   (logger/init!)
   (log/debug  "Entering Paradise!")
