@@ -147,6 +147,26 @@
    {:set-status "Set Status"
     :copy-id "Copy ID"
     :logout "Log Out"}
+   :advanced {
+              :description  "Install custom modifications. Proceed with caution."
+              :title "Plugins & Themes"
+              }
+   :plugins {
+             :themes-title "Custom Themes"
+             :active-custom-theme "Active Custom Theme"
+             :reset-default "Reset Default"
+             :plugins-title "Install Plugin"
+             :apply "Apply"
+             :placeholder-theme-url "https://example.com/my-theme.css"
+             :placeholder-plugin-url "https://raw.githubusercontent.com/.../plugin.edn"
+             :install "Install"
+
+             :active-plugins "Active Plugins"
+             :unknown-plugin "Unknown Plugin"
+             :no-description "No description provided"
+             :uninstall-plugin "Uninstall Plugin"
+             }
+
    :verification
    {:title "Device Verification"
     :description "Enter your Security Key or Recovery Passphrase to verify this session and unlock encrypted messages."
