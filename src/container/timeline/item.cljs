@@ -157,12 +157,11 @@
          (when (.-isIntersecting entry)
            (let [target   (.-target entry)
                  event-id (.getAttribute target "data-event-id")]
-             (when event-id
-               (log/error "Read test?")
+             (when (and event-id (str/starts-with? event-id "$"))
                (.unobserve observer target)
-               (re-frame/dispatch [:msg/mark-visible event-id])
-               )))))
+               (re-frame/dispatch [:msg/mark-visible event-id]))))))
      #js {:threshold 0.5})))
+
 
 (defn build-message-actions [item active-room current-user-id x y]
   (let [tr               @(re-frame/subscribe [:i18n/tr])
