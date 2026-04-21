@@ -17,6 +17,25 @@
   [obj prop]
   `(js/goog.object.get ~obj ~(name prop)))
 
+
+(defmacro expose-ns [ns-sym]
+  (let [public-vars (keys (cljs.analyzer.api/ns-publics &env ns-sym))]
+    (into {}
+          (map (fn [v]
+                 [`(quote ~v) (symbol (str ns-sym "/" v))])
+               public-vars))))
+
+(defmacro defui [comp-name args & body]
+  (let [kw           (keyword comp-name)
+        default-name (symbol (str comp-name "-default"))]
+    `(do
+       (defn ~default-name ~args ~@body)
+       (swap! client.state/!components #(if (contains? % ~kw) % (assoc % ~kw ~default-name)))
+       (defn ~comp-name [& args#]
+         (let [live# (get @client.state/!components ~kw)]
+           (into [live#] args#))))))
+
+
 (defmacro gen-translation-map [dir-path]
   (let [files (filter #(.endsWith (.getName %) ".json") 
                       (file-seq (io/file dir-path)))
