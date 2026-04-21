@@ -68,8 +68,8 @@ aspect.
                        :class "member-item-role-icon"
                        :alt role-name}])
          [:span.profile-preview-role-text {:style {:color role-color}}
-          role-name]])]]))
-
+          role-name]])
+      [plugins/plugin-slot :profile-actions {:member member}]]]))
 
 (defmethod popover-component :profile-preview [_]
   profile-preview-content)
