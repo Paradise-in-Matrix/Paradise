@@ -48,7 +48,6 @@ export default defineConfig(({ mode }) => {
         root: "./build",
         plugins: [
             wasm(),
-
             commonjs({
                 filter(id) {
                     if (
@@ -74,7 +73,7 @@ export default defineConfig(({ mode }) => {
                     swSrc: "./sw.js",
                     swDest: "./dist/sw.js",
                     globIgnores: ["**/*.wasm", "**/element-call/assets/*"],
-                    maximumFileSizeToCacheInBytes: 7340032,
+                    maximumFileSizeToCacheInBytes: 10485760,
                 },
                 devOptions: {
                     enabled: false,
