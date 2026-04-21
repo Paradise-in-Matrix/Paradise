@@ -63,25 +63,21 @@
    (when session-data
      (register-sw!)
      (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data))
-     (store/set-setting! "last_active_user" user-id)
-     )
+     (store/set-setting! "last_active_user" user-id))
    (log/info "Login successful for:" user-id)
    {:db (cond-> (assoc db :auth-status :logged-in
                           :active-user-id user-id
                           :rooms/data {}
                           :timeline/current-events [])
           hs-url (assoc :homeserver-url hs-url))
-    :fx (cond-> [[:dispatch [:app/load-all-settings]]
+    :fx (cond-> [[:dispatch [:app/load-settings-by-stage :login]]
                  [:dispatch [:app/restore-user-session user-id]]
-                 [:dispatch [:push/check-status]]
-                 ]
+                 [:dispatch [:push/check-status]]]
           (and credentials session-data)
           (conj [:dispatch [:push/create-sleepy-shadow
                             (assoc credentials :homeserver
                                    (:homeserverUrl session-data)
-                                   :userId user-id
-                                       )]]))}))
-
+                                   :userId user-id)]]))}))
 
 (re-frame/reg-sub
  :auth/active-user-id
