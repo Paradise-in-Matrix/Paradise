@@ -74,6 +74,17 @@ boot errors of the app.
 killall Xcode
 
 
+If the Package Dependencies fail and clearing Derived Data doesn't seem to work...
+It is likely this file:
+ios/App/CapApp-SPM/Package.swift
+
+Change the line at the top to // swift-tools-version: 6.3.1
+
+I wish I was kidding.
+
+
+
+
 
 #+begin_src
 
