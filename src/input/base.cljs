@@ -13,7 +13,8 @@
             [utils.svg :as icons]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
-            [client.state :as state]))
+            [client.state :as state]
+            [plugins :as plugins]))
 
 (re-frame/reg-event-fx
  :sdk/upload-media
