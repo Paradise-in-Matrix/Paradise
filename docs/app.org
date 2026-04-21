@@ -29,6 +29,7 @@ actual UI components themselves.
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [promesa.core :as p]
+   [clojure.string :as str]
    [reagent.core :as r]
    [reagent.dom.client :as rdom]
    [navigation.spaces.bar :refer [spaces-sidebar]]
