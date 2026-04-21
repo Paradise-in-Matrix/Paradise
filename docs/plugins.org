@@ -1,0 +1,654 @@
+
+** Plugins
+
+
+**** Preface
+
+An important part of why we would choose a LISP based language is the aspect of
+homoiconicity. This allows us to provide developers a way to modify the behavior
+of the client without inherently having to modify upstream repo. Instead of
+making derivative works they can make plugins. A goal we want to have with this
+is that the entirety of the client should be able to be modded.
+
+I imagine initial mod support will be somewhat limited, but as I continue
+development on the project we can provide more and more functionality.
+
+So starting this we'll opt to keep it on the simpler side to just showcase
+modular behavior.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../src/plugins.cljs
+(ns plugins
+  (:require
+   [re-frame.core :as re-frame]
+   [reagent.core :as r]
+   [client.state :as state]
+   [utils.svg :as icons]
+   [plugin-storage]
+   [clojure.string :as str]))
+
+#+end_src
+
+
+
+**** Plugin Slots
+
+So my initial thoughts are a simple slot based system in which
+components can be quickly added.
+However, we also want to be sure we can provide a wrapper pattern.
+
+
+
+#+begin_src clojurescript :tangle ../src/plugins.cljs
+(defn build-wrapped-component [base-comp wrappers]
+  (reduce (fn [acc-comp plugin]
+            (fn [props]
+              ((:wrapper plugin) acc-comp props)))
+          base-comp
+          (sort-by :priority wrappers)))
+#+end_src
+
+
+Need to ensure the components get memoized otherwise a parent component
+remounting will destroy the wrapped one and obliterate state.
+
+#+begin_src clojurescript :tangle ../src/plugins.cljs
+(def memoized-wrapped-component (memoize build-wrapped-component))
+#+end_src
+
+
+As for the actual plugin slots they just need to check wrap the components
+and provide a default if no plugin exists.
+#+begin_src clojurescript :tangle ../src/plugins.cljs
+(defn plugin-slot [slot-id props & children]
+  (let [plugins   (state/get-slot slot-id)
+        wrappers  (filter :wrapper plugins)
+        injectors (filter :component plugins)
+        base-comp (fn [] (into [:<>] children))]
+    [:<>
+     (if (seq wrappers)
+       [(memoized-wrapped-component base-comp wrappers) props]
+       (into [:<>] children))
+     (for [{:keys [id component]} injectors]
+       ^{:key id} [component props])]))
+
+#+end_src
+
+
+
+**** Reframe Logic
+
+We quite literally want to keep a registry, and want to be able to apply mods
+on the fly.
+
+#+begin_src clojurescript :tangle ../src/plugins.cljs
+(re-frame/reg-event-db
+ :plugin/register
+ (fn [db [_ slot-id plugin-map]]
+   (update-in db [:plugins slot-id] (fnil conj []) plugin-map)))
+
+(re-frame/reg-event-db
+ :plugin/deregister
+ (fn [db [_ slot-id plugin-id]]
+   (update-in db [:plugins slot-id]
+              (fn [plugins]
+                (into [] (remove #(= (:id %) plugin-id) plugins))))))
+
+(re-frame/reg-sub
+ :plugins/all
+ (fn [db _]
+   (:plugins db)))
+
+(re-frame/reg-sub
+ :plugins/by-slot
+ :<- [:plugins/all]
+ (fn [plugins [_ slot-id]]
+   (get plugins slot-id [])))
+
+
+(defn security-warning-modal []
+  (let [pending-plugin @(re-frame/subscribe [:plugins/pending-security-approval])]
+    (when pending-plugin
+      [:div {:style {:position "fixed" :top 0 :left 0 :width "100%" :height "100%"
+                     :background "rgba(0,0,0,0.8)" :display "flex" :justify-content "center"
+                     :align-items "center" :z-index 9999}}
+       [:div {:style {:background "#2f3136" :padding "24px" :border-radius "8px" :max-width "500px" :border "1px solid #ed4245"}}
+        [:h2 {:style {:color "#ed4245" :margin-top 0}} "Security Warning"]
+        [:p {:style {:color "#dcddde"}} 
+         "The plugin " [:strong (:name (:plugin-map pending-plugin))] 
+         " is requesting to load external JavaScript from the internet."]
+        
+        [:div {:style {:background "#202225" :padding "12px" :border-radius "4px" :margin "16px 0" :font-family "monospace" :color "#b5bac1"}}
+         (for [script (:external-scripts (:plugin-map pending-plugin))]
+           ^{:key script} [:div script])]
+        
+        [:p {:style {:color "#dcddde" :font-size "14px"}} 
+         "Only allow this if you absolutely trust the developer. Malicious scripts can compromise your session."]
+        
+        [:div {:style {:display "flex" :justify-content "flex-end" :gap "12px" :margin-top "24px"}}
+         [:button.form-button {:on-click #(re-frame/dispatch [:plugins/cancel-install])} "Cancel"]
+         [:button.form-button.destructive 
+          {:style {:background "#ed4245" :color "white" :border "none"}
+           :on-click #(re-frame/dispatch [:plugins/execute-boot-sequence 
+                                          (:url pending-plugin) 
+                                          (:plugin-map pending-plugin)])} 
+          "I understand the risks, Install"]]]])))
+
+(defn plugins-installer []
+  (let [plugin-url-input (r/atom "")
+        theme-url-input  (r/atom "")]
+    (fn []
+      (let [installed-urls @(re-frame/subscribe [:plugins/installed-urls])
+            current-theme  @(re-frame/subscribe [:ui/current-theme])
+            custom-theme?  (and (string? current-theme)
+                                (str/starts-with? current-theme "http"))]
+        [:div.plugin-installer-panel
+         {:style {:border "1px solid #36393f" :padding "20px" :border-radius "8px" :background "#2f3136"}}
+         
+         [security-warning-modal]
+
+         [:div.theme-section {:style {:margin-bottom "32px" :padding-bottom "24px" :border-bottom "1px solid #404249"}}
+          [:h3 {:style {:color "white" :margin-bottom "12px"}} "Custom Theme"]
+
+          [:div {:style {:display "flex" :gap "8px" :margin-bottom "16px"}}
+           [:input.form-input {:type "text" :placeholder "https://example.com/my-theme.css"
+                               :style {:flex 1}
+                               :value @theme-url-input
+                               :on-change #(reset! theme-url-input (.. % -target -value))}]
+           [:button.form-button
+            {:disabled (empty? @theme-url-input)
+             :style {:background "#5865F2" :min-width "80px"}
+             :on-click #(do
+                          (re-frame/dispatch [:ui/switch-theme @theme-url-input])
+                          (reset! theme-url-input ""))}
+            "Apply"]]
+          (when custom-theme?
+            [:div {:style {:display "flex" :justify-content "space-between" :align-items "center"
+                           :background "#202225" :padding "8px 12px" :border-radius "4px" :border "1px solid #5865F2"}}
+             [:div {:style {:display "flex" :flex-direction "column"}}
+              [:span {:style {:color "#43b581" :font-size "11px" :text-transform "uppercase" :font-weight "bold" :margin-bottom "4px"}} "Active Custom Theme"]
+              [:span {:style {:color "#dcddde" :font-size "13px" :overflow "hidden" :text-overflow "ellipsis" :white-space "nowrap" :max-width "300px"}}
+               current-theme]]
+             [:button.form-button.destructive
+              {:style {:padding "6px 12px" :font-size "12px" :margin 0}
+               :on-click #(re-frame/dispatch [:ui/reset-theme])}
+              "Reset Default"]])]
+
+         [:div.plugin-section
+          [:h3 {:style {:color "white" :margin-bottom "12px"}} "Install Plugin"]
+          [:div {:style {:display "flex" :gap "8px" :margin-bottom "24px"}}
+           [:input.form-input {:type "text" :placeholder "https://raw.githubusercontent.com/.../plugin.edn"
+                               :style {:flex 1}
+                               :value @plugin-url-input
+                               :on-change #(reset! plugin-url-input (.. % -target -value))}]
+           [:button.form-button
+            {:disabled (empty? @plugin-url-input)
+             :style {:background "#5865F2" :min-width "80px"}
+             :on-click #(do
+                          (re-frame/dispatch [:plugins/install-from-url @plugin-url-input])
+                          (reset! plugin-url-input ""))}
+            "Install"]]
+
+          (when (seq installed-urls)
+            [:<>
+             [:h4 {:style {:color "#b5bac1" :margin-bottom "12px" :font-size "12px" :text-transform "uppercase" :letter-spacing "0.5px"}} 
+              "Active Plugins"]
+             [:div {:style {:display "flex" :flex-direction "column" :gap "8px"}}
+              (for [url installed-urls]
+                ^{:key url}
+                [:div {:style {:display "flex" :justify-content "space-between" :align-items "center" 
+                               :background "#202225" :padding "8px 12px" :border-radius "4px"}}
+                 [:span {:style {:color "#dcddde" :font-size "13px" :overflow "hidden" :text-overflow "ellipsis" :white-space "nowrap" :max-width "80%"}} 
+                  url]
+                 [:button {:style {:background "transparent" :border "none" :color "#ed4245" :cursor "pointer" :padding "4px"}
+                           :title "Uninstall Plugin"
+                           :on-click #(re-frame/dispatch [:plugins/uninstall-url url])}
+                  "🗑️"]])]])]]))))
+
+#+end_src
+
+
+**** Examples
+
+
+Something important to note, but as we provide CSS for a more pleasant
+base theme-ing experience. This may been mods might have to also
+overwrite the components class.
+
+#+begin_src clojurescript
+
+{:id :sso-button-mod
+ :component (fn [props]
+              [:button
+               {:style {:width "100%"
+                        :background "#1e1f22"
+                        :color "white"
+                        :padding "10px"
+                        :margin-bottom "16px"
+                        :border "1px solid #5865F2"
+                        :cursor "pointer"}
+                :on-click #(println "cat")}
+               "Print cat in console"])}
+
+#+end_src
+
+
+
+
+
+
+
+**** SCI Runner
+
+
+***** Imports
+
+#+begin_src clojurescript :tangle ../src/sci_runner.cljs
+(ns sci-runner
+  (:require
+   [sci.core :as sci]
+   [re-frame.core :as rf]
+   [reagent.core :as r]
+   [client.state :as state]))
+
+#+end_src
+
+
+#+begin_src clojurescript :tangle ../src/sci_runner.cljs
+
+
+(def defoverride-macro
+  (sci/new-macro-var
+   'defoverride
+   (fn [_form _env comp-name args & body]
+     (list 'do
+           (list* 'defn comp-name args body)
+           (list 'js/console.log "PLUGIN OVERWRITING REGISTRY FOR:" (keyword comp-name))
+           (list 'swap! 'client.state/!components 'assoc (keyword comp-name) comp-name)))))
+
+(def plugin-context
+  (sci/init
+   {:namespaces
+    {'user {'defoverride defoverride-macro}
+     're-frame.core {'dispatch rf/dispatch
+                     'subscribe rf/subscribe}
+     'reagent.core  {'as-element r/as-element}
+     'client.state  {'!components state/!components
+                     'reg-slot-item state/reg-slot-item
+                     'get-slot state/get-slot
+                     '!config state/!config}}
+    :classes {'js goog/global}}))
+
+
+(defn evaluate-ui-form [form-str]
+  (js/console.log "SCI RECEIVED THIS STRING TO EVALUATE:" form-str)
+  (sci/eval-string form-str plugin-context))
+
+
+#+end_src
+
+
+
+
+**** Plugin Store
+
+***** Imports
+
+#+begin_src clojurescript :tangle ../src/plugin_storage.cljs
+(ns plugin-storage
+  (:require
+   [re-frame.core :as rf]
+   [cljs.reader :as reader]
+   [cljs.core.async :refer [go <!]]
+   [cljs.core.async.interop :refer-macros [<p!]]
+   [promesa.core :as p]
+   [cljs-workers.core :as main]
+   [sci-runner :as runner]
+   [client.state :as state]
+   ))
+
+#+end_src
+
+
+#+begin_src clojurescript :tangle ../src/plugin_storage.cljs
+
+
+(defn inject-css! [id url]
+  (when-not (.getElementById js/document id)
+    (let [link (.createElement js/document "link")]
+      (set! (.-id link) id)
+      (set! (.-rel link) "stylesheet")
+      (set! (.-href link) url)
+      (.appendChild js/document.head link))))
+
+(defn inject-script! [url]
+  (p/create
+   (fn [resolve reject]
+     (let [script (.createElement js/document "script")]
+       (set! (.-src script) url)
+       (set! (.-crossOrigin script) "anonymous")
+       (set! (.-onload script) #(resolve true))
+       (set! (.-onerror script) #(reject (str "Failed to load script: " url)))
+       (.appendChild js/document.head script)))))
+
+
+
+(rf/reg-event-fx
+ :plugins/hydrate-urls
+ (fn [{:keys [db]} [_ raw-urls]]
+   (let [urls (if (js/Array.isArray raw-urls)
+                (vec (js->clj raw-urls))
+                [])]
+     {:db (assoc db :plugins/installed-urls urls)
+      :dispatch-n (mapv (fn [url] [:plugins/fetch-and-boot url]) urls)})))
+
+(rf/reg-event-fx
+ :plugins/install-from-url
+ (fn [{:keys [db]} [_ url]]
+   (let [current-urls (:plugins/installed-urls db [])
+         new-urls     (vec (distinct (conj current-urls url)))]
+     {:db (assoc db :plugins/installed-urls new-urls)
+      :settings/save ["plugin_urls" (clj->js new-urls)]
+      :dispatch [:plugins/fetch-and-boot url]})))
+
+
+(rf/reg-event-fx
+ :plugins/uninstall-url
+ (fn [{:keys [db]} [_ url]]
+   (let [current-urls (:plugins/installed-urls db [])
+         new-urls     (vec (remove #(= % url) current-urls))
+         plugin       (->> (:plugins/active db)
+                           (vals)
+                           (filter #(= (:source-url %) url))
+                           first)
+         plugin-id    (:id plugin)]
+     (when plugin-id
+       (remove-css! (str "plugin-css-" (name plugin-id))))
+
+     {:db (-> db
+              (assoc :plugins/installed-urls new-urls)
+              (update :plugins/active dissoc plugin-id))
+      :settings/save ["plugin_urls" (clj->js new-urls)]})))
+
+(rf/reg-event-fx
+ :plugins/fetch-and-boot
+ (fn [{:keys [db]} [_ url]]
+   (-> (js/fetch url)
+       (.then (fn [resp]
+                (if (.-ok resp) (.text resp)
+                    (throw (js/Error. (str "Failed to fetch plugin: " (.-status resp)))))))
+       (.then (fn [edn-string]
+                (let [plugin-map (reader/read-string edn-string)]
+                  (if (seq (:external-scripts plugin-map))
+                    (rf/dispatch [:plugins/prompt-security-warning url plugin-map])
+                    (rf/dispatch [:plugins/execute-boot-sequence url plugin-map])))))
+       (.catch (fn [err]
+                 (js/console.error "Plugin boot failed for" url "-" err))))
+   {:db (assoc db :plugins/installing? true)}))
+
+(rf/reg-event-fx
+ :plugins/execute-boot-sequence
+ (fn [{:keys [db]} [_ url plugin-map]]
+   (go
+     (try
+       (when-let [css-url (:theme-url plugin-map)]
+         (inject-css! (str "plugin-css-" (name (:id plugin-map))) css-url))
+
+       (when-let [scripts (:external-scripts plugin-map)]
+         (doseq [script-url scripts]
+           (<p! (inject-script! script-url))))
+
+       (when-let [worker-form (:worker-form-str plugin-map)]
+         (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                           {:handler :evaluate-worker-form
+                                            :arguments {:form-str worker-form}}))]
+           (when (= (:status res) "error")
+             (throw (js/Error. (str "Worker Eval Failed: " (:msg res)))))))
+
+       (when-let [ui-form (:ui-form-str plugin-map)]
+         (runner/evaluate-ui-form ui-form))
+
+       (rf/dispatch [:plugins/installation-success url plugin-map])
+
+       (catch :default e
+         (js/console.error "Plugin Boot Sequence Failed:" e)
+         (rf/dispatch [:plugins/installation-failed url (str e)]))))
+   {}))
+
+(rf/reg-event-db
+ :plugins/installation-success
+ (fn [db [_ source-url plugin-map]]
+   (-> db
+       (assoc :plugins/pending-security-approval nil
+              :plugins/installing? false)
+       (update-in [:plugins/active (:id plugin-map)]
+                  (constantly (assoc plugin-map :source-url source-url))))))
+
+(rf/reg-event-db
+ :plugins/installation-failed
+ (fn [db [_ source-url error-msg]]
+   (assoc db :plugins/pending-security-approval nil
+             :plugins/installing? false)))
+
+(rf/reg-event-db
+ :plugins/prompt-security-warning
+ (fn [db [_ url plugin-map]]
+   (assoc db :plugins/pending-security-approval {:url url :plugin-map plugin-map})))
+
+(rf/reg-event-db
+ :plugins/cancel-install
+ (fn [db _]
+   (assoc db :plugins/pending-security-approval nil
+             :plugins/installing? false)))
+
+
+(rf/reg-sub
+ :plugins/active-list
+ (fn [db _]
+   (vals (:plugins/active db {}))))
+
+(rf/reg-sub :plugins/installed-urls (fn [db _] (:plugins/installed-urls db [])))
+(rf/reg-sub :plugins/pending-security-approval (fn [db _] (:plugins/pending-security-approval db)))
+
+
+#+end_src
+
+
+
+
+#+begin_src clojurescript :tangle ../src/plugins.cljs
+(defn plugins-installer []
+  (let [tr      @(re-frame/subscribe [:i18n/tr])
+        plugin-url-input (r/atom "")
+        theme-url-input  (r/atom "")]
+    (fn []
+      (let [installed-urls @(re-frame/subscribe [:plugins/installed-urls])
+            active-plugins @(re-frame/subscribe [:plugins/active-list])
+            current-theme  @(re-frame/subscribe [:ui/current-theme])
+            custom-theme?  (and (string? current-theme)
+                                (str/starts-with? current-theme "http"))]
+        [:div.plugin-installer-panel
+         [:div.theme-section
+          [:h3 (tr [:settings.plugins/themes-title])]
+
+          [:div.plugin-input-row
+           [:input.form-input.plugin-input
+            {:type "text"
+             :placeholder (tr [:settings.plugins/placeholder-theme-url])
+             :value @theme-url-input
+             :on-change #(reset! theme-url-input (.. % -target -value))}]
+           [:button.form-button.plugin-action-btn
+            {:disabled (empty? @theme-url-input)
+             :on-click #(do
+                          (re-frame/dispatch [:ui/switch-theme @theme-url-input])
+                          (reset! theme-url-input ""))}
+            (tr [:settings.plugins/apply])
+            ]]
+          (when custom-theme?
+            [:div.active-theme-card
+             [:div.active-theme-info
+              [:span.active-theme-label
+               (tr [:settings.plugins/active-custom-theme])]
+              [:span.active-theme-value current-theme]]
+             [:button.form-button.destructive.reset-theme-btn
+              {:on-click #(re-frame/dispatch [:ui/reset-theme])}
+              (tr [:settings.plugins/reset-default])
+              ]])]
+
+         [:div.plugin-section
+          [:h3 (tr [:settings.plugins/plugins-title])]
+          [:div.plugin-input-row
+           [:input.form-input.plugin-input
+            {:type "text"
+             :placeholder (tr [:settings.plugins/placeholder-plugin-url])
+             :value @plugin-url-input
+             :on-change #(reset! plugin-url-input (.. % -target -value))}]
+           [:button.form-button.plugin-action-btn
+            {:disabled (empty? @plugin-url-input)
+             :on-click #(do
+                          (re-frame/dispatch [:plugins/install-from-url @plugin-url-input])
+                          (reset! plugin-url-input ""))}
+            (tr [:settings.plugins/install])
+            ]]
+
+          (when (seq active-plugins)
+           [:<>
+            [:h4.active-plugins-header (tr [:settings.plugins/active-plugins])]
+            [:div.active-plugins-list
+             (for [plugin active-plugins]
+               ^{:key (:id plugin)}
+               [:div.active-plugin-item
+                [:div.active-plugin-meta
+                 [:div {:style {:display "flex" :align-items "center" :gap "8px"}}
+                  [:span.active-plugin-name (:name plugin (tr [:settings.plugins/unknown-plugin]))]
+                  [:span.active-plugin-version (str "v" (:version plugin "1.0.0"))]]
+                 [:span.active-plugin-desc (:description plugin (tr [:settings.plugins/no-description]))]]
+                [:button.uninstall-plugin-btn
+                 {:title (tr [:settings.plugins/uninstall-plugin])
+                  :on-click #(re-frame/dispatch [:plugins/uninstall-url (:source-url plugin)])}
+                 [icons/trash]]])]])]]))))
+#+end_src
+
+
+#+begin_src css :tangle ../css/plugin.css
+.plugin-installer-panel {
+  border: 1px solid #36393f;
+  padding: 20px;
+  border-radius: 8px;
+  background: #2f3136;
+}
+
+.theme-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #404249;
+}
+
+.plugin-installer-panel h3 {
+  color: white;
+  margin-bottom: 12px;
+}
+
+.plugin-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.theme-section .plugin-input-row {
+  margin-bottom: 16px;
+}
+
+.plugin-input {
+  flex: 1;
+}
+
+.plugin-action-btn {
+  background: #5865F2;
+  min-width: 80px;
+}
+
+.active-theme-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #202225;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #5865F2;
+}
+
+.active-theme-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.active-theme-label {
+  color: #43b581;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.active-theme-value {
+  color: #dcddde;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+.reset-theme-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.active-plugins-header {
+  color: #b5bac1;
+  margin-bottom: 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.active-plugins-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.active-plugin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #202225;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.active-plugin-url {
+  color: #dcddde;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+}
+
+.uninstall-plugin-btn {
+  background: transparent;
+  border: none;
+  color: #ed4245;
+  cursor: pointer;
+  padding: 4px;
+}
+
+#+end_src
+
+
+
