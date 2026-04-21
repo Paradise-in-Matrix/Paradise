@@ -31,7 +31,8 @@ if applicable.
    [worker.members]
    [worker.composer]
    [worker.call]
-   [worker.rooms :as rooms]))
+   [worker.rooms :as rooms]
+   [sci.core :as sci]))
 #+end_src
 
 
