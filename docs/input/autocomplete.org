@@ -23,7 +23,10 @@ and the tab completion.
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [utils.images :refer [mxc->url mxc-image]]
-   [utils.global-ui :refer [avatar]]))
+   [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
+
+
+   ))
 #+end_src
 
 
