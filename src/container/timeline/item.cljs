@@ -123,15 +123,25 @@
        (doseq [[room-id event-id] pending]
          (when (not= (get-in db [:read-receipts :sent room-id]) event-id)
            (go
-             (let [res (<! (main/do-with-pool! @state/!engine-pool
-                                               {:handler :send-receipt
-                                                :arguments {:room-id room-id :event-id event-id}}))]
-               (log/error event-id)
-               (log/error res)
-               (if (= (:status res) "success")
-                 (re-frame/dispatch [:msg/receipt-sent room-id event-id])
-                 (log/error "Receipt flush failed:" res)))))))
+             (try
+               (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                                 {:handler :send-receipt
+                                                  :arguments {:room-id room-id :event-id event-id}}))]
+                 (if (= (:status res) "success")
+                   (re-frame/dispatch [:msg/receipt-sent room-id event-id])
+                   (do
+                     (log/error "Receipt flush failed for" room-id ":" (:msg res))
+                     (when-not (str/includes? (str (:msg res)) "Timeline not found")
+                       (re-frame/dispatch [:msg/requeue-receipt room-id event-id])))))
+                 (catch :default e
+                 (log/error "Worker crashed sending receipt:" e)
+                 (re-frame/dispatch [:msg/requeue-receipt room-id event-id])))))))
      {:db (assoc-in db [:read-receipts :pending] {})})))
+
+(re-frame/reg-event-db
+ :msg/requeue-receipt
+ (fn [db [_ room-id event-id]]
+   (assoc-in db [:read-receipts :pending room-id] event-id)))
 
 (re-frame/reg-event-db
  :msg/receipt-sent
@@ -244,6 +254,7 @@
   (r/with-let [room-id      @(re-frame/subscribe [:rooms/active-id])
                event-id     (:id event)
                info         (:info content)
+               source-url   (:url content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
