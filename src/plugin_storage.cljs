@@ -52,17 +52,19 @@
 (rf/reg-event-fx
  :plugins/toggle-plugin
  (fn [{:keys [db]} [_ url enabled?]]
-   (let [disabled (set (:plugins/disabled-urls db #{}))
+   (let [disabled     (set (:plugins/disabled-urls db #{}))
          new-disabled (if enabled? (disj disabled url) (conj disabled url))
-         plugin (->> (:plugins/active db) (vals) (filter #(= (:source-url %) url)) first)]
-     (when (and (not enabled?) (:id plugin))
-       (remove-css! (str "plugin-css-" (name (:id plugin)))))
+         plugin       (->> (:plugins/active db) (vals) (filter #(= (:source-url %) url)) first)
+         plugin-id    (:id plugin)]
+     (when (and (not enabled?) plugin-id)
+       (remove-css! (str "plugin-css-" (name plugin-id)))
+       (client.state/remove-plugin-overrides! plugin-id)
+       (client.state/remove-plugin-slots! plugin-id)
+       )
 
-     {:db (assoc db :plugins/disabled-urls new-disabled)
-      :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]
-      :dispatch (when enabled? [:plugins/execute-boot-sequence url plugin])})))
-
-
+     (cond-> {:db (assoc db :plugins/disabled-urls new-disabled)
+              :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]}
+       enabled? (assoc :dispatch [:plugins/execute-boot-sequence url plugin])))))
 
 (rf/reg-event-fx
  :plugins/install-from-url
@@ -89,18 +91,17 @@
  (fn [{:keys [db]} [_ url]]
    (let [current-urls (:plugins/installed-urls db [])
          new-urls     (vec (remove #(= % url) current-urls))
-         plugin       (->> (:plugins/active db)
-                           (vals)
-                           (filter #(= (:source-url %) url))
-                           first)
+         plugin       (->> (:plugins/active db) (vals) (filter #(= (:source-url %) url)) first)
          plugin-id    (:id plugin)]
      (when plugin-id
-       (remove-css! (str "plugin-css-" (name plugin-id))))
+       (remove-css! (str "plugin-css-" (name plugin-id)))
+       (client.state/remove-plugin-overrides! plugin-id))
 
      {:db (-> db
               (assoc :plugins/installed-urls new-urls)
               (update :plugins/active dissoc plugin-id))
       :settings/save ["plugin_urls" (clj->js new-urls)]})))
+
 
 (rf/reg-event-fx
  :plugins/fetch-and-boot
@@ -138,7 +139,7 @@
              (throw (js/Error. (str "Worker Eval Failed: " (:msg res)))))))
 
        (when-let [ui-form (:ui-form-str plugin-map)]
-         (runner/evaluate-ui-form ui-form))
+         (runner/evaluate-ui-form (:id plugin-map) ui-form))
 
        (rf/dispatch [:plugins/installation-success url plugin-map])
 
@@ -146,15 +147,6 @@
          (js/console.error "Plugin Boot Sequence Failed:" e)
          (rf/dispatch [:plugins/installation-failed url (str e)]))))
    {}))
-
-(rf/reg-event-db
- :plugins/installation-success
- (fn [db [_ source-url plugin-map]]
-   (-> db
-       (assoc :plugins/pending-security-approval nil
-              :plugins/installing? false)
-       (update-in [:plugins/active (:id plugin-map)]
-                  (constantly (assoc plugin-map :source-url source-url))))))
 
 (rf/reg-event-db
  :plugins/installation-failed
