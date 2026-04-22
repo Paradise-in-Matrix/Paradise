@@ -44,14 +44,44 @@
      {:db (assoc db :plugins/installed-urls urls)
       :dispatch-n (mapv (fn [url] [:plugins/fetch-and-boot url]) urls)})))
 
+(rf/reg-sub
+ :plugins/disabled-urls
+ (fn [db _]
+   (set (:plugins/disabled-urls db #{}))))
+
+(rf/reg-event-fx
+ :plugins/toggle-plugin
+ (fn [{:keys [db]} [_ url enabled?]]
+   (let [disabled (set (:plugins/disabled-urls db #{}))
+         new-disabled (if enabled? (disj disabled url) (conj disabled url))
+         plugin (->> (:plugins/active db) (vals) (filter #(= (:source-url %) url)) first)]
+     (when (and (not enabled?) (:id plugin))
+       (remove-css! (str "plugin-css-" (name (:id plugin)))))
+
+     {:db (assoc db :plugins/disabled-urls new-disabled)
+      :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]
+      :dispatch (when enabled? [:plugins/execute-boot-sequence url plugin])})))
+
+
+
 (rf/reg-event-fx
  :plugins/install-from-url
  (fn [{:keys [db]} [_ url]]
+   {:db (assoc db :plugins/installing? true)
+    :dispatch [:plugins/fetch-and-boot url]}))
+
+(rf/reg-event-fx
+ :plugins/installation-success
+ (fn [{:keys [db]} [_ source-url plugin-map]]
    (let [current-urls (:plugins/installed-urls db [])
-         new-urls     (vec (distinct (conj current-urls url)))]
-     {:db (assoc db :plugins/installed-urls new-urls)
-      :settings/save ["plugin_urls" (clj->js new-urls)]
-      :dispatch [:plugins/fetch-and-boot url]})))
+         new-urls     (vec (distinct (conj current-urls source-url)))]
+     {:db (-> db
+              (assoc :plugins/pending-security-approval nil
+                     :plugins/installing? false
+                     :plugins/installed-urls new-urls)
+              (update-in [:plugins/active (:id plugin-map)]
+                         (constantly (assoc plugin-map :source-url source-url))))
+      :settings/save ["plugin_urls" (clj->js new-urls)]})))
 
 
 (rf/reg-event-fx
@@ -151,4 +181,3 @@
 
 (rf/reg-sub :plugins/installed-urls (fn [db _] (:plugins/installed-urls db [])))
 (rf/reg-sub :plugins/pending-security-approval (fn [db _] (:plugins/pending-security-approval db)))
-
