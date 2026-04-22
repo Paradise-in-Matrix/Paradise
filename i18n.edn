@@ -142,7 +142,9 @@
           :accounts "Accounts"
           :notifications "Notifications"
           :language-time "Language/Time"
-          :about "About"}
+          :about "About"
+          :advanced "Advanced"
+          }
    :groups {:user-settings "User Settings"
             :app "App"}
    :modal {:esc "ESC"
