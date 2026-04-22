@@ -562,11 +562,21 @@ overwrite the components class.
 (rf/reg-event-fx
  :plugins/install-from-url
  (fn [{:keys [db]} [_ url]]
+   {:db (assoc db :plugins/installing? true)
+    :dispatch [:plugins/fetch-and-boot url]}))
+
+(rf/reg-event-fx
+ :plugins/installation-success
+ (fn [{:keys [db]} [_ source-url plugin-map]]
    (let [current-urls (:plugins/installed-urls db [])
-         new-urls     (vec (distinct (conj current-urls url)))]
-     {:db (assoc db :plugins/installed-urls new-urls)
-      :settings/save ["plugin_urls" (clj->js new-urls)]
-      :dispatch [:plugins/fetch-and-boot url]})))
+         new-urls     (vec (distinct (conj current-urls source-url)))]
+     {:db (-> db
+              (assoc :plugins/pending-security-approval nil
+                     :plugins/installing? false
+                     :plugins/installed-urls new-urls)
+              (update-in [:plugins/active (:id plugin-map)]
+                         (constantly (assoc plugin-map :source-url source-url))))
+      :settings/save ["plugin_urls" (clj->js new-urls)]})))
 
 
 (rf/reg-event-fx
