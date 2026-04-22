@@ -103,6 +103,14 @@
       :settings/save ["plugin_urls" (clj->js new-urls)]})))
 
 
+(rf/reg-event-db
+ :plugins/hydrate-disabled-urls
+ (fn [db [_ raw-urls]]
+   (let [urls (if (js/Array.isArray raw-urls)
+                (set (js->clj raw-urls))
+                #{})]
+     (assoc db :plugins/disabled-urls urls))))
+
 (rf/reg-event-fx
  :plugins/fetch-and-boot
  (fn [{:keys [db]} [_ url]]
@@ -111,10 +119,14 @@
                 (if (.-ok resp) (.text resp)
                     (throw (js/Error. (str "Failed to fetch plugin: " (.-status resp)))))))
        (.then (fn [edn-string]
-                (let [plugin-map (reader/read-string edn-string)]
-                  (if (seq (:external-scripts plugin-map))
-                    (rf/dispatch [:plugins/prompt-security-warning url plugin-map])
-                    (rf/dispatch [:plugins/execute-boot-sequence url plugin-map])))))
+                (let [plugin-map    (reader/read-string edn-string)
+                      disabled-urls (:plugins/disabled-urls db #{})
+                      disabled?     (contains? disabled-urls url)]
+                  (if disabled?
+                    (rf/dispatch [:plugins/installation-success url plugin-map])
+                    (if (seq (:external-scripts plugin-map))
+                      (rf/dispatch [:plugins/prompt-security-warning url plugin-map])
+                      (rf/dispatch [:plugins/execute-boot-sequence url plugin-map]))))))
        (.catch (fn [err]
                  (js/console.error "Plugin boot failed for" url "-" err))))
    {:db (assoc db :plugins/installing? true)}))
