@@ -532,6 +532,7 @@ providing the encapsulation and parsing for us.
                 [container]])
          [modal-root]
          [popover-root]
+         [global-key-listener]
          [global-context-menu]]
         [:div "Unknown State"]))))
 
