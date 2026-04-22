@@ -458,3 +458,41 @@
                                 :background   "var(--background-primary, #313338)"
                                 :user-select  (if is-dragging? "none" "auto")}})]
                children)]))))
+
+(defn handle-list-navigation
+  [^js e items current-index set-index-fn on-select-fn]
+  (let [key   (.-key e)
+        limit (count items)]
+    (if (and (#{"ArrowUp" "ArrowDown" "Enter" "Tab"} key) (pos? limit))
+      (do
+        (case key
+          "ArrowUp"   (set-index-fn (mod (dec current-index) limit))
+          "ArrowDown" (set-index-fn (mod (inc current-index) limit))
+          ("Enter" "Tab") (on-select-fn (nth items current-index)))
+        (.preventDefault e)
+        (.stopPropagation e)
+        true)
+      false)))
+
+(defn selectable-list
+  [{:keys [items selected-index on-select on-highlight key-fn render-item item-class empty-text]}]
+  (if (empty? items)
+    [:div.selectable-list-empty (or empty-text "No results found.")]
+    [:div.selectable-list-container
+     (doall
+      (map-indexed
+       (fn [idx item]
+         (let [selected? (= idx selected-index)]
+           ^{:key (key-fn item)}
+           [:div
+            {:class [(or item-class "selectable-item") (when selected? "is-selected")]
+             :ref (fn [el]
+                    (when (and selected? el)
+                      (.scrollIntoView el #js {:block "nearest" :behavior "auto"})))
+             :on-mouse-enter #(when on-highlight (on-highlight idx))
+             :on-mouse-down (fn [e]
+                              (.preventDefault e)
+                              (.stopPropagation e)
+                              (on-select item))}
+            (render-item item selected?)]))
+       items))]))
