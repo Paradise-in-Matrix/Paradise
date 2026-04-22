@@ -348,6 +348,7 @@ read receipts. This prevents any sort of spamming to the home server.
   (r/with-let [room-id      @(re-frame/subscribe [:rooms/active-id])
                event-id     (:id event)
                info         (:info content)
+               source-url   (:url content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))

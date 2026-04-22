@@ -204,6 +204,7 @@ mostly just tweaking.
             cnt              (count ordered-events)
             loading?         @(re-frame/subscribe [:timeline/loading-more? room-id])
             loading-forward? @(re-frame/subscribe [:timeline/loading-forward? room-id])
+            back-dead?       @(re-frame/subscribe [:timeline/back-dead? room-id])
             jump-target      @(re-frame/subscribe [:timeline/jump-target-id room-id])
             focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])
             width            @!container-width
@@ -252,6 +253,17 @@ mostly just tweaking.
                  (reset! !initialized? true)
                  (reset! !at-bottom? (not jump-target)))))
            0))
+
+        (when (and @!scroll-ref
+                 @!initialized?
+                 (pos? cnt)
+                 (not loading?)
+                 (not back-dead?)
+                 (< total-height (.-clientHeight @!scroll-ref)))
+        (js/setTimeout
+         (fn []
+           (re-frame/dispatch [:sdk/back-paginate room-id]))
+         50))
 
         [:div.timeline-wrapper
          {:ref (fn [el]
