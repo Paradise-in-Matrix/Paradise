@@ -121,10 +121,11 @@
 
 
 (def settings-registry
-  {;; DB Key           Hydration Event                       Default Value
-   "show_previews"  {:event :push/hydrate-previews-setting :default true      :stage  :login }
-   "theme"          {:event :ui/hydrate-theme              :default :default  :stage  :boot  }
-   "plugin_urls"    {:event :plugins/hydrate-urls          :default []        :stage  :boot  }})
+  {;; DB Key                  Hydration Event                       Default Value
+   "show_previews"         {:event :push/hydrate-previews-setting :default true      :stage  :login }
+   "theme"                 {:event :ui/hydrate-theme              :default :default  :stage  :boot  }
+   "disabled_plugin_urls"  {:event :plugins/hydrate-disabled-urls :default []        :stage  :boot  }
+   "plugin_urls"           {:event :plugins/hydrate-urls          :default []        :stage  :boot  }})
 
 
 (re-frame/reg-event-fx
@@ -466,7 +467,7 @@
      [:div.settings-tab
       {:class (when (= active-tab :advanced) "is-active")
        :on-click #(re-frame/dispatch [:settings/set-tab :advanced])}
-      (tr [:settings.tabs/advanced "Advanced"])]]))
+      (tr [:settings.tabs/advanced])]]))
 
 
 (defn settings-content [_props]
