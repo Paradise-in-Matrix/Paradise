@@ -879,7 +879,7 @@ Inside the modal this is our sidebar options.
      [:div.settings-tab
       {:class (when (= active-tab :advanced) "is-active")
        :on-click #(re-frame/dispatch [:settings/set-tab :advanced])}
-      (tr [:settings.tabs/advanced "Advanced"])]]))
+      (tr [:settings.tabs/advanced])]]))
 
 #+end_src
 
