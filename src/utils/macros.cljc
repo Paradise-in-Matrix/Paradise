@@ -32,7 +32,10 @@
        (defn ~default-name ~args ~@body)
        (swap! client.state/!components #(if (contains? % ~kw) % (assoc % ~kw ~default-name)))
        (defn ~comp-name [& args#]
-         (let [live# (get @client.state/!components ~kw)]
+         (let [override# (get @client.state/!active-overrides ~kw)
+               live#     (if override#
+                           (:fn override#)
+                           (get @client.state/!components ~kw))]
            (into [live#] args#))))))
 
 
