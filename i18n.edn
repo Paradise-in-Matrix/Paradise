@@ -123,7 +123,11 @@
     :headers {:home "Paradise"}}
    :spaces
    {:bars {:home "Paradise"}}}
-
+  :quick-switcher
+  {:placeholder "Jump to a room..."
+   :empty "No rooms found."
+   :loading "Loading..."
+   }
   :lightbox
   {:open-original "Open Original"
    :download "Download"
