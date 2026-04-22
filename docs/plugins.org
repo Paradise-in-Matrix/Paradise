@@ -598,18 +598,17 @@ overwrite the components class.
  (fn [{:keys [db]} [_ url]]
    (let [current-urls (:plugins/installed-urls db [])
          new-urls     (vec (remove #(= % url) current-urls))
-         plugin       (->> (:plugins/active db)
-                           (vals)
-                           (filter #(= (:source-url %) url))
-                           first)
+         plugin       (->> (:plugins/active db) (vals) (filter #(= (:source-url %) url)) first)
          plugin-id    (:id plugin)]
      (when plugin-id
-       (remove-css! (str "plugin-css-" (name plugin-id))))
+       (remove-css! (str "plugin-css-" (name plugin-id)))
+       (client.state/remove-plugin-overrides! plugin-id))
 
      {:db (-> db
               (assoc :plugins/installed-urls new-urls)
               (update :plugins/active dissoc plugin-id))
       :settings/save ["plugin_urls" (clj->js new-urls)]})))
+
 
 (rf/reg-event-fx
  :plugins/fetch-and-boot
