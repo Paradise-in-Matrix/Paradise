@@ -266,6 +266,16 @@ forward.
  :input/context
  (fn [db [_ room-id]]
    (get-in db [:input-context room-id])))
+
+(re-frame/reg-fx
+ :input/focus-composer
+ (fn [_]
+   (js/setTimeout
+    (fn []
+      (when-let [composer (.querySelector js/document ".ProseMirror")]
+        (.focus composer)))
+    50)))
+
 #+end_src
 
 
