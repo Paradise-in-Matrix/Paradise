@@ -433,6 +433,7 @@ Ideally, we should break this apart more later.
                   :onEditorReady #(reset! !editor %)
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
                   :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
+           [plugins/plugin-slot :composer-actions {:room-id active-id}]
            [:button.timeline-emoji-btn
             {:on-click (fn [e]
                          (.stopPropagation e)
