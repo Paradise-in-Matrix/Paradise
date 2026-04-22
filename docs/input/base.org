@@ -329,7 +329,7 @@ Ideally, we should break this apart more later.
 ***** Component
 
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
-(defn message-input []
+(defui message-input []
   (r/with-let [!picker-open? (r/atom false)
                !editor       (r/atom nil)
                !sug-command  (r/atom nil)]
@@ -341,6 +341,20 @@ Ideally, we should break this apart more later.
             cached-html @(re-frame/subscribe [:composer/cached-html active-id])
             context     @(re-frame/subscribe [:input/context active-id])
             tr          @(re-frame/subscribe [:i18n/tr])]
+            tr          @(re-frame/subscribe [:i18n/tr])
+            submit-message! (fn []
+                              (when-let [ed @!editor]
+                                (let [text        (.getText ed)
+                                      matrix-html (get-matrix-formatted-body ed)
+                                      can-send?   (or (not (str/blank? text))
+                                                      (str/includes? matrix-html "<img")
+                                                      (seq attachments))]
+                                  (if can-send?
+                                    (do
+                                      (re-frame/dispatch [:composer/submit active-id text matrix-html])
+                                      (-> ed .chain .clearContent .run)
+                                      true)
+                                    false))))]
         [:div.timeline-input-outer
          [suggestion-menu
           (fn [item]
