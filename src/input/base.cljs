@@ -165,6 +165,16 @@
  (fn [db [_ room-id]]
    (get-in db [:input-context room-id])))
 
+(re-frame/reg-fx
+ :input/focus-composer
+ (fn [_]
+   (js/setTimeout
+    (fn []
+      (when-let [composer (.querySelector js/document ".ProseMirror")]
+        (.focus composer)))
+    50)))
+
+
 (defn inline-editor [item active-id]
   (r/with-let [!editor (r/atom nil)]
     (fn [item active-id]
