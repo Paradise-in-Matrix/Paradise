@@ -11,6 +11,7 @@
             [utils.images :refer [mxc->url]]
             [utils.helpers :refer [truncate-name]]
             [utils.svg :as icons]
+            [utils.macros :refer [defui]]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
             [client.state :as state]
@@ -204,7 +205,7 @@
                                            (re-frame/dispatch [:msg/edit active-id item text matrix-html])
                                            (re-frame/dispatch [:input/clear-context active-id]))))} "save"]]]))))
 
-(defn message-input []
+(defui message-input []
   (r/with-let [!picker-open? (r/atom false)
                !editor       (r/atom nil)
                !sug-command  (r/atom nil)]
@@ -215,7 +216,20 @@
             loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])
             cached-html @(re-frame/subscribe [:composer/cached-html active-id])
             context     @(re-frame/subscribe [:input/context active-id])
-            tr          @(re-frame/subscribe [:i18n/tr])]
+            tr          @(re-frame/subscribe [:i18n/tr])
+            submit-message! (fn []
+                              (when-let [ed @!editor]
+                                (let [text        (.getText ed)
+                                      matrix-html (get-matrix-formatted-body ed)
+                                      can-send?   (or (not (str/blank? text))
+                                                      (str/includes? matrix-html "<img")
+                                                      (seq attachments))]
+                                  (if can-send?
+                                    (do
+                                      (re-frame/dispatch [:composer/submit active-id text matrix-html])
+                                      (-> ed .chain .clearContent .run)
+                                      true)
+                                    false))))]
         [:div.timeline-input-outer
          [suggestion-menu
           (fn [item]
@@ -287,16 +301,7 @@
                   :cachedHtml cached-html
                   :onChange (fn [text html]
                               (re-frame/dispatch [:composer/on-change active-id text html]))
-                  :onSend (fn [text html]
-                            (let [matrix-html (get-matrix-formatted-body @!editor)
-                                  can-send? (or (not (str/blank? text))
-                                                (str/includes? matrix-html "<img")
-                                                (seq attachments))]
-                              (if can-send?
-                                (do
-                                  (re-frame/dispatch [:composer/submit active-id text matrix-html])
-                                  true)
-                                false)))
+                  :onSend submit-message!
                   :onFiles (fn [files]
                              (let [file-array (js/Array.from files)]
                                (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))
@@ -304,8 +309,19 @@
                   :onEditorReady #(reset! !editor %)
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
                   :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
+           [plugins/plugin-slot :composer-actions {:room-id active-id}]
            [:button.timeline-emoji-btn
             {:on-click (fn [e]
                          (.stopPropagation e)
                          (swap! !picker-open? not))}
-            [icons/smiley]]]]]))))
+            [icons/smiley]]
+           [:button.timeline-send-btn
+            {:on-click (fn [e]
+                         (.preventDefault e)
+                         (.stopPropagation e)
+                         (submit-message!))}
+            [icons/send]]
+
+
+           ]]]))))
+
