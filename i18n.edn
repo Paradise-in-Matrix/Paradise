@@ -152,11 +152,16 @@
               :title "Plugins & Themes"
               }
    :plugins {
+             :security-title "Security Warning"
+             :plugin-request "The plugin %1 is requesting to load external JavaScript from the internet."
+             :warning-message "Only allow this if you absolutely trust the developer. Malicious scripts can compromise your session."
+             :warning-confirmation "I understand the risks, Install"
              :themes-title "Custom Themes"
              :active-custom-theme "Active Custom Theme"
              :reset-default "Reset Default"
              :plugins-title "Install Plugin"
              :apply "Apply"
+             :cancel "Cancel"
              :placeholder-theme-url "https://example.com/my-theme.css"
              :placeholder-plugin-url "https://raw.githubusercontent.com/.../plugin.edn"
              :install "Install"
