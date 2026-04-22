@@ -190,6 +190,11 @@ that is currently on screen.
      {:db (assoc-in db [:read-receipts :pending] {})})))
 
 (re-frame/reg-event-db
+ :msg/requeue-receipt
+ (fn [db [_ room-id event-id]]
+   (assoc-in db [:read-receipts :pending room-id] event-id)))
+
+(re-frame/reg-event-db
  :msg/receipt-sent
  (fn [db [_ room-id event-id]]
    (assoc-in db [:read-receipts :sent room-id] event-id)))
