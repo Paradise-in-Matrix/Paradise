@@ -1,0 +1,43 @@
+
+** Key Handler
+
+
+**** Preface
+
+For early instances of this, it'll more or less just be a simple local
+key listener.
+
+Later, we'll expand it to handle native input for features like push to talk.
+
+
+**** Imports
+
+
+#+begin_src clojurescript :tangle ../../src/client/key_handler.cljs
+(ns client.key-handler
+  (:require [reagent.core :as r]
+   [utils.macros :refer [defui]]
+   [re-frame.core :as re-frame]
+            ))
+
+#+end_src
+
+
+**** Global Key Listener
+
+
+#+begin_src clojurescript :tangle ../../src/client/key_handler.cljs
+(defui global-key-listener []
+  (r/with-let [handler (fn [e]
+                         (when (and (= (.-key e) "k")
+                                    (or (.-metaKey e) (.-ctrlKey e)))
+                           (.preventDefault e)
+                           (re-frame/dispatch [:ui/open-modal :quick-switcher
+                                               {:backdrop-props {:class "lightbox-backdrop"}
+                                                :window-props   {:style {:background "transparent"
+                                                                      :box-shadow "none"}}}])))]
+    (.addEventListener js/window "keydown" handler)
+    (finally
+      (.removeEventListener js/window "keydown" handler))))
+#+end_src
+
