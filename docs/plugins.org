@@ -559,17 +559,19 @@ overwrite the components class.
 (rf/reg-event-fx
  :plugins/toggle-plugin
  (fn [{:keys [db]} [_ url enabled?]]
-   (let [disabled (set (:plugins/disabled-urls db #{}))
+   (let [disabled     (set (:plugins/disabled-urls db #{}))
          new-disabled (if enabled? (disj disabled url) (conj disabled url))
-         plugin (->> (:plugins/active db) (vals) (filter #(= (:source-url %) url)) first)]
-     (when (and (not enabled?) (:id plugin))
-       (remove-css! (str "plugin-css-" (name (:id plugin)))))
+         plugin       (->> (:plugins/active db) (vals) (filter #(= (:source-url %) url)) first)
+         plugin-id    (:id plugin)]
+     (when (and (not enabled?) plugin-id)
+       (remove-css! (str "plugin-css-" (name plugin-id)))
+       (client.state/remove-plugin-overrides! plugin-id)
+       (client.state/remove-plugin-slots! plugin-id)
+       )
 
-     {:db (assoc db :plugins/disabled-urls new-disabled)
-      :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]
-      :dispatch (when enabled? [:plugins/execute-boot-sequence url plugin])})))
-
-
+     (cond-> {:db (assoc db :plugins/disabled-urls new-disabled)
+              :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]}
+       enabled? (assoc :dispatch [:plugins/execute-boot-sequence url plugin])))))
 
 (rf/reg-event-fx
  :plugins/install-from-url
