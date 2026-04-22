@@ -100,6 +100,9 @@
    :placeholder "Type a message..."
    :emotes
    {:no-emotes "No emotes found for this space."
+    :search-placeholder "Search emojis..."
+    :no-results "No emojis found."
+
     :default-title "Emotes"
     :mode-inline "Inline"
     :mode-sticker "Sticker"}
