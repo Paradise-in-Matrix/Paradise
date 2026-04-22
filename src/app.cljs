@@ -7,8 +7,10 @@
    [reagent.core :as r]
    [reagent.dom.client :as rdom]
    [navigation.spaces.bar :refer [spaces-sidebar]]
+   [client.key-handler :refer [global-key-listener]]
    [overlays.notifications :as notifications]
    [overlays.settings]
+   [overlays.quick-switcher]
    [overlays.lightbox]
    [overlays.profiles]
    [overlays.reactions]
@@ -256,6 +258,7 @@
                 [container]])
          [modal-root]
          [popover-root]
+         [global-key-listener]
          [global-context-menu]]
         [:div "Unknown State"]))))
 
