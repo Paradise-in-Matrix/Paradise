@@ -340,7 +340,6 @@ Ideally, we should break this apart more later.
             loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])
             cached-html @(re-frame/subscribe [:composer/cached-html active-id])
             context     @(re-frame/subscribe [:input/context active-id])
-            tr          @(re-frame/subscribe [:i18n/tr])]
             tr          @(re-frame/subscribe [:i18n/tr])
             submit-message! (fn []
                               (when-let [ed @!editor]
@@ -426,16 +425,7 @@ Ideally, we should break this apart more later.
                   :cachedHtml cached-html
                   :onChange (fn [text html]
                               (re-frame/dispatch [:composer/on-change active-id text html]))
-                  :onSend (fn [text html]
-                            (let [matrix-html (get-matrix-formatted-body @!editor)
-                                  can-send? (or (not (str/blank? text))
-                                                (str/includes? matrix-html "<img")
-                                                (seq attachments))]
-                              (if can-send?
-                                (do
-                                  (re-frame/dispatch [:composer/submit active-id text matrix-html])
-                                  true)
-                                false)))
+                  :onSend submit-message!
                   :onFiles (fn [files]
                              (let [file-array (js/Array.from files)]
                                (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))
