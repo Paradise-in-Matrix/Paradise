@@ -26,6 +26,7 @@ https://github.com/matrix-org/matrix-spec-proposals/pull/2545
    [reagent.core :as r]
    [utils.helpers :refer [fetch-state-event fetch-room-state]]
    [utils.global-ui :refer [click-away-wrapper]]
+   [utils.macros :refer [defui]]
    [utils.images :refer [mxc-image]]
    ["emojibase-data/en/data.json" :as emoji-data]
    ["react" :as react]
