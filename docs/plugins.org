@@ -131,7 +131,6 @@ on the fly.
          (tr [:settings.plugins/warning-confirmation])]]])))
 
 
-
 (defn plugins-installer []
   (let [tr               @(re-frame/subscribe [:i18n/tr])
         plugin-url-input (r/atom "")
@@ -626,10 +625,14 @@ overwrite the components class.
                 (if (.-ok resp) (.text resp)
                     (throw (js/Error. (str "Failed to fetch plugin: " (.-status resp)))))))
        (.then (fn [edn-string]
-                (let [plugin-map (reader/read-string edn-string)]
-                  (if (seq (:external-scripts plugin-map))
-                    (rf/dispatch [:plugins/prompt-security-warning url plugin-map])
-                    (rf/dispatch [:plugins/execute-boot-sequence url plugin-map])))))
+                (let [plugin-map    (reader/read-string edn-string)
+                      disabled-urls (:plugins/disabled-urls db #{})
+                      disabled?     (contains? disabled-urls url)]
+                  (if disabled?
+                    (rf/dispatch [:plugins/installation-success url plugin-map])
+                    (if (seq (:external-scripts plugin-map))
+                      (rf/dispatch [:plugins/prompt-security-warning url plugin-map])
+                      (rf/dispatch [:plugins/execute-boot-sequence url plugin-map]))))))
        (.catch (fn [err]
                  (js/console.error "Plugin boot failed for" url "-" err))))
    {:db (assoc db :plugins/installing? true)}))
