@@ -322,6 +322,9 @@ Making sure this is dynamic, but abstract is important for now.
 @import "profiles.css";
 @import "search.css";
 @import "pins.css";
+@import "plugin.css";
+@import "switcher.css";
+
 
 html, body {
     margin: 0;
