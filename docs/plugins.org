@@ -646,7 +646,7 @@ overwrite the components class.
              (throw (js/Error. (str "Worker Eval Failed: " (:msg res)))))))
 
        (when-let [ui-form (:ui-form-str plugin-map)]
-         (runner/evaluate-ui-form ui-form))
+         (runner/evaluate-ui-form (:id plugin-map) ui-form))
 
        (rf/dispatch [:plugins/installation-success url plugin-map])
 
