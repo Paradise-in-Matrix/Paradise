@@ -372,7 +372,7 @@
         (let [client     @state/!client
               session    (.session client)
               hs-url     (.-homeserverUrl session)
-              server     (clojure.string/replace (str hs-url) #"/+$" "")
+              server     (str/replace (str hs-url) #"/+$" "")
               ffi-source (when event-id (get @state/!media-cache event-id))]
 
           (cond
@@ -381,27 +381,31 @@
                   file-info  (.-file source-map)]
               (if-not file-info
                 (let [mxc       (or source (.-url source-map) (some-> source-map .-plain .-url) "")
-                      resource  (clojure.string/replace (str mxc) #"^mxc://" "")
-                      fetch-url (cljs.core/str server "/_matrix/client/v1/media/download/" resource)
-                      resp      (<p! (net/fetch fetch-url))
-                      buf       (<p! (.arrayBuffer resp))]
-                  {:status "success" :bytes buf :transfer [:bytes]})
+                      resource  (str/replace (str mxc) #"^mxc://" "")
+                      fetch-url (str server "/_matrix/client/v1/media/download/" resource)
+                      resp      (<p! (net/fetch fetch-url))]
+                  (if-not (.-ok resp)
+                    (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                    (let [buf (<p! (.arrayBuffer resp))]
+                      {:status "success" :bytes buf :transfer [:bytes]})))
 
                 (let [jwk        (.-key file-info)
                       iv-b64     (.-iv file-info)
                       mxc-url    (.-url file-info)
                       resource   (str/replace (str mxc-url) #"^mxc://" "")
                       fetch-url  (str server "/_matrix/client/v1/media/download/" resource)
-                      resp       (<p! (net/fetch fetch-url))
-                      enc-buf    (<p! (.arrayBuffer resp))
-                      iv-arr     (b64->uint8 iv-b64)
-                      algo       #js {:name "AES-CTR"}
-                      crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
-                      dec-buf    (<p! (js/crypto.subtle.decrypt
-                                       #js {:name "AES-CTR" :counter iv-arr :length 64}
-                                       crypto-key
-                                       enc-buf))]
-                  {:status "success" :bytes dec-buf :transfer [:bytes]})))
+                      resp       (<p! (net/fetch fetch-url))]
+                  (if-not (.-ok resp)
+                    (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                    (let [enc-buf    (<p! (.arrayBuffer resp))
+                          iv-arr     (b64->uint8 iv-b64)
+                          algo       #js {:name "AES-CTR"}
+                          crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
+                          dec-buf    (<p! (js/crypto.subtle.decrypt
+                                           #js {:name "AES-CTR" :counter iv-arr :length 64}
+                                           crypto-key
+                                           enc-buf))]
+                      {:status "success" :bytes dec-buf :transfer [:bytes]})))))
 
             source
             (let [is-http?  (or (str/starts-with? source "http://")
@@ -410,14 +414,17 @@
                               source
                               (let [resource (str/replace (str source) #"^mxc://" "")]
                                 (str server "/_matrix/client/v1/media/download/" resource)))
-                  resp      (<p! (net/fetch fetch-url))
-                  buf       (<p! (.arrayBuffer resp))]
-              {:status "success" :bytes buf :transfer [:bytes]})
+                  resp      (<p! (net/fetch fetch-url))]
+              (if-not (.-ok resp)
+                (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                (let [buf (<p! (.arrayBuffer resp))]
+                  {:status "success" :bytes buf :transfer [:bytes]})))
 
             :else
             {:status "error" :msg "Neither event-id with cache hit nor source MXC provided."}))
-        (catch js/Error e
-          {:status "error" :msg (.-message e)})))))
+        (catch :default e
+          (js/console.warn "Media worker trapped fetch error:" e)
+          {:status "error" :msg (str e)})))))
 
 (defn make-timeline-item-shim [item event-id]
   #js {:uniqueId (fn [] #js {:id event-id})
