@@ -1,0 +1,14 @@
+
+.quick-switcher-item {
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.quick-switcher-item.is-selected {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.selectable-item.is-selected {
+  background-color: rgba(255, 255, 255, 0.1);
+}
