@@ -438,7 +438,18 @@ Ideally, we should break this apart more later.
             {:on-click (fn [e]
                          (.stopPropagation e)
                          (swap! !picker-open? not))}
-            [icons/smiley]]]]]))))
+            [icons/smiley]]
+           [:button.timeline-send-btn
+            {:on-click (fn [e]
+                         (.preventDefault e)
+                         (.stopPropagation e)
+                         (submit-message!))}
+            [icons/send]]
+
+
+           ]]]))))
+
+
 #+end_src
 
 ***** CSS
