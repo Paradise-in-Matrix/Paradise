@@ -77,7 +77,6 @@
          (tr [:settings.plugins/warning-confirmation])]]])))
 
 
-
 (defn plugins-installer []
   (let [tr               @(re-frame/subscribe [:i18n/tr])
         plugin-url-input (r/atom "")
