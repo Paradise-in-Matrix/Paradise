@@ -656,15 +656,6 @@ overwrite the components class.
    {}))
 
 (rf/reg-event-db
- :plugins/installation-success
- (fn [db [_ source-url plugin-map]]
-   (-> db
-       (assoc :plugins/pending-security-approval nil
-              :plugins/installing? false)
-       (update-in [:plugins/active (:id plugin-map)]
-                  (constantly (assoc plugin-map :source-url source-url))))))
-
-(rf/reg-event-db
  :plugins/installation-failed
  (fn [db [_ source-url error-msg]]
    (assoc db :plugins/pending-security-approval nil
