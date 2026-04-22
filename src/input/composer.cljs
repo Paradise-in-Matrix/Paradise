@@ -69,6 +69,7 @@
                              (let [id    (aget attrs "id")
                                    label (or (aget attrs "label") id)]
                                (str "<a href=\"https://matrix.to/#/" id "\">@" label "</a>"))
+                             (= type "hardBreak") "<br>"
                              (= type "text") (.-text node)
                              :else "")
                            with-marks
