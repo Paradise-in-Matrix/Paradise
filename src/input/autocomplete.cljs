@@ -4,7 +4,10 @@
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [utils.images :refer [mxc->url mxc-image]]
-   [utils.global-ui :refer [avatar]]))
+   [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
+
+
+   ))
 
 (re-frame/reg-sub
  :mention/filtered-users
@@ -74,30 +77,20 @@
 (defonce !active-command (atom nil))
 
 (defn handle-suggestion-keydown [^js props type]
-  (let [event (.-event props)
-        key   (.-key event)
+  (let [e       (.-event props)
         room-id @(re-frame/subscribe [:rooms/active-id])
-        state @(re-frame/subscribe [:suggestion/state])
-        items (if (= type :emoji)
-                @(re-frame/subscribe [:emoji/filtered-suggestions])
-                @(re-frame/subscribe [:mention/filtered-users room-id]))
-        limit (count items)
-        idx   (or (:index state) 0)]
-    (if (and (#{"ArrowUp" "ArrowDown" "Enter" "Tab"} key) (pos? limit))
-      (do
-        (case key
-          "ArrowUp"   (re-frame/dispatch [:suggestion/set-index (mod (dec idx) limit)])
-          "ArrowDown" (re-frame/dispatch [:suggestion/set-index (mod (inc idx) limit)])
-          ("Enter" "Tab")
-          (let [raw-item (nth items idx)
-                selected-item (if (= type :emoji) (second raw-item) raw-item)]
-            (when-let [cmd @!active-command]
-              (cmd #js {:props selected-item}))))
-        (.preventDefault event)
-        (.stopPropagation event)
-        true)
-      false)))
-
+        state   @(re-frame/subscribe [:suggestion/state])
+        items   (if (= type :emoji)
+                  @(re-frame/subscribe [:emoji/filtered-suggestions])
+                  @(re-frame/subscribe [:mention/filtered-users room-id]))
+        idx     (or (:index state) 0)]
+    (handle-list-navigation
+     e items idx
+     #(re-frame/dispatch [:suggestion/set-index %])
+     (fn [raw-item]
+       (when-let [cmd @!active-command]
+         (let [selected-item (if (= type :emoji) (second raw-item) raw-item)]
+           (cmd #js {:props selected-item})))))))
 
 (defn emoji-suggestion-options []
   #js {:char ":"
@@ -160,10 +153,10 @@
         members @(re-frame/subscribe [:mention/filtered-users room-id])
         tr      @(re-frame/subscribe [:i18n/tr])]
     (when (and active? rect)
-      (let [is-emoji? (= type :emoji)
-            items     (if is-emoji? emojis members)
-            max-items (count items)
-            safe-idx  (if (>= index max-items) 0 index)
+      (let [is-emoji?     (= type :emoji)
+            items         (if is-emoji? emojis members)
+            max-items     (count items)
+            safe-idx      (if (>= index max-items) 0 index)
             render-above? (> (:top rect) 250)]
         [:div.suggestion-popup
          {:class (when render-above? "is-above")
@@ -171,40 +164,30 @@
                    {:bottom (str (+ (- (.-innerHeight js/window) (:top rect)) 5) "px")
                     :left   (str (:left rect) "px")}
                    {:top    (str (+ (:top rect) (:height rect) 5) "px")
-                    :left   (str (:left rect) "px")
-                    })}
-         (if (empty? items)
-           [:div.suggestion-no-results (tr [:composer.suggestions/no-results])]
-           (doall
-            (map-indexed
-             (fn [idx item]
-               (let [selected? (= idx safe-idx)]
-                 ^{:key (if is-emoji? (first item) (:user-id item))}
-                 [:div.suggestion-item
-                  {:class (when selected? "is-selected")
-                   :ref (fn [el]
-                          (when (and selected? el)
-                            (.scrollIntoView el #js {:block "nearest" :behavior "auto"})))
-                   :on-mouse-down (fn [e]
-                                    (.preventDefault e)
-                                    (.stopPropagation e)
-                                    (when-let [cmd @!active-command]
-                                      (let [selected (if is-emoji? (second item) item)]
-                                        (cmd #js {:props selected}))))}
-                  (if is-emoji?
-                    (let [[shortcode emote-data] item]
-                      [:<>
-                       [mxc-image {:mxc   (:url emote-data)
-                                   :class "suggestion-img"
-                                   :alt   shortcode}]
-                       [:span.suggestion-text ":" shortcode ":"]])
-                    [:<>
-                     [avatar {:id    (:user-id item)
-                              :name  (or (:display-name item) (:user-id item) "?")
-                              :url   (:avatar-url item)
-                              :size  24
-                              :shape :circle}]
-                     [:div.suggestion-details
-                      [:span.suggestion-name (:display-name item)]
-                      [:span.suggestion-id (:user-id item)]]])]))
-             items)))]))))
+                    :left   (str (:left rect) "px")})}
+         [selectable-list
+          {:items          items
+           :selected-index safe-idx
+           :empty-text     (tr [:composer.suggestions/no-results])
+           :item-class     "suggestion-item"
+           :key-fn (fn [item]
+                     (if is-emoji? (first item) (:user-id item)))
+           :on-select (fn [item]
+                        (when-let [cmd @!active-command]
+                          (let [selected (if is-emoji? (second item) item)]
+                            (cmd #js {:props selected}))))
+           :render-item (fn [item _selected?]
+                          (if is-emoji?
+                            (let [[shortcode emote-data] item]
+                              [:<>
+                               [mxc-image {:mxc (:url emote-data) :class "suggestion-img" :alt shortcode}]
+                               [:span.suggestion-text ":" shortcode ":"]])
+                            [:<>
+                             [avatar {:id    (:user-id item)
+                                      :name  (or (:display-name item) (:user-id item) "?")
+                                      :url   (:avatar-url item)
+                                      :size  24
+                                      :shape :circle}]
+                             [:div.suggestion-details
+                              [:span.suggestion-name (:display-name item)]
+                              [:span.suggestion-id (:user-id item)]]])) }]]))))
