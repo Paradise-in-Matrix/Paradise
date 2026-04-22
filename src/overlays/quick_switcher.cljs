@@ -1,0 +1,105 @@
+(ns overlays.quick-switcher
+(:require
+ [utils.svg :as icons]
+ [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
+ [utils.images :refer [mxc-image]]
+ [utils.macros :refer [defui]]
+ [re-frame.core :as re-frame]
+ [reagent.core :as r]
+ [clojure.string :as str]
+ [taoensso.timbre :as log]
+ [overlays.base :refer [modal-component popover-component]]))
+
+(re-frame/reg-event-db
+ :quick-switcher/toggle
+ (fn [db _]
+   (update db :quick-switcher-open? not)))
+
+(re-frame/reg-event-db
+ :quick-switcher/close
+ (fn [db _]
+   (assoc db :quick-switcher-open? false)))
+
+(re-frame/reg-sub
+ :quick-switcher/open?
+ (fn [db _] (:quick-switcher-open? db)))
+
+(re-frame/reg-event-fx
+ :quick-switcher/select-room
+ (fn [{:keys [db]} [_ room]]
+   (let [room-id  (or (:id room) (:roomId room))
+         space-id (navigation.rooms.room-list/safe-get room "first-parent-id" :first-parent-id)]
+     {:db (assoc db :quick-switcher-open? false)
+      :dispatch-n (remove nil?
+                          [[:space/select space-id]
+                           [:rooms/select room-id]])})))
+
+(defui quick-switcher-content []
+  (let [tr        @(re-frame/subscribe [:i18n/tr])
+        rooms-map @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
+        rooms     (vals rooms-map)
+        close-fn  #(re-frame/dispatch [:ui/close-modal])]
+    (r/with-let [query          (r/atom "")
+                 selected-index (r/atom 0)]
+      (let [filtered-rooms (if (empty? @query)
+                             []
+                             (->> rooms
+                                  (filter #(str/includes?
+                                            (str/lower-case (or (:name %) "unknown"))
+                                            (str/lower-case @query)))
+                                  (take 15)))]
+        [:div.quick-switcher-container
+         [:input.form-input.quick-switcher-input
+          {:type "text"
+           :auto-focus true
+           :placeholder (tr [:quick-switcher/placeholder])
+           :value @query
+           :on-change (fn [e]
+                        (reset! query (.. e -target -value))
+                        (reset! selected-index 0))
+           :on-key-down (fn [e]
+                          (when (= (.-key e) "Escape")
+                            (close-fn))
+                          (handle-list-navigation
+                           e filtered-rooms @selected-index
+                           #(reset! selected-index %)
+                           #(do
+                              (re-frame/dispatch [:quick-switcher/select-room %])
+                              (close-fn))))}]
+         [:div.quick-switcher-results
+          [selectable-list
+           {:items          filtered-rooms
+            :selected-index @selected-index
+            :empty-text     (tr [:quick-switcher/empty])
+            :item-class     "quick-switcher-item"
+            :key-fn         #(or (:id %) (:roomId %))
+            :on-highlight   #(reset! selected-index %)
+            :on-select      #(do
+                               (re-frame/dispatch [:quick-switcher/select-room %])
+                               (close-fn))
+           :render-item    (fn [room _]
+                              (let [room-id  (or (:id room) (:roomId room))
+                                    is-dm?   (or (:isDirect room) (:is-direct? room) (:is-direct room))
+                                    members  @(re-frame/subscribe [:room/members-map room-id])
+                                    profile  @(re-frame/subscribe [:sdk/profile])
+                                    my-id    (:user-id profile)
+                                    other    (when (and is-dm? (seq members))
+                                               (->> (vals members)
+                                                    (remove #(= (:user-id %) my-id))
+                                                    first))
+                                    final-avatar (or (:avatarUrl room) (:avatar room) (:avatar-url other))
+                                    final-name   (if (and is-dm? other (or (nil? (:name room)) (= (:name room) (tr [:quick-switcher/loading]))))
+                                                   (:display-name other)
+                                                   (:name room))]
+                                [:div {:style {:display "flex" :align-items "center" :gap "12px" :padding "8px"}}
+                                 [avatar {:id    room-id
+                                          :name  (or final-name "?")
+                                          :url   final-avatar
+                                          :size  28
+                                          :shape :rounded}]
+                                 [:span.name final-name]]))
+
+            }]]]))))
+
+(defmethod modal-component :quick-switcher [_]
+  quick-switcher-content)
