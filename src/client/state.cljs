@@ -4,6 +4,7 @@
 (defonce !engine-pool (atom nil))
 (defonce !config (atom nil))
 (defonce !components (r/atom {}))
+(defonce !active-overrides (r/atom {}))
 (defonce !slots (r/atom {}))
 
 (defn reg-slot-item [slot-id component]
@@ -11,5 +12,22 @@
 
 (defn get-slot [slot-id]
   (get @!slots slot-id []))
+
+(defn remove-plugin-overrides! [target-plugin-id]
+  (let [target-str (name target-plugin-id)]
+    (swap! !active-overrides
+           (fn [overrides]
+             (into {} (remove (fn [[_ override-data]]
+                                (= (name (:plugin-id override-data)) target-str))
+                              overrides))))))
+
+(defn remove-plugin-slots! [target-plugin-id]
+  (let [target-str (name target-plugin-id)]
+    (swap! !slots
+           (fn [slots]
+             (into {}
+                   (map (fn [[slot-id items]]
+                          [slot-id (into [] (remove #(= (name (:plugin-id % "unknown")) target-str) items))])
+                        slots))))))
 
 (set! (.-dumpRegistry js/window) #(clj->js @!components))
