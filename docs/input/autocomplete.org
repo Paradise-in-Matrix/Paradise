@@ -206,10 +206,10 @@ and the tab completion.
         members @(re-frame/subscribe [:mention/filtered-users room-id])
         tr      @(re-frame/subscribe [:i18n/tr])]
     (when (and active? rect)
-      (let [is-emoji? (= type :emoji)
-            items     (if is-emoji? emojis members)
-            max-items (count items)
-            safe-idx  (if (>= index max-items) 0 index)
+      (let [is-emoji?     (= type :emoji)
+            items         (if is-emoji? emojis members)
+            max-items     (count items)
+            safe-idx      (if (>= index max-items) 0 index)
             render-above? (> (:top rect) 250)]
         [:div.suggestion-popup
          {:class (when render-above? "is-above")
