@@ -33,13 +33,20 @@ modular behavior.
 
 
 
-**** Plugin Slots
+**** Plugins
 
 So my initial thoughts are a simple slot based system in which
 components can be quickly added.
 However, we also want to be sure we can provide a wrapper pattern.
 
-
+To expand on that, we've found that we can't exactly do a wrapper
+because once the Google Closure library runs on the code...
+the results are mangled to a point where there isn't anything
+useful in them. The SmallTalk pattern might be usable, but I
+don't believe it is inherently needed... I instead opted
+for a defoverride pattern and we'll define UI components
+with a defui macro that builds a registry. Then it is
+much more trivial to actually replace the component directly.
 
 #+begin_src clojurescript :tangle ../src/plugins.cljs
 (defn build-wrapped-component [base-comp wrappers]
