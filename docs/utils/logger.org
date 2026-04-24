@@ -43,8 +43,10 @@ by hand means we can just pass everything to our logger and expect it to handle 
 So now we can move on to set up the logger for our project usage
 #+begin_src clojurescript :tangle ../../src/utils/logger.cljs
 (ns utils.logger
-  (:require [taoensso.timbre :as timbre]
-             [taoensso.timbre.appenders.core :as appenders]))
+  (:require
+   [clojure.string :as str]
+   [taoensso.timbre :as timbre]
+   [taoensso.timbre.appenders.core :as appenders]))
 #+end_src
 
 
