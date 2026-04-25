@@ -14,9 +14,20 @@
          (try
            (let [client    @state/!client
                  user-id   (.userId client)
-                 device-id (or (some-> client .session .-deviceId) "paradise-web")]
-             (log/debug "Worker: Acquiring capabilities for widget...")
-             (sdk/getElementCallRequiredPermissions user-id device-id))
+                 device-id (or (some-> client .session .-deviceId) "paradise-web")
+                 base-caps (sdk/getElementCallRequiredPermissions user-id device-id)
+                 send-caps (.-send base-caps)]
+             (log/debug "Worker: Forging official Rust FFI WidgetEventFilters...")
+             (let [msg-filter  (.new (.-MessageLikeWithType (.-WidgetEventFilter sdk))
+                                     #js {:eventType "m.room.message"})
+                   text-filter (.new (.-RoomMessageWithMsgtype (.-WidgetEventFilter sdk))
+                                     #js {:msgtype "m.text"})]
+               (.push send-caps msg-filter)
+               (.push send-caps text-filter))
+             (set! (.-sendDelayedEvent base-caps) true)
+             (set! (.-updateDelayedEvent base-caps) true)
+             (log/info "Worker: Bouncer bypassed. Capabilities fully loaded.")
+             base-caps)
            (catch :default e
              (log/error "Capabilities provider crashed!" e)
              #js {:read #js [] :send #js []})))})
