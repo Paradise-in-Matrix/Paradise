@@ -471,6 +471,10 @@ overwrite the components class.
              (list 'swap! 'client.state/!active-overrides 'assoc (keyword (name comp-name))
                    (list 'hash-map :plugin-id plugin-id :fn comp-name)))))))
 
+(def log-info-macro (sci/new-macro-var 'info (fn [form _env & args] (list* 'taoensso.timbre/plugin-info @!current-eval-plugin (:line (meta form)) args))))
+(def log-warn-macro (sci/new-macro-var 'warn (fn [form _env & args] (list* 'taoensso.timbre/plugin-warn @!current-eval-plugin (:line (meta form)) args))))
+(def log-error-macro (sci/new-macro-var 'error (fn [form _env & args] (list* 'taoensso.timbre/plugin-error @!current-eval-plugin (:line (meta form)) args))))
+(def log-debug-macro (sci/new-macro-var 'debug (fn [form _env & args] (list* 'taoensso.timbre/plugin-debug @!current-eval-plugin (:line (meta form)) args))))
 
 (defn safe-reg-slot-item [slot-id item]
   (state/reg-slot-item slot-id (assoc item :plugin-id @!current-eval-plugin)))
