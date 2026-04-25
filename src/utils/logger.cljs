@@ -1,6 +1,8 @@
 (ns utils.logger
-  (:require [taoensso.timbre :as timbre]
-             [taoensso.timbre.appenders.core :as appenders]))
+  (:require
+   [clojure.string :as str]
+   [taoensso.timbre :as timbre]
+   [taoensso.timbre.appenders.core :as appenders]))
 
 (def json-appender
   {:enabled? true
@@ -32,3 +34,8 @@
 (def warn   timbre/warn)
 (def error  timbre/error)
 (def fatal  timbre/fatal)
+
+(defn plugin-debug [p-id line & args] (timbre/with-context {:plugin-id p-id :plugin-line line} (timbre/debug (str/join " " args))))
+(defn plugin-info  [p-id line & args] (timbre/with-context {:plugin-id p-id :plugin-line line} (timbre/info  (str/join " " args))))
+(defn plugin-warn  [p-id line & args] (timbre/with-context {:plugin-id p-id :plugin-line line} (timbre/warn  (str/join " " args))))
+(defn plugin-error [p-id line & args] (timbre/with-context {:plugin-id p-id :plugin-line line} (timbre/error (str/join " " args))))
