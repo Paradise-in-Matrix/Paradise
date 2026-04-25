@@ -444,6 +444,59 @@ overwrite the components class.
 **** SCI Runner
 
 
+So this can be broken into two parts. As the worker threads would be unable to communicate
+with the main thread they actually need to instantiate their own SCI context.
+
+With that in mind we need to define the shared entries between the contexts
+
+***** SCI Shared
+
+The shared namespaces
+
+
+#+begin_src clojurescript :tangle ../src/sci_shared.cljs
+
+(ns sci-shared
+  (:require [sci.core :as sci]
+            [cljs.core.async.impl.dispatch :as dispatch]
+            [cljs.core.async.impl.ioc-helpers]
+            [cljs.core.async.interop]
+            [cljs.core.async]
+            [promesa.core]
+            [clojure.string]
+            [utils.macros :refer [expose-ns]]))
+
+(def async-namespaces
+  {'cljs.core.async (expose-ns cljs.core.async)
+   'cljs.core.async.interop
+   {'p->c cljs.core.async.interop/p->c
+    '<p!  (sci/new-macro-var '<p!
+                             (fn [_ _ p]
+                               (list 'cljs.core.async/<! (list 'cljs.core.async.interop/p->c p))))}
+   'cljs.core.async.impl.dispatch   {'run dispatch/run}
+   'cljs.core.async.impl.ioc-helpers (merge
+                                      (expose-ns cljs.core.async.impl.ioc-helpers)
+                                      {'aset-all! (sci/new-macro-var 'aset-all!
+                                                    (fn [_ _ obj & key-vals]
+                                                      (let [sym (gensym "state_arr")]
+                                                        (concat (list 'let (vector sym obj))
+                                                                (map (fn [[k v]] (list 'aset sym k v))
+                                                                     (partition 2 key-vals))
+                                                                (list sym)))))})})
+
+(def common-namespaces
+  (merge async-namespaces
+         {'promesa.core   (expose-ns promesa.core)
+          'clojure.string (expose-ns clojure.string)}))
+
+(def common-classes
+  {'js   goog/global :allow :all
+   'Date js/Date})
+
+
+#+end_src
+
+
 ***** Imports
 
 #+begin_src clojurescript :tangle ../src/sci_runner.cljs
