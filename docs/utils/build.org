@@ -100,7 +100,7 @@ as well as ensuring no invalid CLJS pieces are evaluated
         (and (seq? x) (= (first x) 'clojure.lang.Var/getThreadBindingFrame)) nil
         (and (seq? x) (= (first x) 'clojure.lang.Var/resetThreadBindingFrame)) nil
         (and (seq? x) (= (first x) 'java.util.concurrent.atomic.AtomicReferenceArray.)) (list 'clojure.core/make-array (second x))
-        (= x 'java.lang.Throwable) ':default
+        (or (= x 'java.lang.Throwable) (= x java.lang.Throwable)) ':default
         (and (seq? x) (symbol? (first x)) (= (name (first x)) "return-chan"))
         (let [state-arr (second x)
               ret-val   (nth x 2)]
