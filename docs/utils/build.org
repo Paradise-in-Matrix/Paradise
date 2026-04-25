@@ -167,14 +167,26 @@ easily done. It'll be something that needs to be revisited.
           (let [sym (first x)]
             (cond
               (#{'go 'cljs.core.async/go} sym)
-              (let [qualified (walk/prewalk #(case % <! 'clojure.core.async/<! put! 'clojure.core.async/put! timeout 'clojure.core.async/timeout alts! 'clojure.core.async/alts! %) (rest x))
-                    expanded  (macroexpand-1 `(clojure.core.async/go ~@qualified))]
+              (let [unrolled-promises (walk/prewalk
+                                       (fn [node]
+                                         (if (and (seq? node) (= (first node) '<p!))
+                                           (list '<! (list 'cljs.core.async.interop/p->c (second node)))
+                                           node))
+                                       (rest x))
+                    qualified         (walk/prewalk
+                                       #(case %
+                                          <! 'clojure.core.async/<!
+                                          put! 'clojure.core.async/put!
+                                          timeout 'clojure.core.async/timeout
+                                          alts! 'clojure.core.async/alts!
+                                          %)
+                                       unrolled-promises)
+                    expanded          (macroexpand-1 `(clojure.core.async/go ~@qualified))]
                 (scrub-jvm-artifacts expanded))
 
               (custom-macro? sym)
               (let [qualified-macro (symbol "utils.macros" (name sym))]
                 (macroexpand-1 (cons qualified-macro (rest x))))
- w
               :else x))
           x))
       form)))
