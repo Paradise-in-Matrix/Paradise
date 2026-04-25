@@ -503,9 +503,28 @@ The shared namespaces
 (ns sci-runner
   (:require
    [sci.core :as sci]
+   [cljs.core.async :refer [take! chan put! close!]]
+   [cljs.js :as cljs]
+   [cljs.analyzer :as ana]
+   [cljs.env :as env]
+   [shadow.cljs.bootstrap.browser :as boot]
+   [cljs.core.async :as async]
    [re-frame.core :as rf]
    [reagent.core :as r]
+   [sci.configs.reagent.reagent :as sci-reagent]
+   [sci.configs.re-frame.re-frame :as sci-re-frame]
+   [clojure.string]
+   [cljs-workers.core :as main]
+   [sci-shared]
+   [promesa.core]
+   [input.composer]
+   [utils.logger]
+   [utils.helpers]
+   [utils.images]
+   [utils.svg]
+   [utils.macros :refer [expose-ns]]
    [client.state :as state]))
+
 
 #+end_src
 
