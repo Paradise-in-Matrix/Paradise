@@ -205,6 +205,25 @@
                                            (re-frame/dispatch [:msg/edit active-id item text matrix-html])
                                            (re-frame/dispatch [:input/clear-context active-id]))))} "save"]]]))))
 
+
+(defui timeline-send-button [{:keys [submit-message! editor attachments]}]
+  [:button.timeline-send-btn
+   {:on-click (fn [e]
+                (.preventDefault e)
+                (.stopPropagation e)
+                (submit-message!))}
+   [icons/send]])
+
+(defui timeline-emoji-button [!picker-open?]
+  [:button.timeline-emoji-btn
+   {:on-click (fn [e]
+                (.stopPropagation e)
+                (swap! !picker-open? not))}
+   [icons/smiley]
+   [plugins/plugin-slot :composer-emojis {:room-id active-id}]
+   ])
+
+
 (defui message-input []
   (r/with-let [!picker-open? (r/atom false)
                !editor       (r/atom nil)
@@ -310,18 +329,9 @@
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
                   :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
            [plugins/plugin-slot :composer-actions {:room-id active-id}]
-           [:button.timeline-emoji-btn
-            {:on-click (fn [e]
-                         (.stopPropagation e)
-                         (swap! !picker-open? not))}
-            [icons/smiley]]
-           [:button.timeline-send-btn
-            {:on-click (fn [e]
-                         (.preventDefault e)
-                         (.stopPropagation e)
-                         (submit-message!))}
-            [icons/send]]
-
-
+           [timeline-emoji-button !picker-open?]
+           [timeline-send-button {:submit-message! submit-message!
+                                  :editor @!editor
+                                  :attachments attachments}]
            ]]]))))
 
