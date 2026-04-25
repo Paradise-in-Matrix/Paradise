@@ -91,16 +91,13 @@
                                 :video (.-video_enabled d)}])))
 
              (when (str/starts-with? action "io.element.")
-               (let [is-primary? (get-in @rf-db/app-db [:call :primary-iframe?] true)
-                     iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
-                 (when-let [iframe @iframe-ref]
-                   (let [ack #js {:api       "toWidget"
-                                  :action    action
-                                  :requestId req-id
-                                  :widgetId  widget-id
-                                  :response  #js {}
-                                  :data      #js {}}]
-                     (.postMessage (.-contentWindow iframe) ack "*")))))
+               (let [ack #js {:api       "toWidget"
+                              :action    action
+                              :requestId req-id
+                              :widgetId  widget-id
+                              :response  #js {}
+                              :data      #js {}}]
+                 (.postMessage (.-source event) ack "*")))
 
              (if-let [pool @state/!engine-pool]
                (main/do-with-pool! pool {:handler :send-widget-message
