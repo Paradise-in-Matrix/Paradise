@@ -2,7 +2,10 @@
   (:require [reagent.core :as r]
             [taoensso.timbre :as log]
             [re-frame.core :as rf]
-            [re-frame.db :as rf-db]))
+            [re-frame.db :as rf-db]
+            [client.state :as state]
+            [utils.macros :refer [defui]]
+            ))
 
 (defonce primary-iframe-ref (r/atom nil))
 (defonce backup-iframe-ref  (r/atom nil))
@@ -43,11 +46,9 @@
                   (js/setTimeout check-dom 400)))))]
     (check-dom)))
 
-
-(defn persistent-call-container []
+(defui persistent-call-container []
   (let [call-state   @(rf/subscribe [:call/state])
         tr           @(rf/subscribe [:i18n/tr])
-
         primary?     (get call-state :primary-iframe? true)
         rect         @host-rect
         active-style (if rect
@@ -60,19 +61,17 @@
      {:style {:position "fixed" :top 0 :left 0 :width "100%" :height "100%"
               :pointer-events "none" :z-index 99
               :display (if (and (:mobile? call-state) (:chat-open? call-state)) "none" "block")}}
-     [:iframe
-      {:ref     #(reset! primary-iframe-ref %)
-       :title   (tr [:container.calls/main-iframe])
-       :style   (if primary? active-style hidden-style)
-       :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
-       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
-       :on-load #(attach-iframe-observers! primary-iframe-ref)
-       :src     "about:blank"}]
-     [:iframe
-      {:ref     #(reset! backup-iframe-ref %)
-       :title   (tr [:container.calls/backup-iframe])
-       :style   (if-not primary? active-style hidden-style)
-       :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
-       :allow   "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
-       :on-load #(attach-iframe-observers!   backup-iframe-ref)
-       :src     "about:blank"}]]))
+     [:iframe {:ref #(reset! primary-iframe-ref %) :title (tr [:container.calls/main-iframe])
+               :style (if primary? active-style hidden-style)
+               :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
+               :allow "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
+               :on-load #(attach-iframe-observers! primary-iframe-ref)
+               :src "about:blank"}]
+     [:iframe {:ref #(reset! backup-iframe-ref %) :title (tr [:container.calls/backup-iframe])
+               :style (if-not primary? active-style hidden-style)
+               :sandbox "allow-forms allow-scripts allow-same-origin allow-popups allow-modals allow-downloads"
+               :allow "camera; microphone; display-capture; autoplay; encrypted-media; fullscreen;"
+               :on-load #(attach-iframe-observers! backup-iframe-ref)
+               :src "about:blank"}]
+
+     (state/get-slot :call-container/background)]))
