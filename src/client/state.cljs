@@ -11,7 +11,10 @@
   (swap! !slots update slot-id (fnil conj []) component))
 
 (defn get-slot [slot-id]
-  (get @!slots slot-id []))
+  (->> (get @!slots slot-id [])
+       (sort-by #(get % :order 0))
+       (map (fn [{:keys [id component]}]
+              ^{:key (or id (random-uuid))} [component]))))
 
 (defn remove-plugin-overrides! [target-plugin-id]
   (let [target-str (name target-plugin-id)]
