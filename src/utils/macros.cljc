@@ -1,6 +1,9 @@
 (ns utils.macros
   (:require [clojure.java.io :as io]
-            [clojure.edn :as edn]))
+            [clojure.edn :as edn]
+            [cljs.analyzer.api :as ana]
+            [cljs.env :as env]
+            ))
 
 (defmacro ocall
   [obj method & args]
@@ -18,12 +21,21 @@
   `(js/goog.object.get ~obj ~(name prop)))
 
 
+
+
 (defmacro expose-ns [ns-sym]
-  (let [public-vars (keys (cljs.analyzer.api/ns-publics &env ns-sym))]
+  (let [public-vars (keys (ana/ns-publics env/*compiler* ns-sym))]
     (into {}
           (map (fn [v]
                  [`(quote ~v) (symbol (str ns-sym "/" v))])
                public-vars))))
+
+(defmacro defoverride [comp-name args & body]
+  (list 'do
+        (list* 'defn comp-name args body)
+        (list 'swap! 'client.state/!active-overrides 'assoc (keyword (name comp-name))
+              (list 'hash-map :plugin-id (list 'deref 'sci-runner/!current-eval-plugin) :fn comp-name))))
+
 
 (defmacro defui [comp-name args & body]
   (let [kw           (keyword comp-name)
