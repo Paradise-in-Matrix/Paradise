@@ -453,19 +453,10 @@ Ideally, we should break this apart more later.
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
                   :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
            [plugins/plugin-slot :composer-actions {:room-id active-id}]
-           [:button.timeline-emoji-btn
-            {:on-click (fn [e]
-                         (.stopPropagation e)
-                         (swap! !picker-open? not))}
-            [icons/smiley]]
-           [:button.timeline-send-btn
-            {:on-click (fn [e]
-                         (.preventDefault e)
-                         (.stopPropagation e)
-                         (submit-message!))}
-            [icons/send]]
-
-
+           [timeline-emoji-button !picker-open?]
+           [timeline-send-button {:submit-message! submit-message!
+                                  :editor @!editor
+                                  :attachments attachments}]
            ]]]))))
 
 
