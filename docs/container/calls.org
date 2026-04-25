@@ -240,11 +240,9 @@ this is not a smooth experience for the user.
                   (js/setTimeout check-dom 400)))))]
     (check-dom)))
 
-
-(defn persistent-call-container []
+(defui persistent-call-container []
   (let [call-state   @(rf/subscribe [:call/state])
         tr           @(rf/subscribe [:i18n/tr])
-
         primary?     (get call-state :primary-iframe? true)
         rect         @host-rect
         active-style (if rect
