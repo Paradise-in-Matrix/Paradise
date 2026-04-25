@@ -479,21 +479,42 @@ overwrite the components class.
 (defn safe-reg-slot-item [slot-id item]
   (state/reg-slot-item slot-id (assoc item :plugin-id @!current-eval-plugin)))
 
+
 (def plugin-context
   (sci/init
    {:namespaces
-    {'user {'defoverride defoverride-macro}
-     're-frame.core {'dispatch rf/dispatch
-                     'subscribe rf/subscribe}
-     'reagent.core  {'as-element r/as-element}
-     'client.state  {'!components state/!components
-                     'reg-slot-item safe-reg-slot-item
-                     '!active-overrides state/!active-overrides
-                     'remove-plugin-overrides! state/remove-plugin-overrides!
-                     'get-slot state/get-slot
-                     '!config state/!config}}
-    :classes {'js goog/global}}))
+    (merge
+     sci-shared/common-namespaces
+     (:namespaces sci-reagent/config)
+     (:namespaces sci-re-frame/config)
+     {'user {'defoverride defoverride-macro}
+      'sci-runner {'!current-eval-plugin !current-eval-plugin}
 
+      'taoensso.timbre {'info  log-info-macro
+                        'warn  log-warn-macro
+                        'error log-error-macro
+                        'debug log-debug-macro
+                        'plugin-info  utils.logger/plugin-info
+                        'plugin-warn  utils.logger/plugin-warn
+                        'plugin-error utils.logger/plugin-error
+                        'plugin-debug utils.logger/plugin-debug}
+
+      'utils.macros   (expose-ns utils.macros)
+      'utils.helpers  (expose-ns utils.helpers)
+      'utils.images   (expose-ns utils.images)
+      'utils.svg      (expose-ns utils.svg)
+      'input.composer (expose-ns input.composer)
+      'client.state  {'!components state/!components
+                      'reg-slot-item safe-reg-slot-item
+                      '!active-overrides state/!active-overrides
+                      'remove-plugin-overrides! state/remove-plugin-overrides!
+                      'get-slot state/get-slot
+                      '!config state/!config
+                      '!engine-pool state/!engine-pool}
+                      
+      'cljs-workers.core {'do-with-pool! main/do-with-pool!}})
+
+    :classes sci-shared/common-classes}))
 
 (defn evaluate-ui-form [plugin-id form-str]
   (reset! !current-eval-plugin plugin-id)
