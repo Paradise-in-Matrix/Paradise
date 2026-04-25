@@ -19,6 +19,7 @@
    [utils.logger]
    [utils.helpers]
    [utils.images]
+   [utils.global-ui]
    [utils.svg]
    [utils.macros :refer [expose-ns]]
    [client.state :as state]))
@@ -65,7 +66,7 @@
                         'plugin-warn  utils.logger/plugin-warn
                         'plugin-error utils.logger/plugin-error
                         'plugin-debug utils.logger/plugin-debug}
-
+      'utils.global-ui (expose-ns utils.global-ui)
       'utils.macros   (expose-ns utils.macros)
       'utils.helpers  (expose-ns utils.helpers)
       'utils.images   (expose-ns utils.images)
@@ -78,7 +79,6 @@
                       'get-slot state/get-slot
                       '!config state/!config
                       '!engine-pool state/!engine-pool}
-                      
       'cljs-workers.core {'do-with-pool! main/do-with-pool!}})
 
     :classes sci-shared/common-classes}))
