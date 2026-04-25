@@ -196,7 +196,10 @@ this is not a smooth experience for the user.
   (:require [reagent.core :as r]
             [taoensso.timbre :as log]
             [re-frame.core :as rf]
-            [re-frame.db :as rf-db]))
+            [re-frame.db :as rf-db]
+            [client.state :as state]
+            [utils.macros :refer [defui]]
+            ))
 
 (defonce primary-iframe-ref (r/atom nil))
 (defonce backup-iframe-ref  (r/atom nil))
