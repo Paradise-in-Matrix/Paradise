@@ -285,12 +285,13 @@ export enum TimelineEventFocusThreadMode_Tags {
               t-handle (when is-live?
                          (.subscribeToTypingNotifications room #js {:call #(worker/stream! {:type "typing-update" :room-id room-id :users (js->clj %)})}))
               p-handle (when is-live?
-                         (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))]
+                         (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))
+              _        (when (:forward paginate-amount)
+                         (.paginateForwards tl (:forward paginate-amount)))
+              _        (when (:back paginate-amount)
+                         (.paginateBackwards tl (:back paginate-amount)))]
         (swap! !active-timelines assoc-in [room-id source]
-               {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
-        (when (:forward paginate-amount)
-          (.paginateForwards tl (:forward paginate-amount)))
-        (.paginateBackwards tl (:back paginate-amount)))
+               {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle}))
       (p/catch #(log/error source "boot failed:" %))
       (p/finally #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))))
 
