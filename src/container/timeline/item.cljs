@@ -6,7 +6,7 @@
             [cljs-workers.core :as main]
             [client.state :as state]
             [cljs.core.async :refer [go <!]]
-            ["@chenglou/pretext" :refer [prepare layout]]
+            ["@chenglou/pretext" :refer [prepareWithSegments layoutWithLines]]
             [utils.helpers :refer [sanitize-custom-html hiccup->text format-divider-date format-time linkify-text truncate-name]]
             [utils.images :refer [mxc->url mxc-image]]
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
@@ -254,7 +254,7 @@
   (r/with-let [room-id      @(re-frame/subscribe [:rooms/active-id])
                event-id     (:id event)
                info         (:info content)
-               source-url   (:url content)
+               source-url   (:source content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
@@ -271,6 +271,7 @@
                      (let [pool @state/!engine-pool
                            res  (<! (main/do-with-pool! pool {:handler :get-media
                                                               :arguments {:room-id room-id
+                                                                          :source source-url
                                                                           :event-id event-id}}))]
                        (case (:status res)
                          "unencrypted"
@@ -366,11 +367,11 @@
 (defn reaction-row [{:keys [reactions my-id members-map active-room event-id]}]
   [:div.reactions-row
    (for [[emoji count senders] reactions]
-     ^{:key emoji}
      (let [hover-text (->> senders
                            (map (fn [uid]
                                   (or (:display-name (get members-map uid)) uid)))
                            (str/join ", "))]
+       ^{:key emoji}
        [:span.reaction-pill
         {:class (when (contains? senders my-id) "active")
          :title hover-text
@@ -531,40 +532,54 @@
 
 (defn calc-text-height [msg available-w pretext-cache theme-metrics]
   (let [content (:content msg)
+        content-tag (:tag content)
         html-txt (or (get-in content [:inner :content :html]) "")
 
-        raw-txt (if (not-empty html-txt)
-                  (let [sanitized (sanitize-custom-html html-txt)]
-                    (hiccup->text sanitized))
-                  (or (:body msg)
-                      (:body content)
-                      (get-in content [:inner :content :body])
-                      (:caption content)
-                      (get-in content [:inner :content :caption])
-                      ""))
+        cleaned-html (if (seq html-txt)
+                       (str/replace html-txt #"(?i)<br[^>]*>\s*(?=</(?:p|div|h[1-6]|blockquote|li)>)" "")
+                       "")
 
-        txt-str (if (string? raw-txt) raw-txt (str raw-txt))
+        raw-txt (cond
+                  (= content-tag "UnableToDecrypt") "Unable to decrypt"
+                  (= content-tag "Redacted") "Message deleted"
+                  (seq cleaned-html) (hiccup->text (sanitize-custom-html cleaned-html))
+                  :else (or (:body msg)
+                            (:body content)
+                            (get-in content [:inner :content :body])
+                            (:caption content)
+                            (get-in content [:inner :content :caption])
+                            ""))
+
+        txt-str (if (string? raw-txt)
+                  (str/replace raw-txt #"\n+$" "")
+                  (str raw-txt))
+        has-url? (boolean (re-find #"https?://[^\s]+" txt-str))
+        measure-str (if has-url?
+                      (str/replace txt-str #"https?://[^\s]+"
+                                   (fn [url-match]
+                                     (let [url (if (coll? url-match) (first url-match) url-match)]
+                                       (str/replace url #"([/=?&._:-])" "$1\u200B"))))
+                      txt-str)
+
         is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
-        measure-str (if is-edited? (str txt-str " (edited)") txt-str)
-
-        is-quote?       (str/includes? html-txt "<blockquote")
-        has-code-block? (or (str/includes? measure-str "```")
+        is-quote? (str/includes? html-txt "<blockquote")
+        has-code-block? (or (str/includes? txt-str "```")
                             (str/includes? html-txt "<pre>"))
 
-        wrap-buffer     (if is-quote?
-                          (:quote-wrap-buffer theme-metrics 19)
-                          (:text-wrap-buffer theme-metrics 8))
+        wrap-buffer (cond
+                      is-quote? (:quote-wrap-buffer theme-metrics 19)
+                      has-url?  (:url-wrap-buffer theme-metrics 40)
+                      :else     0)
 
         safe-available-w (max 0 (- available-w wrap-buffer))
 
         font-str (if has-code-block?
                    (:code-font theme-metrics "13.68px 'fira code', monospace")
-                   (:font theme-metrics "16px sans-serif"))
+                   (:font theme-metrics "15.2px Inter, sans-serif"))
 
-        base-lh  (if has-code-block?
-                   (:code-line-height theme-metrics 20.52)
-                   (:line-height theme-metrics 22.8))
-
+        base-lh (if has-code-block?
+                  (:code-line-height theme-metrics 20.52)
+                  (:line-height theme-metrics 22.8))
 
         code-padding (if has-code-block? (:code-padding theme-metrics 28) 0)
 
@@ -572,19 +587,30 @@
         cached-text-h (get @pretext-cache cache-key)]
 
     (or cached-text-h
-        (let [lines   (str/split measure-str #"\n")
-              total-h (reduce (fn [acc line]
-                                (let [trimmed (str/trim line)]
-                                  (if (empty? trimmed)
-                                    (+ acc base-lh)
-                                    (let [prep (prepare line font-str #js {:whiteSpace "pre-wrap"
-                                                                           :wordBreak "normal"})
-                                          raw  (try (layout prep safe-available-w base-lh) (catch js/Error _ nil))]
-                                      (+ acc (if raw (.-height raw) base-lh))))))
-                              0 lines)
-              final-h (+ total-h code-padding)]
+        (let [prep (prepareWithSegments measure-str font-str #js {:whiteSpace "pre-wrap"
+                                                                  :wordBreak "normal"})
+              raw  (try (layoutWithLines prep safe-available-w base-lh) (catch js/Error _ nil))
+              total-h (if raw (.-height raw) base-lh)
+
+              lines-arr (if raw (.-lines raw) #js [])
+              len (.-length lines-arr)
+              last-line-w (if (pos? len) (.-width (aget lines-arr (dec len))) 0)
+
+              edited-w (:edited-label-w theme-metrics 40)
+              edited-tax (if (and is-edited? (> (+ last-line-w edited-w) safe-available-w))
+                           base-lh
+                           0)
+
+              has-html? (seq html-txt)
+              v-tax (if has-html?
+                      (:html-vertical-tax theme-metrics 0)
+                      (:text-vertical-tax theme-metrics 0))
+
+              final-h (+ total-h code-padding edited-tax v-tax)]
+
           (swap! pretext-cache assoc cache-key final-h)
           final-h))))
+
 
 (defmethod calc-item-height :message [msg width pretext-cache theme-metrics]
   (let [is-sequence-start? (not (:merge-with-prev? msg))
