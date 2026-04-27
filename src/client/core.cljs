@@ -40,7 +40,11 @@
     (reset! state/!engine-pool
             (main/create-pool 1 "engine.js"
                               {:worker-opts #js {:type "module"}
-                               :on-stream handle-worker-stream!}))))
+                               :on-stream handle-worker-stream!})))
+  (when-not @state/!media-pool
+    (reset! state/!media-pool
+            (main/create-pool 3 "engine.js"
+                              {:worker-opts #js {:type "module"}}))))
 
 (re-frame/reg-event-fx
  :app/bootstrap
