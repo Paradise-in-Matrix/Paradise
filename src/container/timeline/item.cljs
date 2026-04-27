@@ -12,7 +12,8 @@
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [inline-editor]]
-            [utils.svg :as icons]))
+            [utils.svg :as icons]
+            [utils.net :as net]))
 
 (defmulti calc-item-height
   (fn [msg _width _pretext-cache _theme-metrics]
@@ -255,6 +256,7 @@
                event-id     (:id event)
                info         (:info content)
                source-url   (:source content)
+               source-map   (:source-map content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
@@ -268,11 +270,15 @@
                                :background "var(--bg-secondary)"})
                !blob-url    (r/atom nil)
                _   (go
-                     (let [pool @state/!engine-pool
+                     (let [pool @state/!media-pool
+                           {:keys [token hs-url]} @net/!auth-context
                            res  (<! (main/do-with-pool! pool {:handler :get-media
                                                               :arguments {:room-id room-id
                                                                           :source source-url
-                                                                          :event-id event-id}}))]
+                                                                          :event-id event-id
+                                                                          :source-map source-map
+                                                                          :hs-url hs-url
+                                                                          :token token}}))]
                        (case (:status res)
                          "unencrypted"
                          (reset! !blob-url (:url res))
@@ -294,6 +300,7 @@
     (finally
       (when-let [url @!blob-url]
         (js/URL.revokeObjectURL url)))))
+
 
 (defn calc-media-height [content actual-tag available-w theme-metrics]
   (let [info          (or (:info content)
@@ -322,7 +329,7 @@
   [:div.image-attachment-container
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
-      [:img {:src url :alt alt-text :loading "eager"
+      [:img {:src url :alt alt-text :loading "lazy"
 ;;             :decoding "async"
 
              :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox
@@ -348,7 +355,7 @@
 (defn sticker-message [event content]
   [async-media-wrapper event content {:class "media-sticker" :default-ratio 1.0}
    (fn [url alt]
-     [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])])
+     [:img {:src url :alt alt :loading "lazy" :style {:width "100%" :height "100%" :display "block"}} ])])
 
 (defn file-message [event content tr]
   (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
