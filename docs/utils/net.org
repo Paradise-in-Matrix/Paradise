@@ -99,8 +99,14 @@ I can later revise the SW to use this mechanism instead to remove the duplicatio
                                                       (aset acc (name k) v) acc)
                                                     #js {} options)
                           :else (js/Object.assign #js {} options))
+           headers      (or (.-headers opts) #js {})
+           has-token?   (if (map? headers)
+                          (or (get headers "Authorization") (get headers :Authorization))
+                          (some? (aget headers "Authorization")))
+
            is-media?    (str/includes? raw-url "/_matrix/client/v1/media/")
-           needs-wait?  (or (.-auth opts) is-media?)
+           needs-wait?  (and (not has-token?) (or (.-auth opts) is-media?))
+
            _            (when needs-wait?
                           (wait-for-auth))
            {:keys [token hs-url]} @!auth-context
