@@ -23,7 +23,8 @@ It is convenient to define the actual items that make up a timeline.
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [inline-editor]]
-            [utils.svg :as icons]))
+            [utils.svg :as icons]
+            [utils.net :as net]))
 #+end_src
 
 
