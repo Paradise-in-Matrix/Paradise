@@ -120,6 +120,7 @@
       (let [tr             @tr-sub
             matrix-packs   @(re-frame/subscribe [:emoji/active-set])
             popover-active @(re-frame/subscribe [:ui/active-popover])
+            is-mobile?     @(re-frame/subscribe [:ui/is-mobile?])
             packs          (merge categorized-system-packs matrix-packs)
             sorted-ids     (sort-by #(get-in packs [% :system-priority] 999) (keys packs))
             active-id      (or @selected-pack-id (first sorted-ids))
@@ -173,7 +174,7 @@
                                  [:input.form-input
                                   {:type "text"
                                    :placeholder (tr [:composer.emotes/search-placeholder])
-                                   :auto-focus true
+                                   :auto-focus (not is-mobile?)
                                    :value @search-query
                                    :on-change #(reset! search-query (.. % -target -value))}]]
 
