@@ -479,45 +479,45 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
 (worker/register :get-media
   (fn [{:keys [event-id source]}]
     (go
-      (try
-        (let [client     @state/!client
-              session    (.session client)
-              hs-url     (.-homeserverUrl session)
-              server     (str/replace (str hs-url) #"/+$" "")
-              ffi-source (when event-id (get @state/!media-cache event-id))]
+      (if-not (or event-id source)
+        {:status "ignored" :msg "No source provided"}
+        (try
+          (let [client     @state/!client
+                session    (.session client)
+                hs-url     (.-homeserverUrl session)
+                server     (str/replace (str hs-url) #"/+$" "")
+                source-map (when event-id (get @state/!media-cache event-id))]
 
-          (cond
-            ffi-source
-            (let [source-map (js/JSON.parse (.toJson ffi-source))
-                  file-info  (.-file source-map)]
-              (if-not file-info
-                (let [mxc       (or source (.-url source-map) (some-> source-map .-plain .-url) "")
-                      resource  (str/replace (str mxc) #"^mxc://" "")
-                      fetch-url (str server "/_matrix/client/v1/media/download/" resource)
-                      resp      (<p! (net/fetch fetch-url))]
-                  (if-not (.-ok resp)
-                    (throw (ex-info "Fetch failed" {:status (.-status resp)}))
-                    (let [buf (<p! (.arrayBuffer resp))]
-                      {:status "success" :bytes buf :transfer [:bytes]})))
+            (cond
+              source-map
+              (let [file-info (.-file source-map)]
+                (if-not file-info
+                  (let [mxc       (or source (.-url source-map) (some-> source-map .-plain .-url) "")
+                        resource  (str/replace (str mxc) #"^mxc://" "")
+                        fetch-url (str server "/_matrix/client/v1/media/download/" resource)
+                        resp      (<p! (net/fetch fetch-url))]
+                    (if-not (.-ok resp)
+                      (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                      (let [buf (<p! (.arrayBuffer resp))]
+                        {:status "success" :bytes buf :transfer [:bytes]})))
 
-                (let [jwk        (.-key file-info)
-                      iv-b64     (.-iv file-info)
-                      mxc-url    (.-url file-info)
-                      resource   (str/replace (str mxc-url) #"^mxc://" "")
-                      fetch-url  (str server "/_matrix/client/v1/media/download/" resource)
-                      resp       (<p! (net/fetch fetch-url))]
-                  (if-not (.-ok resp)
-                    (throw (ex-info "Fetch failed" {:status (.-status resp)}))
-                    (let [enc-buf    (<p! (.arrayBuffer resp))
-                          iv-arr     (b64->uint8 iv-b64)
-                          algo       #js {:name "AES-CTR"}
-                          crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
-                          dec-buf    (<p! (js/crypto.subtle.decrypt
-                                           #js {:name "AES-CTR" :counter iv-arr :length 64}
-                                           crypto-key
-                                           enc-buf))]
-                      {:status "success" :bytes dec-buf :transfer [:bytes]})))))
-
+                  (let [jwk        (.-key file-info)
+                        iv-b64     (.-iv file-info)
+                        mxc-url    (.-url file-info)
+                        resource   (str/replace (str mxc-url) #"^mxc://" "")
+                        fetch-url  (str server "/_matrix/client/v1/media/download/" resource)
+                        resp       (<p! (net/fetch fetch-url))]
+                    (if-not (.-ok resp)
+                      (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                      (let [enc-buf    (<p! (.arrayBuffer resp))
+                            iv-arr     (b64->uint8 iv-b64)
+                            algo       #js {:name "AES-CTR"}
+                            crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
+                            dec-buf    (<p! (js/crypto.subtle.decrypt
+                                             #js {:name "AES-CTR" :counter iv-arr :length 64}
+                                             crypto-key
+                                             enc-buf))]
+                        {:status "success" :bytes dec-buf :transfer [:bytes]})))))
             source
             (let [is-http?  (or (str/starts-with? source "http://")
                                 (str/starts-with? source "https://"))
@@ -532,10 +532,10 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
                   {:status "success" :bytes buf :transfer [:bytes]})))
 
             :else
-            {:status "error" :msg "Neither event-id with cache hit nor source MXC provided."}))
+            {:status "error" :msg "Neither event-id with cache hit nor source MXC provided. Stale check."}))
         (catch :default e
           (js/console.warn "Media worker trapped fetch error:" e)
-          {:status "error" :msg (str e)})))))
+          {:status "error" :msg (str e)}))))))
 #+end_src
 
 
