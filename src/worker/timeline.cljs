@@ -21,7 +21,6 @@
     (try
       (.url ffi-source)
       (catch :default _ nil))))
-
 (defn wrap-item [ffi-item]
   (let [raw-id (.uniqueId ffi-item)
         id-str (if raw-id (or (.-id raw-id) raw-id) (str "virt-" (hash ffi-item)))
@@ -96,34 +95,43 @@
                                                    :html (some-> m-content-obj .-formatted .-body)}
 
                                                   ("Image" "Video" "Audio" "File" "Sticker")
-                                                  (let [formatted  (.-formattedCaption m-content-obj)
-                                                        info       (.-info m-content-obj)
-                                                        ffi-source (.-source m-content-obj)
-                                                        raw-mxc    (extract-mxc-url ffi-source)
-                                                        res        {:mimetype (some-> info .-mimetype)
-                                                                    :size     (some-> info .-size js/Number)}]
-                                                    (when ffi-source
-                                                      (swap! state/!media-cache assoc real-id ffi-source))
+                                        (let [formatted  (.-formattedCaption m-content-obj)
+                                              info       (.-info m-content-obj)
+                                              ffi-source (.-source m-content-obj)
+                                              raw-mxc    (extract-mxc-url ffi-source)
+                                              res        {:mimetype (some-> info .-mimetype)
+                                                          :size     (some-> info .-size js/Number)}]
+                                          (when ffi-source
+                                            (try
+                                              (let [source-map (js/JSON.parse (.toJson ffi-source))]
+                                                (swap! state/!media-cache assoc real-id source-map))
+                                              (catch :default e
+                                                (log/error "Failed to serialize media source:" e))))
 
-                                                    {:tag         m-tag
-                                                     :source      raw-mxc
-                                                     :caption     (.-caption m-content-obj)
-                                                     :html        (when formatted (.-body formatted))
-                                                     :info        (if (and info (.-width info))
-                                                                    (assoc res :w (js/Number (.-width info))
-                                                                           :h (js/Number (.-height info)))
-                                                                    res)})
-                                                  {:unsupported true})})
+                                          {:tag         m-tag
+                                           :source      raw-mxc
+                                           :caption     (.-caption m-content-obj)
+                                           :html        (when formatted (.-body formatted))
+                                           :info        (if (and info (.-width info))
+                                                          (assoc res :w (js/Number (.-width info))
+                                                                     :h (js/Number (.-height info)))
+                                                          res)})
+                                        {:unsupported true})})
                                     "Sticker"
                                     (let [ffi-source (.-source kind-inner)
-                                          raw-mxc    (extract-mxc-url ffi-source)
-                                          ]
-                                      (swap! state/!media-cache assoc real-id ffi-source)
+                                          raw-mxc    (extract-mxc-url ffi-source)]
+                                      (when ffi-source
+                                        (try
+                                          (let [source-map (js/JSON.parse (.toJson ffi-source))]
+                                            (swap! state/!media-cache assoc real-id source-map))
+                                          (catch :default e
+                                            (log/error "Failed to serialize sticker source:" e))))
                                       {:source raw-mxc
                                        :info   (when-let [info (.-info kind-inner)]
                                                  {:w (some-> info .-width js/Number)
                                                   :h (some-> info .-height js/Number)})})
                                     nil)})
+
                         "State"
                         (let [state-content (.-content content-inner)
                               state-tag     (.-tag state-content)
@@ -200,12 +208,13 @@
               t-handle (when is-live?
                          (.subscribeToTypingNotifications room #js {:call #(worker/stream! {:type "typing-update" :room-id room-id :users (js->clj %)})}))
               p-handle (when is-live?
-                         (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))]
+                         (.subscribeToBackPaginationStatus tl #js {:onUpdate #(worker/stream! {:type "pagination-status" :room-id room-id :status %})}))
+              _        (when (:forward paginate-amount)
+                         (.paginateForwards tl (:forward paginate-amount)))
+              _        (when (:back paginate-amount)
+                         (.paginateBackwards tl (:back paginate-amount)))]
         (swap! !active-timelines assoc-in [room-id source]
-               {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle})
-        (when (:forward paginate-amount)
-          (.paginateForwards tl (:forward paginate-amount)))
-        (.paginateBackwards tl (:back paginate-amount)))
+               {:timeline tl :handle handle :t-handle t-handle :p-handle p-handle}))
       (p/catch #(log/error source "boot failed:" %))
       (p/finally #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))))
 
@@ -221,11 +230,13 @@
                              :room-id room-id
                              :focus-obj (focus {:type :live :threaded? false})
                              :track-receipts 0
-                             :paginate-amount {:back 25}})
+                             :paginate-amount {:back 1}
+
+                             })
 
             :focused
             (if event-id
-              (boot-timeline! {:source :focused
+               (boot-timeline! {:source :focused
                                :room room
                                :room-id room-id
                                :focus-obj (focus {:type :event :id event-id :count 40})
@@ -249,7 +260,6 @@
 
 
 
-()
 
 
 (defn safe-cancel! [handle]
@@ -368,45 +378,45 @@
 (worker/register :get-media
   (fn [{:keys [event-id source]}]
     (go
-      (try
-        (let [client     @state/!client
-              session    (.session client)
-              hs-url     (.-homeserverUrl session)
-              server     (str/replace (str hs-url) #"/+$" "")
-              ffi-source (when event-id (get @state/!media-cache event-id))]
+      (if-not (or event-id source)
+        {:status "ignored" :msg "No source provided"}
+        (try
+          (let [client     @state/!client
+                session    (.session client)
+                hs-url     (.-homeserverUrl session)
+                server     (str/replace (str hs-url) #"/+$" "")
+                source-map (when event-id (get @state/!media-cache event-id))]
 
-          (cond
-            ffi-source
-            (let [source-map (js/JSON.parse (.toJson ffi-source))
-                  file-info  (.-file source-map)]
-              (if-not file-info
-                (let [mxc       (or source (.-url source-map) (some-> source-map .-plain .-url) "")
-                      resource  (str/replace (str mxc) #"^mxc://" "")
-                      fetch-url (str server "/_matrix/client/v1/media/download/" resource)
-                      resp      (<p! (net/fetch fetch-url))]
-                  (if-not (.-ok resp)
-                    (throw (ex-info "Fetch failed" {:status (.-status resp)}))
-                    (let [buf (<p! (.arrayBuffer resp))]
-                      {:status "success" :bytes buf :transfer [:bytes]})))
+            (cond
+              source-map
+              (let [file-info (.-file source-map)]
+                (if-not file-info
+                  (let [mxc       (or source (.-url source-map) (some-> source-map .-plain .-url) "")
+                        resource  (str/replace (str mxc) #"^mxc://" "")
+                        fetch-url (str server "/_matrix/client/v1/media/download/" resource)
+                        resp      (<p! (net/fetch fetch-url))]
+                    (if-not (.-ok resp)
+                      (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                      (let [buf (<p! (.arrayBuffer resp))]
+                        {:status "success" :bytes buf :transfer [:bytes]})))
 
-                (let [jwk        (.-key file-info)
-                      iv-b64     (.-iv file-info)
-                      mxc-url    (.-url file-info)
-                      resource   (str/replace (str mxc-url) #"^mxc://" "")
-                      fetch-url  (str server "/_matrix/client/v1/media/download/" resource)
-                      resp       (<p! (net/fetch fetch-url))]
-                  (if-not (.-ok resp)
-                    (throw (ex-info "Fetch failed" {:status (.-status resp)}))
-                    (let [enc-buf    (<p! (.arrayBuffer resp))
-                          iv-arr     (b64->uint8 iv-b64)
-                          algo       #js {:name "AES-CTR"}
-                          crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
-                          dec-buf    (<p! (js/crypto.subtle.decrypt
-                                           #js {:name "AES-CTR" :counter iv-arr :length 64}
-                                           crypto-key
-                                           enc-buf))]
-                      {:status "success" :bytes dec-buf :transfer [:bytes]})))))
-
+                  (let [jwk        (.-key file-info)
+                        iv-b64     (.-iv file-info)
+                        mxc-url    (.-url file-info)
+                        resource   (str/replace (str mxc-url) #"^mxc://" "")
+                        fetch-url  (str server "/_matrix/client/v1/media/download/" resource)
+                        resp       (<p! (net/fetch fetch-url))]
+                    (if-not (.-ok resp)
+                      (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                      (let [enc-buf    (<p! (.arrayBuffer resp))
+                            iv-arr     (b64->uint8 iv-b64)
+                            algo       #js {:name "AES-CTR"}
+                            crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
+                            dec-buf    (<p! (js/crypto.subtle.decrypt
+                                             #js {:name "AES-CTR" :counter iv-arr :length 64}
+                                             crypto-key
+                                             enc-buf))]
+                        {:status "success" :bytes dec-buf :transfer [:bytes]})))))
             source
             (let [is-http?  (or (str/starts-with? source "http://")
                                 (str/starts-with? source "https://"))
@@ -421,10 +431,10 @@
                   {:status "success" :bytes buf :transfer [:bytes]})))
 
             :else
-            {:status "error" :msg "Neither event-id with cache hit nor source MXC provided."}))
+            {:status "error" :msg "Neither event-id with cache hit nor source MXC provided. Stale check."}))
         (catch :default e
           (js/console.warn "Media worker trapped fetch error:" e)
-          {:status "error" :msg (str e)})))))
+          {:status "error" :msg (str e)}))))))
 
 (defn make-timeline-item-shim [item event-id]
   #js {:uniqueId (fn [] #js {:id event-id})
