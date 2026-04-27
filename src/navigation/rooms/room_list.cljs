@@ -255,7 +255,6 @@
    (let [active-call-id     (get-in db [:call :active-room-id])
          already-loaded?    (get-in db [:room-members room-id :data])
          loading?           (get-in db [:room-members room-id :loading?])
-
          is-call-room?      (is-call-room? db room-id)
 
          force-lobby?       (:force-lobby? opts)
@@ -282,7 +281,7 @@
                              (when (and (= current-side-panel :timeline) (nil? side-panel-update)) [:container/set-side-panel nil])
                              (when is-call-room? [:call/init-widget room-id {:join-directly? join-directly?}])])]
      {:db                 base-db
-      :input/focus-composer true
+      :input/focus-composer (not mobile?)
       :dispatch-n         dispatches})))
 
 
