@@ -151,6 +151,44 @@ is responsible for its calculations.
 #+end_src
 
 
+**** Measuring Sticks
+
+We want to try to dynamically calculate the size of components
+at least once. That way we can pass pretext the correct
+values without overly relying on plugin developers to update
+the values correctly. This should prove to be a bit more
+resilient.
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/virtualizer.cljs
+(defn timeline-measuring-sticks [ruler-ref-fn]
+  [:div#timeline-rulers
+   {:style {:position "absolute" :visibility "hidden" :pointer-events "none" :z-index -1 :width "100%"}}
+   [:div.swipe-foreground.timeline-message.is-message {:id "ruler-row" :ref ruler-ref-fn}
+    [:div.timeline-avatar-wrapper {:id "ruler-avatar" :ref ruler-ref-fn}]
+    [:div.timeline-content-wrapper {:id "ruler-content-wrapper" :ref ruler-ref-fn}
+     [:div.timeline-header {:id "ruler-header" :ref ruler-ref-fn}
+      [:span.timeline-sender-name "A"]
+      [:span.timeline-timestamp "12:00 PM"]]
+     [:div.timeline-reply-banner {:id "ruler-reply" :ref ruler-ref-fn} "Reply Text"]
+     [:div.timeline-body {:id "ruler-text-plain" :ref ruler-ref-fn}
+      [:div.message-render-container
+       [:span.body "A"]]]
+     [:div.timeline-body {:id "ruler-text-html" :ref ruler-ref-fn}
+      [:div.message-render-container
+       [:span.body.formatted [:p {:style {:margin 0}} "A"]]]]
+     [:div.timeline-body
+      [:pre {:id "ruler-code" :ref ruler-ref-fn} [:code "A"]]]
+     [:div {:style {:display "flex"}}
+      [:span.timeline-edited-label {:id "ruler-edited" :ref ruler-ref-fn} "(edited)"]]
+     [:div.reactions-row {:id "ruler-reaction" :ref ruler-ref-fn}
+      [:span.reaction-pill "😀 1"]]]]
+   [:div.timeline-system-event {:id "ruler-system" :ref ruler-ref-fn} "System text"]
+   [:div.timeline-item-virtual-wrapper {:id "ruler-divider" :ref ruler-ref-fn}
+    [:div.timeline-date-separator
+     [:div.separator-line]
+     [:span.separator-text "Today"]
+     [:div.separator-line]]]])
+#+end_src
 
 
 **** Virtualizer
