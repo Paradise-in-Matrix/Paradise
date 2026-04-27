@@ -364,11 +364,15 @@ read receipts. This prevents any sort of spamming to the home server.
                                :background "var(--bg-secondary)"})
                !blob-url    (r/atom nil)
                _   (go
-                     (let [pool @state/!engine-pool
+                     (let [pool @state/!media-pool
+                           {:keys [token hs-url]} @net/!auth-context
                            res  (<! (main/do-with-pool! pool {:handler :get-media
                                                               :arguments {:room-id room-id
                                                                           :source source-url
-                                                                          :event-id event-id}}))]
+                                                                          :event-id event-id
+                                                                          :source-map source-map
+                                                                          :hs-url hs-url
+                                                                          :token token}}))]
                        (case (:status res)
                          "unencrypted"
                          (reset! !blob-url (:url res))
@@ -390,6 +394,7 @@ read receipts. This prevents any sort of spamming to the home server.
     (finally
       (when-let [url @!blob-url]
         (js/URL.revokeObjectURL url)))))
+
 
 (defn calc-media-height [content actual-tag available-w theme-metrics]
   (let [info          (or (:info content)
@@ -420,7 +425,7 @@ read receipts. This prevents any sort of spamming to the home server.
   [:div.image-attachment-container
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
-      [:img {:src url :alt alt-text :loading "eager"
+      [:img {:src url :alt alt-text :loading "lazy"
 ;;             :decoding "async"
 
              :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox
@@ -450,7 +455,7 @@ read receipts. This prevents any sort of spamming to the home server.
 (defn sticker-message [event content]
   [async-media-wrapper event content {:class "media-sticker" :default-ratio 1.0}
    (fn [url alt]
-     [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])])
+     [:img {:src url :alt alt :loading "lazy" :style {:width "100%" :height "100%" :display "block"}} ])])
 #+end_src
 
 
