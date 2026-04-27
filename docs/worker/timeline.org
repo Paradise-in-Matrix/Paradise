@@ -315,11 +315,13 @@ export enum TimelineEventFocusThreadMode_Tags {
                              :room-id room-id
                              :focus-obj (focus {:type :live :threaded? false})
                              :track-receipts 0
-                             :paginate-amount {:back 25}})
+                             :paginate-amount {:back 1}
+
+                             })
 
             :focused
             (if event-id
-              (boot-timeline! {:source :focused
+               (boot-timeline! {:source :focused
                                :room room
                                :room-id room-id
                                :focus-obj (focus {:type :event :id event-id :count 40})
@@ -343,7 +345,6 @@ export enum TimelineEventFocusThreadMode_Tags {
 
 
 
-()
 
 #+end_src
 
