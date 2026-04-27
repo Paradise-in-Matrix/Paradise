@@ -2,6 +2,7 @@
   (:require [reagent.core :as r]))
 
 (defonce !engine-pool (atom nil))
+(defonce !media-pool (atom nil))
 (defonce !config (atom nil))
 (defonce !components (r/atom {}))
 (defonce !active-overrides (r/atom {}))
