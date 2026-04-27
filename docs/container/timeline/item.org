@@ -681,6 +681,7 @@ state for now.
 
 (defn calc-text-height [msg available-w pretext-cache theme-metrics]
   (let [content (:content msg)
+        content-tag (:tag content)
         html-txt (or (get-in content [:inner :content :html]) "")
 
         raw-txt (if (not-empty html-txt)
@@ -722,19 +723,30 @@ state for now.
         cached-text-h (get @pretext-cache cache-key)]
 
     (or cached-text-h
-        (let [lines   (str/split measure-str #"\n")
-              total-h (reduce (fn [acc line]
-                                (let [trimmed (str/trim line)]
-                                  (if (empty? trimmed)
-                                    (+ acc base-lh)
-                                    (let [prep (prepare line font-str #js {:whiteSpace "pre-wrap"
-                                                                           :wordBreak "normal"})
-                                          raw  (try (layout prep safe-available-w base-lh) (catch js/Error _ nil))]
-                                      (+ acc (if raw (.-height raw) base-lh))))))
-                              0 lines)
-              final-h (+ total-h code-padding)]
+        (let [prep (prepareWithSegments measure-str font-str #js {:whiteSpace "pre-wrap"
+                                                                  :wordBreak "normal"})
+              raw  (try (layoutWithLines prep safe-available-w base-lh) (catch js/Error _ nil))
+              total-h (if raw (.-height raw) base-lh)
+
+              lines-arr (if raw (.-lines raw) #js [])
+              len (.-length lines-arr)
+              last-line-w (if (pos? len) (.-width (aget lines-arr (dec len))) 0)
+
+              edited-w (:edited-label-w theme-metrics 40)
+              edited-tax (if (and is-edited? (> (+ last-line-w edited-w) safe-available-w))
+                           base-lh
+                           0)
+
+              has-html? (seq html-txt)
+              v-tax (if has-html?
+                      (:html-vertical-tax theme-metrics 0)
+                      (:text-vertical-tax theme-metrics 0))
+
+              final-h (+ total-h code-padding edited-tax v-tax)]
+
           (swap! pretext-cache assoc cache-key final-h)
           final-h))))
+
 
 (defmethod calc-item-height :message [msg width pretext-cache theme-metrics]
   (let [is-sequence-start? (not (:merge-with-prev? msg))
