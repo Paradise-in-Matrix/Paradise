@@ -42,8 +42,8 @@
                         (if (empty? val) fallback val)))
         avatar-size (get-var "--chat-avatar-size" 32)
         avatar-gap  (get-var "--chat-avatar-gap" 14)]
-    {:font             (get-str-var "--chat-body-font" "15.2px sans-serif")
-     :line-height      (get-var "--chat-body-line-height" 22.8)
+    {:font              (get-str-var "--chat-body-font" "15.2px sans-serif")
+     :line-height       (get-var "--chat-body-line-height" 22.8)
      :avatar-h          avatar-size
      :avatar-col-w      (+ avatar-size avatar-gap)
      :header-h          (get-var "--chat-header-h" 26.8)
@@ -62,12 +62,17 @@
      :code-font         (get-str-var "--chat-code-font" "13.68px 'fira code', monospace")
      :code-line-height  (get-var "--chat-code-line-height" 20.52)}))
 
+
 (defn estimate-height [msg width pretext-cache measured-heights theme-metrics]
   (let [id (:id msg)
         cached-measured (get measured-heights id)]
     (if cached-measured
       cached-measured
-      (item/calc-item-height msg width pretext-cache theme-metrics))))
+      (if (= id "read-marker")
+        (:virtual-divider-h theme-metrics 49)
+        (item/calc-item-height msg width pretext-cache theme-metrics)))))
+
+
 
 (defn calculate-layout [events width pretext-cache measured-heights theme-metrics]
   (reduce (fn [acc msg]
@@ -79,41 +84,157 @@
           {:total 0 :items []}
           events))
 
+(defn timeline-measuring-sticks [ruler-ref-fn]
+  [:div#timeline-rulers
+   {:style {:position "absolute" :visibility "hidden" :pointer-events "none" :z-index -1 :width "100%"}}
+   [:div.swipe-foreground.timeline-message.is-message {:id "ruler-row" :ref ruler-ref-fn}
+    [:div.timeline-avatar-wrapper {:id "ruler-avatar" :ref ruler-ref-fn}]
+    [:div.timeline-content-wrapper {:id "ruler-content-wrapper" :ref ruler-ref-fn}
+     [:div.timeline-header {:id "ruler-header" :ref ruler-ref-fn}
+      [:span.timeline-sender-name "A"]
+      [:span.timeline-timestamp "12:00 PM"]]
+     [:div.timeline-reply-banner {:id "ruler-reply" :ref ruler-ref-fn} "Reply Text"]
+     [:div.timeline-body {:id "ruler-text-plain" :ref ruler-ref-fn}
+      [:div.message-render-container
+       [:span.body "A"]]]
+     [:div.timeline-body {:id "ruler-text-html" :ref ruler-ref-fn}
+      [:div.message-render-container
+       [:span.body.formatted [:p {:style {:margin 0}} "A"]]]]
+     [:div.timeline-body
+      [:pre {:id "ruler-code" :ref ruler-ref-fn} [:code "A"]]]
+     [:div {:style {:display "flex"}}
+      [:span.timeline-edited-label {:id "ruler-edited" :ref ruler-ref-fn} "(edited)"]]
+     [:div.reactions-row {:id "ruler-reaction" :ref ruler-ref-fn}
+      [:span.reaction-pill "😀 1"]]]]
+   [:div.timeline-system-event {:id "ruler-system" :ref ruler-ref-fn} "System text"]
+   [:div.timeline-item-virtual-wrapper {:id "ruler-divider" :ref ruler-ref-fn}
+    [:div.timeline-date-separator
+     [:div.separator-line]
+     [:span.separator-text "Today"]
+     [:div.separator-line]]]])
+
 (defn pretext-timeline [room-id]
   (r/with-let [!scroll-ref      (atom nil)
-               !scroll-top      (r/atom 0)
+               !dist-bottom     (r/atom 0)
                !container-width (r/atom 400)
                !prepared-cache  (atom {})
                !measured        (r/atom {})
-               !theme-metrics   (r/atom {:font "16px sans-serif" :line-height 24})
                !latest-events   (atom {})
-               metrics-obs      (js/ResizeObserver.
-                                 (fn [entries]
-                                   (let [el (.-target (aget entries 0))
-                                         metrics (get-computed-metrics el)]
-                                     (when (not= metrics @!theme-metrics)
-                                       (reset! !prepared-cache {})
-                                       (reset! !theme-metrics metrics)))))
+
+               !theme-metrics (r/atom {:font "16px sans-serif" :line-height 22.8})
+               metrics-obs (js/ResizeObserver.
+                            (fn [entries]
+                              (let [parse-px (fn [val fallback]
+                                               (let [v (js/parseFloat val)]
+                                                 (if (js/isNaN v) fallback v)))
+
+                                    new-metrics
+                                    (reduce
+                                     (fn [acc entry]
+                                       (let [el    (.-target entry)
+                                             id    (.-id el)
+                                             style (js/window.getComputedStyle el)]
+
+                                         (case id
+
+                                           "ruler-text-html"
+                                           (let [total-h (.-offsetHeight el)
+                                                 base-lh (:line-height acc 22.8)]
+                                             (assoc acc :html-vertical-tax (max 0 (- total-h base-lh))))
+
+                                           "ruler-row"
+                                           (assoc acc
+                                                  :row-w          (.-offsetWidth el)
+                                                  :seq-padding    (parse-px (.getPropertyValue style "--chat-seq-padding") 10)
+                                                  :merged-padding (parse-px (.getPropertyValue style "--chat-merged-padding") 5)
+                                                  :media-margin   (parse-px (.getPropertyValue style "--chat-media-margin") 0))
+
+                                           "ruler-content-wrapper"
+                                           (assoc acc :content-w (.-offsetWidth el))
+
+                                           "ruler-reply"
+                                           (let [mb (parse-px (.getPropertyValue style "margin-bottom") 0)
+                                                 mt (parse-px (.getPropertyValue style "margin-top") 0)]
+                                             (assoc acc :reply-banner-h (+ (.-offsetHeight el) mb mt)))
+
+"ruler-text-plain"
+                                           (let [lh          (parse-px (.getPropertyValue style "line-height") 22.8)
+                                                 total-h     (.-offsetHeight el)
+                                                 container-w (.-offsetWidth el)
+                                                 fw          (.getPropertyValue style "font-weight")
+                                                 fs          (.getPropertyValue style "font-size")
+                                                 ff          (.getPropertyValue style "font-family")
+                                                 raw-font    (str/trim (.getPropertyValue style "font"))
+                                                 font-str    (if (empty? raw-font)
+                                                               (str fw " " fs " " ff)
+                                                               raw-font)]
+                                             (assoc acc
+                                                    :line-height       lh
+                                                    :text-vertical-tax (max 0 (- total-h lh))
+                                                    :text-node-w       container-w
+                                                    :font              font-str
+                                                    :text-wrap-buffer  (parse-px (.getPropertyValue style "--chat-text-wrap-buffer") 8)
+                                                    :quote-wrap-buffer (parse-px (.getPropertyValue style "--chat-quote-wrap-buffer") 19)))
+
+                                           "ruler-code"
+                                           (let [lh          (parse-px (.getPropertyValue style "line-height") 20.52)
+                                                 pt          (parse-px (.getPropertyValue style "padding-top") 0)
+                                                 pb          (parse-px (.getPropertyValue style "padding-bottom") 0)
+                                                 fw          (.getPropertyValue style "font-weight")
+                                                 fs          (.getPropertyValue style "font-size")
+                                                 ff          (.getPropertyValue style "font-family")
+                                                 raw-font    (str/trim (.getPropertyValue style "font"))
+                                                 font-str    (if (empty? raw-font)
+                                                               (str fw " " fs " " ff)
+                                                               raw-font)]
+                                             (assoc acc
+                                                    :code-line-height lh
+                                                    :code-padding     (+ pt pb)
+                                                    :code-font        font-str))
+
+
+                                           "ruler-avatar"   (assoc acc :avatar-h (.-offsetHeight el))
+                                           "ruler-header"   (assoc acc :header-h (.-offsetHeight el))
+
+                                           "ruler-edited"
+                                           (assoc acc
+                                                  :edited-label-h (.-offsetHeight el)
+                                                  :edited-label-w (.-offsetWidth el))
+
+                                           "ruler-reaction" (assoc acc :reaction-row-h (.-offsetHeight el) :reaction-pill-h (.-offsetHeight el))
+                                           "ruler-system"   (assoc acc :system-event-h (.-offsetHeight el))
+                                           "ruler-divider"  (assoc acc :virtual-divider-h (.-offsetHeight el))
+
+
+                                           acc)))
+                                     @!theme-metrics
+                                     entries)]
+
+                                (when (not= new-metrics @!theme-metrics)
+                                  (log/info "Theme metrics dynamically recalibrated from true DOM!")
+                                  (reset! !prepared-cache {})
+                                  (reset! !theme-metrics new-metrics)))))
                !at-bottom?      (r/atom true)
                !show-jump?      (r/atom false)
                !initialized?    (r/atom false)
                !scroll-timer    (atom nil)
-               item-resize-obs (js/ResizeObserver.
-                                 (fn [entries]
-                                   (doseq [entry entries]
-                                     (let [el (.-target entry)
-                                           id (.getAttribute el "data-event-id")
-                                           rect (.-contentRect entry)
-                                           dom-h (.-height rect)]
-                                       (when (and id (pos? dom-h))
-                                         (when-let [msg (get @!latest-events id)]
-                                           (let [current-measured (get @!measured id)
-                                                 estimated (estimate-height msg @!container-width !prepared-cache !measured @!theme-metrics)
-                                                 diff (js/Math.abs (- dom-h estimated))]
-                                             (when (and (> diff 2) (not= current-measured (js/Math.round dom-h)))
-                                               (log/warn "Layout Correction on" id "| Math:" estimated "| DOM:" dom-h)
-                                               (log/warn "Message event: " msg)
-                                               (swap! !measured assoc id (js/Math.round dom-h))))))))))
+item-resize-obs (js/ResizeObserver.
+                                (fn [entries]
+                                  (doseq [entry entries]
+                                    (let [el (.-target entry)
+                                          id (.getAttribute el "data-event-id")
+                                          rect (.-contentRect entry)
+                                          dom-h (.-height rect)]
+                                      (when (and id (pos? dom-h))
+                                        (when-let [msg (or (get @!latest-events id)
+                                                           (when (= id "read-marker") {:id id}))]
+                                          (let [current-measured (get @!measured id)
+                                                estimated (estimate-height msg @!container-width !prepared-cache !measured @!theme-metrics)
+                                                diff (js/Math.abs (- dom-h estimated))]
+                                            (when (and (> diff 4) (not= current-measured (js/Math.round dom-h)))
+                                              (log/warn "Layout Correction on" id "| Math:" estimated "| DOM:" dom-h)
+                                              (log/warn "Message event: " msg)
+                                              (swap! !measured assoc id (js/Math.round dom-h))))))))))
 
                container-obs    (js/ResizeObserver.
                                  (fn [entries]
@@ -121,7 +242,7 @@
                                      (reset! !container-width (.-width rect)))))]
     (fn [room-id]
       (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
-             events-map       @(re-frame/subscribe [:timeline/events-map room-id])
+            events-map       @(re-frame/subscribe [:timeline/events-map room-id])
             _                (reset! !latest-events events-map)
             ordered-events   (keep #(or (get events-map (:id %)) %) (reverse events))
             cnt              (count ordered-events)
@@ -135,18 +256,11 @@
 
             layout-data      @(r/track calculate-layout ordered-events width !prepared-cache @!measured metrics)
 
-
             total-height     (:total layout-data)
             positioned       (:items layout-data)
-            visible-window   (let [st @!scroll-top
+            visible-window   (let [dist-from-bottom @!dist-bottom
                                    vh (if-let [el @!scroll-ref] (.-clientHeight el) 800)
                                    overscan 2000
-                                   max-s (max 0 (- total-height vh))
-                                   dist-from-bottom (if (<= st 0)
-                                                      (js/Math.abs st)
-                                                      (if (> st (/ max-s 2))
-                                                        (max 0 (- max-s st))
-                                                        0))
                                    w-start (- dist-from-bottom overscan)
                                    w-end (+ dist-from-bottom vh overscan)]
                                (->> positioned
@@ -178,28 +292,34 @@
            0))
 
         (when (and @!scroll-ref
-                 @!initialized?
-                 (pos? cnt)
-                 (not loading?)
-                 (not back-dead?)
-                 (< total-height (.-clientHeight @!scroll-ref)))
-        (js/setTimeout
-         (fn []
-           (re-frame/dispatch [:sdk/back-paginate room-id]))
-         50))
+                   @!initialized?
+                   (pos? cnt)
+                   (not loading?)
+                   (not back-dead?)
+                   (< total-height (.-clientHeight @!scroll-ref)))
+          (js/setTimeout
+           (fn []
+             (re-frame/dispatch [:sdk/back-paginate room-id]))
+           50))
 
         [:div.timeline-wrapper
-         {:ref (fn [el]
-                 (if el
-                   (.observe container-obs el)
-                   (.disconnect container-obs)))}
+
+         [timeline-measuring-sticks
+          (fn [el]
+            (when el (.observe metrics-obs el)))]
 
          [:div.timeline-item {:style {:position "absolute" :visibility "hidden" :pointer-events "none" :z-index -1}}
           [:div.timeline-body {:ref #(when % (.observe metrics-obs %))}
            "Measuring Stick"]]
 
          [:div.timeline-messages
-          {:ref #(reset! !scroll-ref %)
+          {:ref
+           (fn [el]
+             (reset! !scroll-ref el)
+             (if el
+               (.observe container-obs el)
+               (.disconnect container-obs)))
+
            :class (when jump-target "jumping-animation")
            :on-scroll (fn [e]
                         (let [target           (.-currentTarget e)
@@ -213,8 +333,8 @@
                               dist-from-top    (max 0 (- max-scroll dist-from-bottom))
                               at-bottom        (<= dist-from-bottom 30)]
 
-                          (when (not= @!scroll-top scroll-top)
-                            (reset! !scroll-top scroll-top))
+                          (when (not= @!dist-bottom dist-from-bottom)
+                            (reset! !dist-bottom dist-from-bottom))
 
                           (when (and (pos? cnt) (not loading?) @!initialized?)
                             (reset! !at-bottom? at-bottom)
@@ -251,7 +371,6 @@
                        {:style {:height (str bottom-gap "px")
                                 :overflow-anchor "auto"
 
-
                                 :flex-shrink 0
                                 :width "100%"}}]]
                      (for [{:keys [id height] :as item} visible-window]
@@ -272,9 +391,9 @@
                      [^{:key "top-gap"}
                       [:div.timeline-top-gap
                        {:style {:height (str top-gap "px")
+                                :overflow-anchor "none"
                                 :flex-shrink 0
                                 :width "100%"}}]]))))
-
 
           (when (and focus-mode? loading-forward?)
             [:div.spinner-wrapper
