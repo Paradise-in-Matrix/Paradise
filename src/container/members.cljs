@@ -195,20 +195,21 @@
     :on-click #(re-frame/dispatch [:room/set-member-filter-type room-id type])}
    (str label " (" (or count 0) ")")])
 
-(defn build-member-actions [tr {:keys [user-id display-name]} active-room]
-  [{:id "view-profile"
-    :label (tr [:container.member-actions/view-profile])
-    :action #(js/console.log "View profile for:" user-id)}
-   {:id "mention"
-    :label (tr [:container.member-actions/mention] [display-name])
-    :action #(js/console.log "Mention:" user-id)}
-   {:id "message"
-    :label (tr [:container.member-actions/message])
-    :action #(js/console.log "DM:" user-id)}
-   {:id "kick"
-    :label (tr [:container.member-actions/kick])
-    :class-name "text-danger"
-    :action #(js/console.log "Kick:" user-id)}])
+(defn build-member-actions [{:keys [user-id display-name]} active-room]
+  (let [tr           @(re-frame/subscribe [:i18n/tr])]
+    [{:id "view-profile"
+      :label (tr [:container.member-actions/view-profile])
+      :action #(log/info "View profile for:" user-id)}
+     {:id "mention"
+      :label (tr [:container.member-actions/mention] [display-name])
+      :action #(log/info "Mention:" user-id)}
+     {:id "message"
+      :label (tr [:container.member-actions/message])
+      :action #(log/info "DM:" user-id)}
+     {:id "kick"
+      :label (tr [:container.member-actions/kick])
+      :class-name "text-danger"
+      :action #(log/info "Kick:" user-id)}]))
 
 (defn profile-popover-trigger [member custom-tags active-room pos child]
   (let [open-popover! (fn [current-target]
@@ -225,8 +226,8 @@
                              :height     150
                              :backdrop?  true
                              :member     member
-                             :tags       custom-tags}])))]
-    (let [trigger-props {:on-click (fn [e]
+                             :tags       custom-tags}])))
+        trigger-props {:on-click (fn [e]
                                      (.stopPropagation e)
                                      (open-popover! (.-currentTarget e)))
                          :on-context-menu (fn [e]
@@ -237,13 +238,13 @@
                                              [:context-menu/open
                                               {:x (.-clientX e)
                                                :y (.-clientY e)
-                                               :items (build-member-actions tr member active-room)}]))}
+                                               :items (build-member-actions member active-room)}]))}
 
           [tag & xs] child
           has-props? (map? (first xs))
           old-props  (if has-props? (first xs) {})
           body       (if has-props? (rest xs) xs)]
-      (into [tag (merge old-props trigger-props)] body))))
+      (into [tag (merge old-props trigger-props)] body)))
 
 (defn member-item [m custom-tags active-room]
   (let [pl         (:power-level m)
