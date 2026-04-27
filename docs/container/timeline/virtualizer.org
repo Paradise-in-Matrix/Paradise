@@ -77,8 +77,8 @@ sophisticated in determining these (so font can be varied throughout).
                         (if (empty? val) fallback val)))
         avatar-size (get-var "--chat-avatar-size" 32)
         avatar-gap  (get-var "--chat-avatar-gap" 14)]
-    {:font             (get-str-var "--chat-body-font" "15.2px sans-serif")
-     :line-height      (get-var "--chat-body-line-height" 22.8)
+    {:font              (get-str-var "--chat-body-font" "15.2px sans-serif")
+     :line-height       (get-var "--chat-body-line-height" 22.8)
      :avatar-h          avatar-size
      :avatar-col-w      (+ avatar-size avatar-gap)
      :header-h          (get-var "--chat-header-h" 26.8)
@@ -96,6 +96,7 @@ sophisticated in determining these (so font can be varied throughout).
      :code-padding      (get-var "--chat-code-padding" 28)
      :code-font         (get-str-var "--chat-code-font" "13.68px 'fira code', monospace")
      :code-line-height  (get-var "--chat-code-line-height" 20.52)}))
+
 #+end_src
 
 
