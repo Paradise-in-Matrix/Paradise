@@ -350,6 +350,7 @@ read receipts. This prevents any sort of spamming to the home server.
                event-id     (:id event)
                info         (:info content)
                source-url   (:source content)
+               source-map   (:source-map content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
