@@ -488,11 +488,11 @@ individual's display name.
 (defn reaction-row [{:keys [reactions my-id members-map active-room event-id]}]
   [:div.reactions-row
    (for [[emoji count senders] reactions]
-     ^{:key emoji}
      (let [hover-text (->> senders
                            (map (fn [uid]
                                   (or (:display-name (get members-map uid)) uid)))
                            (str/join ", "))]
+       ^{:key emoji}
        [:span.reaction-pill
         {:class (when (contains? senders my-id) "active")
          :title hover-text
