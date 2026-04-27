@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "930823777712",
+    "project_id": "device-streaming-d838e540",
+    "storage_bucket": "device-streaming-d838e540.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:930823777712:android:00909ea951b635508c7a75",
+        "android_client_info": {
+          "package_name": "com.gigiaj.paradise"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOc2FdDJ0btxbw-1vvxn7L2Luj7IdRNcA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:930823777712:android:f28dcfc53f6dede08c7a75",
+        "android_client_info": {
+          "package_name": "moi.paradise.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOc2FdDJ0btxbw-1vvxn7L2Luj7IdRNcA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
