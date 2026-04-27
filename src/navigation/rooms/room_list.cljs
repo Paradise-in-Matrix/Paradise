@@ -239,45 +239,51 @@
  :rooms/select
  (fn [{:keys [db]} [_ room-id opts]]
    (let [current-room-id (:active-room-id db)
-         current-user (:active-user-id db)
-         active-call-id  (get-in db [:call :active-room-id])
-         already-loaded? (get-in db [:room-members room-id :data])
-         loading?        (get-in db [:room-members room-id :loading?])
+         current-user    (:active-user-id db)]
+     (store/set-setting! (str "last_room_" current-user) room-id)
 
-         is-call-room?   (is-call-room? db room-id)
+     (if (= current-room-id room-id)
+       {:db (assoc-in db [:ui :sidebar-open?] false)}
+       {:db         (assoc db :active-room-id nil)
+        :dispatch-n [(when current-room-id [:sdk/cleanup-timeline current-room-id])]
+        :dispatch-later [{:ms 20 :dispatch [:rooms/finish-select room-id opts]}]}))))
 
-         force-lobby?    (:force-lobby? opts)
-         focus-override  (:focus-override opts)
-         mobile?         (get-in db [:ui :mobile?])
-         join-directly?  (if force-lobby? false (not mobile?))
-         wipe-call-state? (not is-call-room?)
-         swapping-calls? (and active-call-id (not= active-call-id room-id) is-call-room?)
+
+(re-frame/reg-event-fx
+ :rooms/finish-select
+ (fn [{:keys [db]} [_ room-id opts]]
+   (let [active-call-id     (get-in db [:call :active-room-id])
+         already-loaded?    (get-in db [:room-members room-id :data])
+         loading?           (get-in db [:room-members room-id :loading?])
+
+         is-call-room?      (is-call-room? db room-id)
+
+         force-lobby?       (:force-lobby? opts)
+         focus-override     (:focus-override opts)
+         mobile?            (get-in db [:ui :mobile?])
+         join-directly?     (if force-lobby? false (not mobile?))
+         wipe-call-state?   (not is-call-room?)
+         swapping-calls?    (and active-call-id (not= active-call-id room-id) is-call-room?)
          current-side-panel (get-in db [:ui :side-panel])
-         side-panel-update  (if (and (= current-side-panel :timeline) (not focus-override)) nil current-side-panel)]
-    (store/set-setting! (str "last_room_" current-user) room-id)
-
-    (if (= current-room-id room-id)
-       {:db (assoc-in db [:ui :sidebar-open?] false) }
-       (let [new-focus (if is-call-room? :call :timeline)
-             base-db   (-> db
-                           (assoc :active-room-id room-id)
-                           (assoc-in [:ui :sidebar-open?] false)
-                           (assoc-in [:ui :main-focus] new-focus))
-             dispatches (remove nil?
-                                [(when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
-                                 [:sdk/cleanup-timeline current-room-id]
-                                 [:sdk/boot-timeline room-id]
-                                 (when (not (or already-loaded? loading?)) [:room/fetch-members room-id])
-                                 [:sdk/fetch-room-emotes :room room-id]
-                                 [:composer/load-draft room-id]
-                                 [:container/set-main-focus new-focus]
-                                 (when focus-override [:container/set-side-panel focus-override])
-                                 (when (and (= current-side-panel :timeline) (nil? side-panel-update)) [:container/set-side-panel nil])
-                                 (when is-call-room? [:call/init-widget room-id {:join-directly? join-directly?}])
-                                ])]
-         {:db base-db
-          :input/focus-composer true
-          :dispatch-n dispatches})))))
+         side-panel-update  (if (and (= current-side-panel :timeline) (not focus-override)) nil current-side-panel)
+         new-focus (if is-call-room? :call :timeline)
+         base-db   (-> db
+                       (assoc :active-room-id room-id)
+                       (assoc-in [:ui :sidebar-open?] false)
+                       (assoc-in [:ui :main-focus] new-focus))
+         dispatches (remove nil?
+                            [(when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
+                             [:sdk/boot-timeline room-id]
+                             (when (not (or already-loaded? loading?)) [:room/fetch-members room-id])
+                             [:sdk/fetch-room-emotes :room room-id]
+                             [:composer/load-draft room-id]
+                             [:container/set-main-focus new-focus]
+                             (when focus-override [:container/set-side-panel focus-override])
+                             (when (and (= current-side-panel :timeline) (nil? side-panel-update)) [:container/set-side-panel nil])
+                             (when is-call-room? [:call/init-widget room-id {:join-directly? join-directly?}])])]
+     {:db                 base-db
+      :input/focus-composer true
+      :dispatch-n         dispatches})))
 
 
 (defn filter-toggle-bar []
