@@ -55,7 +55,7 @@ So some key aspects to baking a Pretext virtualizer include:
 
 
 
-**** Preface Setup
+**** Pretext Setup
 
 
 Since we want to be able to provide dynamic themes... we do need
