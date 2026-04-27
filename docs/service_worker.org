@@ -534,8 +534,10 @@ may immediately begin to render our images.
   (when (exists? js/navigator.serviceWorker)
     (let [sw-container js/navigator.serviceWorker
           try-sync!    (fn []
-                         (when (.-controller sw-container)
-                           (re-frame/dispatch [:auth/sync-sw-with-worker])))]
+                         (-> sw-container
+                             .-ready
+                             (.then (fn [_]
+                                      (re-frame/dispatch [:auth/sync-sw-with-worker])))))]
 
       (-> (.register sw-container "/sw.js" #js {:type "module"})
           (.then (fn [reg]
@@ -564,7 +566,6 @@ may immediately begin to render our images.
                                (let [room-id (.-room_id data)]
                                  (log/debug "SW requested navigation to room:" room-id)
                                  (re-frame/dispatch [:rooms/select room-id])))))))))
-
 #+end_src
 
 
@@ -582,7 +583,7 @@ We may wish to break this apart a bit for re-usability, but for now this will do
        (let [res (<! (main/do-with-pool! pool {:handler :get-client-context}))]
          (when (= (:status res) "success")
            (re-frame/dispatch [:auth/sync-sw-only (:session res)]))))
-     (log/warn "Engine pool not ready for SW sync"))
+     (js/setTimeout #(re-frame/dispatch [:auth/sync-sw-with-worker]) 250))
    {}))
 
 (re-frame/reg-event-fx
@@ -593,16 +594,19 @@ We may wish to break this apart a bit for re-usability, but for now this will do
 (re-frame/reg-fx
  :sync-sw-auth
  (fn [session]
-   (if-let [sw-controller (.-controller js/navigator.serviceWorker)]
-     (try
-       (let [origin (.-origin (js/URL. (:homeserverUrl session)))
-             payload (assoc session :origin origin)]
-         (.postMessage sw-controller #js {:type "SET_SESSION"
-                                          :session (clj->js payload)})
-         (js/console.log "re-frame: Session synced for" (:userId session) "at" origin))
-       (catch js/Error e
-         (js/console.error "re-frame: Failed to parse homeserver URL" e)))
-     (js/console.warn "re-frame: SW controller not found"))))
+   (when (exists? js/navigator.serviceWorker)
+     (-> (.-ready js/navigator.serviceWorker)
+         (.then (fn [reg]
+                  (if-let [sw-active (.-active reg)]
+                    (try
+                      (let [origin (.-origin (js/URL. (:homeserverUrl session)))
+                            payload (assoc session :origin origin)]
+                        (.postMessage sw-active #js {:type "SET_SESSION"
+                                                     :session (clj->js payload)})
+                        (js/console.log "re-frame: Session synced for" (:userId session) "at" origin))
+                      (catch js/Error e
+                        (js/console.error "re-frame: Failed to parse homeserver URL" e)))
+                    (js/console.warn "re-frame: SW active worker not found"))))))))
 #+end_src
 
 
