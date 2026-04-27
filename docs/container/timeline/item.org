@@ -348,7 +348,7 @@ read receipts. This prevents any sort of spamming to the home server.
   (r/with-let [room-id      @(re-frame/subscribe [:rooms/active-id])
                event-id     (:id event)
                info         (:info content)
-               source-url   (:url content)
+               source-url   (:source content)
                w            (:w info)
                h            (:h info)
                valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
@@ -365,6 +365,7 @@ read receipts. This prevents any sort of spamming to the home server.
                      (let [pool @state/!engine-pool
                            res  (<! (main/do-with-pool! pool {:handler :get-media
                                                               :arguments {:room-id room-id
+                                                                          :source source-url
                                                                           :event-id event-id}}))]
                        (case (:status res)
                          "unencrypted"
