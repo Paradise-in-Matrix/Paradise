@@ -114,7 +114,11 @@ elegantly implemented into the overall resulting mathematical product.
         cached-measured (get measured-heights id)]
     (if cached-measured
       cached-measured
-      (item/calc-item-height msg width pretext-cache theme-metrics))))
+      (if (= id "read-marker")
+        (:virtual-divider-h theme-metrics 49)
+        (item/calc-item-height msg width pretext-cache theme-metrics)))))
+
+
 #+end_src
 
 
