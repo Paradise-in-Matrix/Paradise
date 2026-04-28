@@ -1,8 +1,8 @@
 {
     "name": "Paradise",
-    "version": "0.30.2",
+    "version": "0.30.3",
     "config": {
-        "build": "25"
+        "build": "26"
     },
 
     "repository": {
