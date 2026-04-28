@@ -120,7 +120,7 @@
       (let [tr             @tr-sub
             matrix-packs   @(re-frame/subscribe [:emoji/active-set])
             popover-active @(re-frame/subscribe [:ui/active-popover])
-            is-mobile?     @(re-frame/subscribe [:ui/is-mobile?])
+            is-mobile?       @(re-frame/subscribe [:ui/mobile?])
             packs          (merge categorized-system-packs matrix-packs)
             sorted-ids     (sort-by #(get-in packs [% :system-priority] 999) (keys packs))
             active-id      (or @selected-pack-id (first sorted-ids))
@@ -207,7 +207,7 @@
                                       [:div.emoji-mode-switch
                                        [:button {:class    (when-not @sticker-mode? "active")
                                                  :on-click #(reset! sticker-mode? false)}
-                                        (tr [:composer.emotes/mode-inline] )]
+                                        (tr [:composer.emotes/mode-inline])]
                                        [:button {:class    (when @sticker-mode? "active")
                                                  :on-click #(reset! sticker-mode? true)}
                                         (tr [:composer.emotes/mode-sticker])]])]
