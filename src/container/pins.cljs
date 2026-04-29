@@ -16,37 +16,29 @@
 (re-frame/reg-event-fx
  :room/fetch-pinned-events
  (fn [{:keys [db]} [_ room-id]]
-   (go
-     (let [pool @state/!engine-pool
-           res  (<! (main/do-with-pool! pool {:handler :get-pinned-events
-                                              :arguments {:room-id room-id}}))]
-       (if (= (:status res) "success")
-         (re-frame/dispatch [:room/save-pinned-events room-id (:events res)])
-         (log/error "Failed to fetch pinned events:" (:msg res)))))
+   (main/do-with-pool! @state/!engine-pool {:handler :get-pinned-events
+                                            :arguments {:room-id room-id}})
    {}))
 
 
+
 (re-frame/reg-event-db
- :room/save-pinned-events
- (fn [db [_ room-id pinned-events]]
-   (assoc-in db [:rooms/data room-id :pinned-events] pinned-events)))
+ :room/sync-pinned-ids
+ (fn [db [_ room-id pinned-ids]]
+   (let [current-pins (get-in db [:rooms/data room-id :pinned-events] {})
+         valid-pins   (select-keys current-pins pinned-ids)]
+     (assoc-in db [:rooms/data room-id :pinned-events] valid-pins))))
+
+(re-frame/reg-event-db
+ :room/update-pinned-event
+ (fn [db [_ room-id event]]
+   (assoc-in db [:rooms/data room-id :pinned-events (:id event)] event)))
 
 (re-frame/reg-sub
  :room/pinned-events
  (fn [db [_ room-id]]
-   (get-in db [:rooms/data room-id :pinned-events] [])))
+   (vals (get-in db [:rooms/data room-id :pinned-events] {}))))
 
-(re-frame/reg-sub
- :room/pinned-ids
- (fn [db [_ room-id]]
-   (let [events (get-in db [:rooms/data room-id :pinned-events] [])]
-     (mapv :id events))))
-
-(re-frame/reg-sub
- :room/pinned-event-by-id
- (fn [db [_ room-id event-id]]
-   (let [pins (get-in db [:rooms/data room-id :pinned-events] [])]
-     (first (filter #(= (:id %) event-id) pins)))))
 
 (defn pins []
   (let [active-room @(re-frame/subscribe [:rooms/active-id])
