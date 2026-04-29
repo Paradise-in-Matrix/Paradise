@@ -207,7 +207,7 @@
                                       [:div.emoji-mode-switch
                                        [:button {:class    (when-not @sticker-mode? "active")
                                                  :on-click #(reset! sticker-mode? false)}
-                                        (tr [:composer.emotes/mode-inline])]
+                                        (tr [:composer.emotes/mode-inline] )]
                                        [:button {:class    (when @sticker-mode? "active")
                                                  :on-click #(reset! sticker-mode? true)}
                                         (tr [:composer.emotes/mode-sticker])]])]
