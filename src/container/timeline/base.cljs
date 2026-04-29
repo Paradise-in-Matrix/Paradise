@@ -68,13 +68,14 @@
  ;;    (if (empty? focused-data) focused-data live-data)
      ))))
 
-
 (re-frame/reg-event-db
  :sdk/update-timeline
  (fn [db [_ room-id source new-raw-events]]
-   (assoc-in db [:timeline-data room-id source] new-raw-events)))
-
-
+   (if (get-in db [:timeline-subs room-id source])
+     (assoc-in db [:timeline-data room-id source] new-raw-events)
+     (do
+       (log/warn "Ghost diff dropped: Timeline" source "is dead for room:" room-id)
+       db))))
 
 (re-frame/reg-sub
  :timeline/sorted-events
@@ -102,13 +103,14 @@
 (re-frame/reg-event-fx
  :sdk/boot-timeline
  (fn [{:keys [db]} [_ room-id]]
-   (if (get-in db [:timeline-subs room-id])
+   (if (get-in db [:timeline-subs room-id :live])
      (do (log/warn "Prevented duplicate timeline boot for:" room-id) {})
      (do
        (main/do-with-pool! @state/!engine-pool
                            {:handler :boot-timeline
                             :arguments {:room-id room-id :mode :live}})
-       {:db (assoc-in db [:timeline-subs room-id] true)}))))
+       {:db (assoc-in db [:timeline-subs room-id :live] true)}))))
+
 
 (re-frame/reg-event-fx
  :room/boot-focused-timeline
@@ -136,6 +138,7 @@
             (update :timeline-subs dissoc room-id)
             (update :timeline-data dissoc room-id))}))
 
+
 (re-frame/reg-sub
  :timeline/pinned-events
  (fn [db [_ room-id]]
@@ -144,9 +147,8 @@
 (re-frame/reg-event-fx
  :sdk/back-paginate
  (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])]
-     (if (and room-id (not loading-back?) (not loading-forward?))
+   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])]
+     (if (and room-id (not loading-back?))
        (do
          (log/info "Triggering Worker Back Paginate for" room-id)
          (go
@@ -160,16 +162,16 @@
 (re-frame/reg-event-fx
  :sdk/forward-paginate
  (fn [{:keys [db]} [_ room-id]]
-   (let [loading-back?    (get-in db [:timeline/loading-more? room-id])
-         loading-forward? (get-in db [:timeline/loading-forward? room-id])]
-     (if (and room-id (not loading-back?) (not loading-forward?))
+   (let [loading-forward? (get-in db [:timeline/loading-forward? room-id])]
+     (if (and room-id (not loading-forward?))
        (do
          (log/info "Triggering Worker Forward Paginate for" room-id)
          (go
            (let [res (<! (main/do-with-pool! @state/!engine-pool
                                              {:handler :paginate-timeline
                                               :arguments {:room-id room-id :direction :forward :amount 25}}))]
-             (re-frame/dispatch [:sdk/pagination-complete room-id])))
+             (re-frame/dispatch [:sdk/forward-pagination-complete room-id])
+             ))
          {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
        {}))))
 
@@ -249,7 +251,7 @@
    (main/do-with-pool! @state/!engine-pool {:handler :cleanup-timeline
                                             :arguments {:room-id room-id}})
    {:db (-> db
-            (update-in [:timeline-subs room-id] dissoc :focused-timeline :focused-handle)
+            (update-in [:timeline-subs room-id] dissoc :focused :focused-handle)
             (assoc-in [:timeline-data room-id :focused] [])
             (assoc-in [:timeline/ui-state room-id :animating-jump?] true))
     :dispatch-later [{:ms 50
