@@ -33,7 +33,15 @@
       "timeline-loading"  (re-frame/dispatch [:timeline/set-loading (:room-id data) (:loading? data)])
       "typing-update"     (re-frame/dispatch [:sdk/update-typing-users (:room-id data) (:users data)])
       "pagination-status" (re-frame/dispatch [:sdk/update-pagination-status (:room-id data) (:status data)])
-      nil)))
+
+
+      ;; band-aid syncs
+      "pins-sync"  (re-frame/dispatch [:room/sync-pinned-ids (:room-id data) (:pinned-ids data)])
+      "pin-update" (re-frame/dispatch [:room/update-pinned-event (:room-id data) (:event data)])
+
+      nil)
+
+    ))
 
 (defn init-worker! []
   (when-not @state/!engine-pool
