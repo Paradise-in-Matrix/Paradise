@@ -308,6 +308,7 @@ export enum TimelineEventFocusThreadMode_Tags {
       (p/catch #(log/error source "boot failed:" %))
       (p/finally #(worker/stream! {:type "timeline-loading" :room-id room-id :loading? false}))))
 
+
 (worker/register :boot-timeline
   (fn [{:keys [room-id mode event-id] :or {mode :live}}]
     (go
@@ -320,22 +321,20 @@ export enum TimelineEventFocusThreadMode_Tags {
                              :room-id room-id
                              :focus-obj (focus {:type :live :threaded? false})
                              :track-receipts 0
-                             :paginate-amount {:back 1}
-
-                             })
+                             :paginate-amount {:back 20}})
 
             :focused
             (if event-id
                (boot-timeline! {:source :focused
-                               :room room
-                               :room-id room-id
-                               :focus-obj (focus {:type :event :id event-id :count 40})
-                               :track-receipts 0
-                               :paginate-amount {:back 20 :forward 20}})
+                                :room room
+                                :room-id room-id
+                                :focus-obj (focus {:type :event :id event-id :count 40})
+                                :track-receipts 0
+                                :paginate-amount {:back 20 :forward 20}})
               (throw (js/Error. "event-id is strictly required for focused timelines")))
 
-;;            :pins
-  #_          (boot-timeline! {:source :pins
+            :pins
+            (boot-timeline! {:source :pins
                              :room room
                              :room-id room-id
                              :focus-obj (focus {:type :pins})
@@ -375,7 +374,9 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
           (safe-cancel! p-handle))))
     (swap! !active-timelines dissoc room-id)
     (swap! !timeline-arrays dissoc [room-id :live] [room-id :focused])
+    (swap! !timeline-mutexes dissoc [room-id :live] [room-id :focused])
     {:status :success}))
+
 #+end_src
 
 #+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
@@ -614,45 +615,32 @@ From what I can tell we can't fetch arbitrary events from the server
 so we can manipulate what we are dealt by sync.
 
 #+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
-(defn fetch-pin-via-ephemeral-timeline [room event-id]
-  (js/Promise.
-   (fn [resolve _]
-     (p/let [focus    (.new (.. sdk -TimelineFocus -Event) #js {:eventId event-id :numEventsToLoad 1})
-             config   (.create sdk/TimelineConfiguration
-                               #js {:focus             focus
-                                    :dateDividerMode   (.-Daily sdk/DateDividerMode)
+(defn boot-live-pin! [room room-id event-id]
+  (go
+    (try
+      (let [focus-obj (focus {:type :event :id event-id :count 1})
+            config    (.create TimelineConfiguration
+                               #js {:focus             focus-obj
+                                    :dateDividerMode   (.. sdk -DateDividerMode -Daily)
                                     :filter            (new (.. sdk -TimelineFilter -All))
-                                    :trackReadReceipts false})
-             timeline (.timelineWithConfiguration room config)]
-       (let [handle-ref (atom nil)
-             resolved?  (atom false)
-             cleanup!   (fn []
-                          (when-let [h @handle-ref]
-                            (try (.cancel h) (catch :default _)))
-                          (reset! handle-ref nil))]
+                                    :trackReadReceipts 0})
+            timeline  (<p! (.timelineWithConfiguration room config))
+            handle    (.addListener timeline
+                        #js {:onUpdate
+                             (fn [_diffs]
+                               (-> (.getEventTimelineItemByEventId timeline event-id)
+                                   (p/then (fn [item]
+                                             (when item
+                                               (let [parsed (wrap-item (make-timeline-item-shim item event-id))]
+                                                 (worker/stream! {:type    "pin-update"
+                                                                  :room-id room-id
+                                                                  :event   parsed})))))
+                                   (p/catch #(log/error "Live pin resolve failed:" %))))})]
+        (let [source-key (keyword (str "pin-" event-id))]
+          (swap! !active-timelines assoc-in [room-id source-key] {:timeline timeline :handle handle})))
+      (catch :default e
+        (log/error "Failed to boot live pin:" event-id e)))))
 
-         (reset! handle-ref
-                 (.addListener timeline
-                   #js {:onUpdate
-                        (fn [_diffs]
-                          (when-not @resolved?
-                            (reset! resolved? true)
-                            (-> (.getEventTimelineItemByEventId timeline event-id)
-                                (p/then (fn [item]
-                                          (cleanup!)
-                                          (if item
-                                            (resolve (wrap-item (make-timeline-item-shim item event-id)))
-                                            (resolve nil))))
-                                (p/catch (fn [err]
-                                           (cleanup!)
-                                           (log/error "Pin resolve failed:" err)
-                                           (resolve nil))))))}))
-         (js/setTimeout (fn []
-                          (when-not @resolved?
-                            (reset! resolved? true)
-                            (cleanup!)
-                            (resolve nil)))
-                        5000))))))
 #+end_src
 
 
@@ -680,20 +668,20 @@ usually; so this shouldn't be too taxing.
     (go
       (if-let [room (.getRoom @state/!client room-id)]
         (try
-          (let [client  @state/!client
-                session (.session client)
-                token   (.-accessToken session)
-                hs      (.-homeserverUrl session)
-                url     (str hs "/_matrix/client/v3/rooms/" room-id "/state/m.room.pinned_events/")
-                resp    (<p! (net/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
+          (let [client   @state/!client
+                session  (.session client)
+                token    (.-accessToken session)
+                clean-hs (str/replace (.-homeserverUrl session) #"/+$" "")
+                url      (str clean-hs "/_matrix/client/v3/rooms/" room-id "/state/m.room.pinned_events")
+                resp     (<p! (net/fetch url #js {:headers #js {"Authorization" (str "Bearer " token)}}))]
             (if-not (.-ok resp)
-              {:status :success :events []}
+              (worker/stream! {:type "pins-sync" :room-id room-id :pinned-ids []})
               (let [state-json (<p! (.json resp))
                     pinned-ids (get (js->clj state-json :keywordize-keys true) :pinned [])]
-                (if (empty? pinned-ids)
-                  {:status :success :events []}
-                  (let [resolved (<p! (p/all (map #(fetch-pin-via-ephemeral-timeline room %) pinned-ids)))]
-                    {:status :success :events (remove nil? resolved)})))))
+                (worker/stream! {:type "pins-sync" :room-id room-id :pinned-ids pinned-ids})
+                (doseq [id pinned-ids]
+                  (boot-live-pin! room room-id id)))))
+          {:status :success}
           (catch :default e
             {:status :error :msg (str e)}))
         {:status :error :msg "Room not found"}))))
