@@ -48,9 +48,8 @@ So some key aspects to baking a Pretext virtualizer include:
               (tr [:container.timeline/jump-to-bottom]))]]))
 
 (defn timeline-loading-overlay []
-  [:div.timeline-loading-overlay
-   [:div.timeline-loading-spinner-container
-    [:div.spinner]]])
+   [:div.spinner-wrapper
+    [:div.spinner]])
 #+end_src
 
 
