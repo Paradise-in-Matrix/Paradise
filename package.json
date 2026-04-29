@@ -24,6 +24,8 @@
         "ios:add": "npx cap add ios",
         "ios:sync": "npx cap sync ios",
         "ad:sync": "npx cap sync android",
+        "ios:copy": "npx cap copy ios",
+        "ad:copy": "npx cap copy android",
         "version:ios": "npx capacitor-set-version set:ios -v $npm_package_version -b $npm_package_config_build",
         "version:android": "npx capacitor-set-version set:android -v $npm_package_version -b $npm_package_config_build",
         "config:ios": ". ./.env && TEAM_ID=$APPLE_TEAM_ID npx trapeze run trapeze.yaml -y --ios",
