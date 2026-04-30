@@ -22,6 +22,7 @@
    [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay make-swipe-handlers]]
    ["@capacitor/status-bar" :refer [StatusBar]]
+   ["@capacitor/app" :refer [App]]
    [utils.macros :refer [i18n-data]]
    [utils.svg :as icons]
    [navigation.rooms.room-list :refer [room-list]]
@@ -59,10 +60,37 @@
    default-db
    ))
 
+
+(re-frame/reg-fx
+ :ui/blur-active
+ (fn [_]
+   (when-let [active-el (.-activeElement js/document)]
+     (.blur active-el))))
+
 (re-frame/reg-event-db
+ :ui/clear-overlays
+ (fn [db _]
+   (-> db
+       (assoc-in [:ui :sidebar-open?] false)
+       (assoc-in [:active-popover] nil)
+       (assoc-in [:active-modal] nil))))
+
+
+(re-frame/reg-event-fx
  :ui/set-sidebar
- (fn [db [_ open?]]
-   (assoc-in db [:ui :sidebar-open?] open?)))
+ (fn [{:keys [db]} [_ open?]]
+   (if open?
+     (let [dispatches (cond-> []
+                        (:active-modal db)   (conj [:ui/close-modal])
+                        (:active-popover db) (conj [:ui/close-popover]))]
+       (merge
+        {:db (assoc-in db [:ui :sidebar-open?] true)
+         :native/hide-keyboard nil
+         :ui/blur-active nil}
+        (when (seq dispatches)
+          {:dispatch-n dispatches})))
+     {:db (assoc-in db [:ui :sidebar-open?] false)})))
+
 
 (re-frame/reg-event-db
  :ui/toggle-sidebar
@@ -214,6 +242,28 @@
       [:div.boot-loading-text
        [:span (tr [:boot/loading-text])]]]]))
 
+(re-frame/reg-event-fx
+ :native/hardware-back
+ (fn [{:keys [db]} _]
+   (cond
+     (get-in db [:active-modal])
+     {:dispatch [:ui/close-modal]}
+
+     (get-in db [:active-popover])
+     {:dispatch [:ui/close-popover]}
+
+     (get-in db [:ui :sidebar-open?])
+     {:dispatch [:ui/set-sidebar false]}
+
+     ;; :else
+     ;; {:dispatch [:nav/go-back]}
+     )))
+
+(defn init-capacitor-listeners! []
+  (.addListener App "backButton"
+                (fn [_]
+                  (re-frame/dispatch [:native/hardware-back]))))
+
 (defn set-status-bar! []
   (.setBackgroundColor StatusBar #js {:color
                                       "#1e1f22"})
@@ -281,6 +331,7 @@
     (when-not @root
       (reset! root (rdom/create-root container)))
     (init-window-size-listener!)
+    (init-capacitor-listeners!)
     (.render @root (r/as-element [main-layout]))))
 
 (defn ^:export init []
