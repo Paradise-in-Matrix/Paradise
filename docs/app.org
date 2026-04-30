@@ -120,9 +120,21 @@ https://day8.github.io/re-frame/application-state/
        (assoc-in [:active-modal] nil))))
 
 
+(re-frame/reg-event-fx
  :ui/set-sidebar
- (fn [db [_ open?]]
-   (assoc-in db [:ui :sidebar-open?] open?)))
+ (fn [{:keys [db]} [_ open?]]
+   (if open?
+     (let [dispatches (cond-> []
+                        (:active-modal db)   (conj [:ui/close-modal])
+                        (:active-popover db) (conj [:ui/close-popover]))]
+       (merge
+        {:db (assoc-in db [:ui :sidebar-open?] true)
+         :native/hide-keyboard nil
+         :ui/blur-active nil}
+        (when (seq dispatches)
+          {:dispatch-n dispatches})))
+     {:db (assoc-in db [:ui :sidebar-open?] false)})))
+
 
 (re-frame/reg-event-db
  :ui/toggle-sidebar
