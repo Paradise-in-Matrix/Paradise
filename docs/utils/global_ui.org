@@ -317,17 +317,17 @@ much simpler.
 (re-frame/reg-event-db
  :ui/open-popover
  (fn [db [_ id props]]
-   (assoc db :ui/active-popover {:id id :props props})))
+   (assoc db :active-popover {:id id :props props})))
 
 (re-frame/reg-event-db
  :ui/close-popover
  (fn [db _]
-   (dissoc db :ui/active-popover)))
+   (dissoc db :active-popover)))
 
 (re-frame/reg-sub
  :ui/active-popover
  (fn [db _]
-   (:ui/active-popover db)))
+   (:active-popover db)))
 #+end_src
 
 
