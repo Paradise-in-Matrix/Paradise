@@ -329,6 +329,7 @@ mostly just tweaking.
                                              diff (js/Math.abs (- dom-h estimated))]
                                          (when (and (> diff 4) (not= current-measured (js/Math.round dom-h)))
                                            (log/info "[DEBUG: RESIZE-OBSERVER] Misprediction fixed for:" id "| Est:" estimated "| Real:" dom-h)
+                                           (log/warn "[DEBUG: RESIZE-OBSERVER] Misprediction fixed for:" id "| Est:" estimated "| Real:" dom-h)
                                            (swap! !measured assoc id (js/Math.round dom-h))))))))))))
 
         container-obs    (js/ResizeObserver.
@@ -373,7 +374,7 @@ mostly just tweaking.
                           (do
                             (log/info "--> ACTION: Applying Coordinate Drift (" drift "px)")
                             (set! (.-scrollTop el) (- (.-scrollTop el) drift))))))
-                    (js/console.warn "--> WARNING: Target Anchor ID NOT FOUND in positioned array! Node unmounted?")))
+                    (log/warn "--> WARNING: Target Anchor ID NOT FOUND in positioned array! Node unmounted?")))
                 (log/info "==================================\n"))
 
               (let [dist-after-shift (get-dist el)
