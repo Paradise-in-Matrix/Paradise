@@ -484,6 +484,40 @@ html, body {
 
 
 
+**** Android Back
+
+This just provides some basic behavior to the back button on Android.
+
+****** TODO Add history to the DB so the back button can navigate around?
+
+#+begin_src clojurescript :tangle ../src/app.cljs
+(re-frame/reg-event-fx
+ :native/hardware-back
+ (fn [{:keys [db]} _]
+   (cond
+     (get-in db [:ui :active-modal])
+     {:dispatch [:ui/close-modal]}
+
+     (get-in db [:ui :active-popover])
+     {:dispatch [:ui/close-popover]}
+
+     (get-in db [:ui :sidebar-open?])
+     {:dispatch [:ui/set-sidebar false]}
+
+     ;; :else
+     ;; {:dispatch [:nav/go-back]}
+     )))
+
+(defn init-capacitor-listeners! []
+  (.addListener App "backButton"
+                (fn [_]
+                  (re-frame/dispatch [:native/hardware-back]))))
+#+end_src
+
+
+
+
+
 
 **** Application Layout
 
