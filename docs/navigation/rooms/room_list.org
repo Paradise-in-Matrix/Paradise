@@ -396,10 +396,10 @@ and file structures.
                        (assoc-in [:ui :main-focus] new-focus))
          dispatches (remove nil?
                             [(when swapping-calls? [:call/hangup {:wipe-state? wipe-call-state?}])
+                             [:composer/load-draft room-id]
                              [:sdk/boot-timeline room-id]
                              (when (not (or already-loaded? loading?)) [:room/fetch-members room-id])
                              [:sdk/fetch-room-emotes :room room-id]
-                             [:composer/load-draft room-id]
                              [:container/set-main-focus new-focus]
                              (when focus-override [:container/set-side-panel focus-override])
                              (when (and (= current-side-panel :timeline) (nil? side-panel-update)) [:container/set-side-panel nil])
