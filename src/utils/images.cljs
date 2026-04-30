@@ -70,11 +70,12 @@
     (cond
       (= cached-val :error)
       (if fallback-url
-        [:img {:src fallback-url :class class :style style :alt alt}]
+        [:img {:src fallback-url :class class :style style :alt alt :on-error on-error}]
         (do
-          (when on-error (on-error))
-          [:span.error-placeholder {:class class :style (merge {:display "inline-block"} style)}]))
+          (when on-error
+            (js/setTimeout on-error 0))
+          [:div {:style {:display "none"}}]))
       (string? cached-val)
-      [:img {:src cached-val :class class :style style :alt alt}]
+      [:img {:src cached-val :class class :style style :alt alt :on-error on-error}]
       :else
       [:span.spinner-placeholder {:class class :style (merge {:display "inline-block"} style)}])))
