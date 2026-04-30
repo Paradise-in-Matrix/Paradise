@@ -43,3 +43,9 @@ Later, we'll expand it to handle native input for features like push to talk.
 #+end_src
 
 
+#+begin_src clojurescript :tangle ../../src/client/key_handler.cljs
+(re-frame/reg-fx
+ :native/hide-keyboard
+ (fn [_]
+   (.hide Keyboard)))
+#+end_src
