@@ -9,6 +9,8 @@
  [input.emotes :refer [emoji-sticker-board]]
  [overlays.base :refer [modal-component popover-component]]))
 
+(defmethod popover-component :inline-emoji [_] nil)
+
 (defn reaction-details-content [{:keys [room-id reactions]}]
   (let [tr          @(re-frame/subscribe [:i18n/tr])
         members-map @(re-frame/subscribe [:room/members-map room-id])
