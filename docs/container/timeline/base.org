@@ -204,6 +204,10 @@ each of these later.
          {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
        {}))))
 
+(re-frame/reg-sub
+ :timeline/back-dead?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/back-dead? room-id] false)))
 
 (re-frame/reg-event-db
  :timeline/set-loading
