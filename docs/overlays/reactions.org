@@ -23,6 +23,15 @@ Realistically, we should have a rather generic modal in which we just offer prop
 #+end_src
 
 
+**** Composer Emojis
+
+***** Component
+
+
+#+begin_src clojurescript :tangle ../../src/overlays/reactions.cljs
+(defmethod popover-component :inline-emoji [_] nil)
+#+end_src
+
 
 **** Reaction Details
 
