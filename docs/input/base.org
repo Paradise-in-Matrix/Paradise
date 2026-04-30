@@ -346,15 +346,13 @@ Ideally, we should break this apart more later.
    [plugins/plugin-slot :composer-send {:room-id active-id}]
    [icons/send]])
 
-(defui timeline-emoji-button [!picker-open?]
+(defui timeline-emoji-button [{:keys [on-click active? room-id]}]
   [:button.timeline-emoji-btn
    {:on-click (fn [e]
                 (.stopPropagation e)
-                (swap! !picker-open? not))}
+                (when on-click (on-click)))}
    [icons/smiley]
-   [plugins/plugin-slot :composer-emojis {:room-id active-id}]
-   ])
-
+   [plugins/plugin-slot :composer-emojis {:room-id room-id}]])
 
 (defui message-input []
   (r/with-let [!picker-open? (r/atom false)
