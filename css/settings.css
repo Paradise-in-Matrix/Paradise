@@ -338,7 +338,7 @@
 .settings-backdrop {
   position: fixed;
   top: env(safe-area-inset-top, 0px);
-  bottom: env(safe-area-inset-bottom, 0px);
+  bottom: 0px;
   left: 0;
   right: 0;
   background: rgba(0, 0, 0, 0.75);
