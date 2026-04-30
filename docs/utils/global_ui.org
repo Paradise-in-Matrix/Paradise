@@ -340,24 +340,24 @@ much simpler.
             {:keys [x y width height backdrop?]
              :or {width 320 height 380 backdrop? true}} props
             close-fn #(re-frame/dispatch [:ui/close-popover])
-            Target   (popover-component id)
-            win-w js/window.innerWidth
-            win-h js/window.innerHeight
-            render-x (max 10 (if (> (+ x width) win-w) (- x width) x))
-            render-y (max 10 (if (> (+ y height) win-h) (- y height) y))]
-        [:<>
-         (when backdrop?
-           [:div.popover-backdrop
-            {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
-             :on-click close-fn
-             :on-context-menu (fn [e] (.preventDefault e) (close-fn))}])
-         [:div.popover-container
-          {:style {:left (str render-x "px")
-                   :top  (str render-y "px")
-                   :position "fixed"
-                   :z-index 12000}}
-          [Target (assoc props :close-fn close-fn)]]]))))
-
+            Target   (popover-component id)]
+        (when Target
+          (let [win-w js/window.innerWidth
+                win-h js/window.innerHeight
+                render-x (max 10 (if (> (+ x width) win-w) (- x width) x))
+                render-y (max 10 (if (> (+ y height) win-h) (- y height) y))]
+            [:<>
+             (when backdrop?
+               [:div.popover-backdrop
+                {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
+                 :on-click close-fn
+                 :on-context-menu (fn [e] (.preventDefault e) (close-fn))}])
+             [:div.popover-container
+              {:style {:left (str render-x "px")
+                       :top  (str render-y "px")
+                       :position "fixed"
+                       :z-index 12000}}
+              [Target (assoc props :close-fn close-fn)]]]))))))
 
 #+end_src
 
