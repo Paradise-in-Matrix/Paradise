@@ -119,14 +119,17 @@
         !prepared-cache     (atom {})
         !measured           (r/atom {})
         !latest-events      (atom {})
+
         !current-height     (atom 0)
         !current-positioned (atom [])
         !current-focus      (atom false)
         !current-was-loading-fwd (atom false)
         !prev-loading-fwd   (atom false)
-        !anchor             (atom {:id nil :offset 0 :total-height 0})
+
+        !anchor             (atom {:id nil :offset 0 :anchor-bottom 0 :total-height 0})
 
         !theme-metrics (r/atom {:font "16px sans-serif" :line-height 22.8})
+
         metrics-obs (js/ResizeObserver.
                      (fn [entries]
                        (let [parse-px (fn [val fallback]
@@ -141,7 +144,6 @@
                                       style (js/window.getComputedStyle el)]
 
                                   (case id
-
                                     "ruler-text-html"
                                     (let [total-h (.-offsetHeight el)
                                           base-lh (:line-height acc 22.8)]
@@ -197,7 +199,6 @@
                                              :code-padding     (+ pt pb)
                                              :code-font        font-str))
 
-
                                     "ruler-avatar"   (assoc acc :avatar-h (.-offsetHeight el))
                                     "ruler-header"   (assoc acc :header-h (.-offsetHeight el))
 
@@ -210,44 +211,53 @@
                                     "ruler-system"   (assoc acc :system-event-h (.-offsetHeight el))
                                     "ruler-divider"  (assoc acc :virtual-divider-h (.-offsetHeight el))
 
-
                                     acc)))
                               @!theme-metrics
                               entries)]
 
                          (when (not= new-metrics @!theme-metrics)
-                           (reset! !prepared-cache {})
-                           (reset! !theme-metrics new-metrics)))))
+                           (js/requestAnimationFrame
+                            (fn []
+                              (reset! !prepared-cache {})
+                              (reset! !theme-metrics new-metrics)))))))
+
         !at-bottom?      (r/atom true)
         !show-jump?      (r/atom false)
         !initialized?    (r/atom false)
         !scroll-timer    (atom nil)
+
         item-resize-obs  (js/ResizeObserver.
                           (fn [entries]
-                            (doseq [entry entries]
-                              (let [el (.-target entry)
-                                    id (.getAttribute el "data-event-id")
-                                    rect (.-contentRect entry)
-                                    dom-h (.-height rect)]
-                                (when (and id (pos? dom-h))
-                                  (when-let [msg (or (get @!latest-events id)
-                                                     (when (= id "read-marker") {:id id}))]
-                                    (let [current-measured (get @!measured id)
-                                          estimated (estimate-height msg @!container-width !prepared-cache !measured @!theme-metrics)
-                                          diff (js/Math.abs (- dom-h estimated))]
-                                      (when (and (> diff 4) (not= current-measured (js/Math.round dom-h)))
-                                        (swap! !measured assoc id (js/Math.round dom-h))))))))))
+                            (js/requestAnimationFrame
+                             (fn []
+                               (doseq [entry entries]
+                                 (let [el (.-target entry)
+                                       id (.getAttribute el "data-event-id")
+                                       rect (.-contentRect entry)
+                                       dom-h (.-height rect)]
+                                   (when (and id (pos? dom-h))
+                                     (when-let [msg (or (get @!latest-events id)
+                                                        (when (= id "read-marker") {:id id}))]
+                                       (let [current-measured (get @!measured id)
+                                             estimated (estimate-height msg @!container-width !prepared-cache !measured @!theme-metrics)
+                                             diff (js/Math.abs (- dom-h estimated))]
+                                         (when (and (> diff 4) (not= current-measured (js/Math.round dom-h)))
+                                           (log/info "[DEBUG: RESIZE-OBSERVER] Misprediction fixed for:" id "| Est:" estimated "| Real:" dom-h)
+                                           (swap! !measured assoc id (js/Math.round dom-h))))))))))))
 
         container-obs    (js/ResizeObserver.
                           (fn [entries]
-                            (let [rect (.-contentRect (aget entries 0))]
-                              (reset! !container-width (.-width rect)))))]
+                            (js/requestAnimationFrame
+                             (fn []
+                               (let [rect (.-contentRect (aget entries 0))]
+                                 (reset! !container-width (.-width rect)))))))]
     (r/create-class
      {:component-did-update
       (fn [this]
         (let [el @!scroll-ref]
           (when el
             (let [state        @!anchor
+
                   get-dist     (fn [target-el]
                                  (let [st (js/Math.round (.-scrollTop target-el))
                                        max-s (- (.-scrollHeight target-el) (.-clientHeight target-el))]
@@ -256,33 +266,38 @@
                                      (if (> st (/ max-s 2))
                                        (max 0 (- max-s st))
                                        0))))
+
                   current-dist (get-dist el)
                   total-height @!current-height
                   positioned   @!current-positioned
                   focus-mode?  @!current-focus
                   was-loading? @!current-was-loading-fwd]
+
               (when (not= total-height (:total-height state))
                 (log/info "\n==================================")
                 (log/info "[TIMELINE-UPDATE] Height shift detected!")
-                (log/info "--> Prev Height:" (:total-height state) "| New Height:" total-height)
+
                 (let [old-anchor-item (first (filter #(= (:id %) (:id state)) positioned))]
                   (if old-anchor-item
-                    (let [expected-dist (+ (:bottom old-anchor-item) (:offset state))]
-                      (if (or focus-mode? was-loading? (> current-dist 5))
-                        (do
-                          (log/info "--> ACTION: Applying expected ScrollDist natively (" expected-dist ")")
-                          (set! (.-scrollTop el) (- expected-dist)))
-                        (log/info "--> ACTION: SKIPPED math application. Assuming Live message hug.")))
-                    (log/info "--> WARNING: Target Anchor ID NOT FOUND in positioned array! Node unmounted?")))
+                    (let [drift (- (:bottom old-anchor-item) (:anchor-bottom state))]
+                      (if (zero? drift)
+                        (log/info "--> ACTION: SKIPPED. Coordinate drift is 0 px.")
+                        (if (and (<= current-dist 5) (not was-loading?) (not focus-mode?))
+                          (log/info "--> ACTION: SKIPPED. At bottom. Letting Live message hug.")
+                          (do
+                            (log/info "--> ACTION: Applying Coordinate Drift (" drift "px)")
+                            (set! (.-scrollTop el) (- (.-scrollTop el) drift))))))
+                    (js/console.warn "--> WARNING: Target Anchor ID NOT FOUND in positioned array! Node unmounted?")))
                 (log/info "==================================\n"))
 
               (let [dist-after-shift (get-dist el)
                     new-anchor       (first (filter #(> (+ (:bottom %) (:height %)) dist-after-shift) positioned))]
                 (when new-anchor
                   (reset! !anchor
-                          {:id           (:id new-anchor)
-                           :offset       (- dist-after-shift (:bottom new-anchor))
-                           :total-height total-height})))))))
+                          {:id            (:id new-anchor)
+                           :offset        (- dist-after-shift (:bottom new-anchor))
+                           :anchor-bottom (:bottom new-anchor)
+                           :total-height  total-height})))))))
 
       :component-will-unmount
       (fn [this]
@@ -305,13 +320,14 @@
               metrics          @!theme-metrics
 
               layout-data      @(r/track calculate-layout ordered-events width !prepared-cache @!measured metrics)
-
               total-height     (:total layout-data)
               positioned       (:items layout-data)
+
               _ (when (not= total-height (:total-height @!anchor))
                   (log/info "\n[DEBUG: RENDER] Height Shift Detected!")
                   (log/info "--> Old Height:" (:total-height @!anchor) "| New Height:" total-height)
                   (log/info "--> Loading Forward?:" loading-forward?))
+
               visible-window   (let [dist-from-bottom @!dist-bottom
                                      vh (if-let [el @!scroll-ref] (.-clientHeight el) 800)
                                      overscan 2000
@@ -321,6 +337,7 @@
                                       (drop-while #(let [item-top (+ (:bottom %) (:height %))]
                                                      (< item-top w-start)))
                                       (take-while #(<= (:bottom %) w-end))))
+
               do-jump!         (fn []
                                  (reset! !at-bottom? true)
                                  (if focus-mode?
@@ -328,16 +345,19 @@
                                      (reset! !initialized? false)
                                      (re-frame/dispatch [:room/jump-to-live-bottom room-id]))
                                    (when-let [el @!scroll-ref]
-                                     (set! (.-scrollTop el) 0))))]
+                                     (js/requestAnimationFrame
+                                      (fn []
+                                        (set! (.-scrollTop el) 0))))))]
 
           (reset! !current-height total-height)
           (reset! !current-positioned positioned)
           (reset! !current-focus focus-mode?)
+
           (reset! !current-was-loading-fwd @!prev-loading-fwd)
           (reset! !prev-loading-fwd loading-forward?)
 
           (when (and @!scroll-ref (pos? cnt) (not @!initialized?))
-            (js/setTimeout
+            (js/requestAnimationFrame
              (fn []
                (let [el @!scroll-ref]
                  (when el
@@ -348,8 +368,7 @@
                          (set! (.-scrollTop el) 0)))
                      (set! (.-scrollTop el) 0))
                    (reset! !initialized? true)
-                   (reset! !at-bottom? (not jump-target)))))
-             0))
+                   (reset! !at-bottom? (not jump-target)))))))
 
           (when (and @!scroll-ref
                      @!initialized?
@@ -357,13 +376,11 @@
                      (not loading?)
                      (not back-dead?)
                      (< total-height (.-clientHeight @!scroll-ref)))
-            (js/setTimeout
+            (js/requestAnimationFrame
              (fn []
-               (re-frame/dispatch [:sdk/back-paginate room-id]))
-             50))
+               (re-frame/dispatch [:sdk/back-paginate room-id]))))
 
-          [:div.timeline-wrapper
-
+          [:div.timeline-wrapper {:style {:min-height "0" :display "flex" :flex-direction "column"}}
            [timeline-measuring-sticks
             (fn [el]
               (when el (.observe metrics-obs el)))]
@@ -381,25 +398,26 @@
                  (.disconnect container-obs)))
 
              :style {:overflow-anchor "none"
-                     :overflow-y "auto"}
+                     :overflow-y "auto"
+                     :min-height "0"}
 
              :class (when jump-target "jumping-animation")
              :on-scroll (fn [e]
                           (let [target           (.-currentTarget e)
                                 scroll-top       (js/Math.round (.-scrollTop target))
                                 max-scroll       (- (.-scrollHeight target) (.-clientHeight target))
+
                                 dist-from-bottom (if (<= scroll-top 0)
                                                    (js/Math.abs scroll-top)
                                                    (if (> scroll-top (/ max-scroll 2))
                                                      (max 0 (- max-scroll scroll-top))
                                                      0))
+
                                 dist-from-top    (max 0 (- max-scroll dist-from-bottom))
                                 at-bottom        (<= dist-from-bottom 30)]
 
                             (when (not= @!dist-bottom dist-from-bottom)
-                              (log/info "\n[DEBUG: ON-SCROLL] Dist from bottom changed!")
-                              (log/info "--> Raw ScrollTop:" scroll-top)
-                              (log/info "--> Calculated Dist From Bottom:" dist-from-bottom)
+                              (log/info "\n[DEBUG: ON-SCROLL] Viewport shifted. New Dist From Bottom:" dist-from-bottom)
                               (reset! !dist-bottom dist-from-bottom))
 
                             (when (and (pos? cnt) (not loading?) @!initialized?)
@@ -422,7 +440,15 @@
                                          10))))))}
 
             (when loading?
-              [timeline-loading-overlay])
+              [:div {:style {:position "absolute"
+                             :top "10px"
+                             :left 0
+                             :right 0
+                             :z-index 10
+                             :display "flex"
+                             :justify-content "center"
+                             :pointer-events "none"}}
+               [timeline-loading-overlay]])
 
             (if (zero? cnt)
               [timeline-empty-state room-id]
@@ -461,7 +487,15 @@
                                   :width "100%"}}]]))))
 
             (when (and focus-mode? loading-forward?)
-              [:div.spinner-wrapper
-               [:div.spinner]])]
+              [:div {:style {:position "absolute"
+                             :bottom "10px"
+                             :left 0
+                             :right 0
+                             :z-index 10
+                             :display "flex"
+                             :justify-content "center"
+                             :pointer-events "none"}}
+               [timeline-loading-overlay]])]
+
            (when (and @!show-jump? (not @!at-bottom?))
              [timeline-jump-button do-jump! focus-mode?])]))})))
