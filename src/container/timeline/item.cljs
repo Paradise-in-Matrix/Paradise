@@ -329,7 +329,7 @@
   [:div.image-attachment-container
    [async-media-wrapper event content {:class "media-image" :default-ratio 1.33}
     (fn [url alt-text]
-      [:img {:src url :alt alt-text :loading "lazy"
+      [:img {:src url :alt alt-text :loading "eager"
 ;;             :decoding "async"
 
              :on-click #(re-frame/dispatch [:ui/open-modal :image-lightbox
@@ -355,7 +355,7 @@
 (defn sticker-message [event content]
   [async-media-wrapper event content {:class "media-sticker" :default-ratio 1.0}
    (fn [url alt]
-     [:img {:src url :alt alt :loading "lazy" :style {:width "100%" :height "100%" :display "block"}} ])])
+     [:img {:src url :alt alt :loading "eager" :style {:width "100%" :height "100%" :display "block"}} ])])
 
 (defn file-message [event content tr]
   (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
