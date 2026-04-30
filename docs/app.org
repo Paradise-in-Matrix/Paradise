@@ -612,6 +612,7 @@ when we detatch and reload (basically when you hit control + s to save).
     (when-not @root
       (reset! root (rdom/create-root container)))
     (init-window-size-listener!)
+    (init-capacitor-listeners!)
     (.render @root (r/as-element [main-layout]))))
 
 (defn ^:export init []
