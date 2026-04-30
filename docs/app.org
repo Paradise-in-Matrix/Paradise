@@ -104,6 +104,13 @@ https://day8.github.io/re-frame/application-state/
 
 
 #+begin_src clojurescript :tangle ../src/app.cljs
+
+(re-frame/reg-fx
+ :ui/blur-active
+ (fn [_]
+   (when-let [active-el (.-activeElement js/document)]
+     (.blur active-el))))
+
 (re-frame/reg-event-db
  :ui/set-sidebar
  (fn [db [_ open?]]
