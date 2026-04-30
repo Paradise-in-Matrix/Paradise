@@ -352,13 +352,14 @@ the user may be typing and it'll bump the composer when it appears.
       font-size: 0.75rem;
       color: var(--cp-text-muted);
       display: flex;
-      align-items: center;
+      align-items: start;
       justify-content: center;
-      gap: 6px;
+      gap: 2px;
       user-select: none;
       height: 24px;
       transition: opacity 0.2s ease-in-out;
       opacity: 0;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .followers-indicator.is-visible {
