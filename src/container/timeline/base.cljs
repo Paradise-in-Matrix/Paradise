@@ -175,6 +175,10 @@
          {:db (assoc-in db [:timeline/loading-forward? room-id] true)})
        {}))))
 
+(re-frame/reg-sub
+ :timeline/back-dead?
+ (fn [db [_ room-id]]
+   (get-in db [:timeline/back-dead? room-id] false)))
 
 (re-frame/reg-event-db
  :timeline/set-loading
@@ -193,24 +197,6 @@
  (fn [db [_ room-id]]
    (assoc-in db [:timeline/loading-forward? room-id] false)))
 
-(re-frame/reg-event-db
- :sdk/back-pagination-dead
- (fn [db [_ room-id]]
-   (-> db
-       (assoc-in [:timeline/loading-more? room-id] false)
-       (assoc-in [:timeline/back-dead? room-id] true))))
-
-(re-frame/reg-sub
- :timeline/back-dead?
- (fn [db [_ room-id]]
-   (get-in db [:timeline/back-dead? room-id] false)))
-
-(re-frame/reg-event-db
- :sdk/forward-pagination-dead
- (fn [db [_ room-id]]
-   (-> db
-       (assoc-in [:timeline/loading-forward? room-id] false)
-       (assoc-in [:timeline/forward-dead? room-id] true))))
 
 (re-frame/reg-event-db
  :sdk/update-pagination-status
