@@ -1,8 +1,9 @@
 (ns client.key-handler
-  (:require [reagent.core :as r]
+  (:require
+   [reagent.core :as r]
    [utils.macros :refer [defui]]
-   [re-frame.core :as re-frame]
-            ))
+   ["@capacitor/keyboard" :refer [Keyboard]]
+   [re-frame.core :as re-frame]))
 
 
 (defui global-key-listener []
@@ -17,3 +18,8 @@
     (.addEventListener js/window "keydown" handler)
     (finally
       (.removeEventListener js/window "keydown" handler))))
+
+(re-frame/reg-fx
+ :native/hide-keyboard
+ (fn [_]
+   (.hide Keyboard)))
