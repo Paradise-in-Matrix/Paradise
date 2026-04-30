@@ -1,10 +1,9 @@
 {
     "name": "Paradise",
-    "version": "0.31.1",
+    "version": "0.31.2",
     "config": {
-        "build": "28"
+        "build": "29"
     },
-
     "repository": {
         "type": "git",
         "url": "https://github.com/Paradise-in-Matrix/Paradise"
@@ -40,6 +39,7 @@
         "@capacitor/cli": "^8.3.0",
         "@capacitor/core": "^8.3.0",
         "@capacitor/ios": "^8.3.0",
+        "@capacitor/keyboard": "^8.0.3",
         "@capacitor/push-notifications": "^8.0.3",
         "@capacitor/status-bar": "^8.0.2",
         "@chenglou/pretext": "^0.0.4",
