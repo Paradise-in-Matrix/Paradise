@@ -498,5 +498,5 @@
                              :pointer-events "none"}}
                [timeline-loading-overlay]])]
 
-           (when (and @!show-jump? (not @!at-bottom?))
+           (when (or @!show-jump? (not @!at-bottom?))
              [timeline-jump-button do-jump! focus-mode?])]))})))
