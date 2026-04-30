@@ -15,10 +15,10 @@ Later, we'll expand it to handle native input for features like push to talk.
 
 #+begin_src clojurescript :tangle ../../src/client/key_handler.cljs
 (ns client.key-handler
-  (:require [reagent.core :as r]
+  (:require
+   [reagent.core :as r]
    [utils.macros :refer [defui]]
-   [re-frame.core :as re-frame]
-            ))
+   [re-frame.core :as re-frame]))
 
 #+end_src
 
@@ -40,4 +40,5 @@ Later, we'll expand it to handle native input for features like push to talk.
     (finally
       (.removeEventListener js/window "keydown" handler))))
 #+end_src
+
 
