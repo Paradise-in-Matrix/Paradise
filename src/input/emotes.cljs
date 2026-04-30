@@ -149,6 +149,7 @@
                               [:div.emoji-loading (tr [:composer.emotes/no-emotes])]
                               [:div.emoji-container
                                (when-not is-searching?
+                                 ^{:key "sidebar"}
                                  [:div.emoji-sidebar
                                   (for [pack-id sorted-ids]
                                     (let [pack-data (get packs pack-id)
@@ -168,7 +169,7 @@
                                                      :alt   pname}]
                                          :else
                                          [:span.pack-text-icon (subs pname 0 (min 2 (count pname)))])]))])
-
+                               ^{:key "grid-area"}
                                [:div.emoji-grid-area
                                 [:div.emoji-search-bar {:style {:padding "8px 12px" :border "1px solid var(--border-color)"}}
                                  [:input.form-input
