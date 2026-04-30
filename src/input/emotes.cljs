@@ -70,6 +70,7 @@
          room-packs (when active-room (get-in db [:emoji/packs :room active-room] {}))]
      (merge account-packs space-packs room-packs))))
 
+
 (defonce categorized-system-packs
   (let [unwrap (fn [mod] (if (and mod (.-default mod)) (.-default mod) mod))
         raw-data (js->clj (unwrap emoji-data) :keywordize-keys true)
@@ -110,17 +111,16 @@
                                   }))))
                     {}))))
 
-(defui emoji-sticker-board [{:keys [on-close on-insert-emoji on-insert-native on-send-sticker]}]
+(defui emoji-sticker-board [{:keys [on-close on-insert-emoji on-insert-native on-send-sticker inline?]}]
   (re-frame/dispatch [:sdk/fetch-all-emotes])
   (let [selected-pack-id (r/atom nil)
         sticker-mode?    (r/atom false)
         search-query     (r/atom "")
         tr-sub           (re-frame/subscribe [:i18n/tr])]
-    (fn [{:keys [on-close on-insert-emoji on-insert-native on-send-sticker]}]
+    (fn [{:keys [on-close on-insert-emoji on-insert-native on-send-sticker inline?]}]
       (let [tr             @tr-sub
             matrix-packs   @(re-frame/subscribe [:emoji/active-set])
-            popover-active @(re-frame/subscribe [:ui/active-popover])
-            is-mobile?       @(re-frame/subscribe [:ui/mobile?])
+            is-mobile?     @(re-frame/subscribe [:ui/mobile?])
             packs          (merge categorized-system-packs matrix-packs)
             sorted-ids     (sort-by #(get-in packs [% :system-priority] 999) (keys packs))
             active-id      (or @selected-pack-id (first sorted-ids))
@@ -232,7 +232,7 @@
                                                      :class "emoji-img"
                                                      :title shortcode
                                                      :alt   shortcode}])])]])]])]]
-        (if (nil? popover-active)
+        (if inline?
           [click-away-wrapper
            {:on-close on-close :z-index 19}
            content]
