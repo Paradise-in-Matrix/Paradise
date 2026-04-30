@@ -1,8 +1,8 @@
 {
     "name": "Paradise",
-    "version": "0.31.2",
+    "version": "0.31.3",
     "config": {
-        "build": "29"
+        "build": "30"
     },
     "repository": {
         "type": "git",
