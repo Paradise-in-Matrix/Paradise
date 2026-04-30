@@ -18,6 +18,7 @@ Later, we'll expand it to handle native input for features like push to talk.
   (:require
    [reagent.core :as r]
    [utils.macros :refer [defui]]
+   ["@capacitor/keyboard" :refer [Keyboard]]
    [re-frame.core :as re-frame]))
 
 #+end_src
