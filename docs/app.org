@@ -522,10 +522,10 @@ This just provides some basic behavior to the back button on Android.
  :native/hardware-back
  (fn [{:keys [db]} _]
    (cond
-     (get-in db [:ui :active-modal])
+     (get-in db [:active-modal])
      {:dispatch [:ui/close-modal]}
 
-     (get-in db [:ui :active-popover])
+     (get-in db [:active-popover])
      {:dispatch [:ui/close-popover]}
 
      (get-in db [:ui :sidebar-open?])
