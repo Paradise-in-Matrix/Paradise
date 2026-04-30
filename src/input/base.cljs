@@ -176,6 +176,12 @@
           (.focus composer)))
       50))))
 
+(re-frame/reg-sub
+ :ui/inline-emoji-open?
+ :<- [:ui/active-popover]
+ (fn [active-popover _]
+   (= (:id active-popover) :inline-emoji)))
+
 
 (defn inline-editor [item active-id]
   (r/with-let [!editor (r/atom nil)]
@@ -213,30 +219,29 @@
                 (.preventDefault e)
                 (.stopPropagation e)
                 (submit-message!))}
+   [plugins/plugin-slot :composer-send {:room-id active-id}]
    [icons/send]])
 
-(defui timeline-emoji-button [!picker-open?]
+(defui timeline-emoji-button [{:keys [on-click active? room-id]}]
   [:button.timeline-emoji-btn
    {:on-click (fn [e]
                 (.stopPropagation e)
-                (swap! !picker-open? not))}
+                (when on-click (on-click)))}
    [icons/smiley]
-   [plugins/plugin-slot :composer-emojis {:room-id active-id}]
-   ])
-
+   [plugins/plugin-slot :composer-emojis {:room-id room-id}]])
 
 (defui message-input []
-  (r/with-let [!picker-open? (r/atom false)
-               !editor       (r/atom nil)
+  (r/with-let [!editor       (r/atom nil)
                !sug-command  (r/atom nil)]
     (fn []
-      (let [active-id   @(re-frame/subscribe [:rooms/active-id])
-            uploading?  @(re-frame/subscribe [:input/uploading?])
-            attachments @(re-frame/subscribe [:composer/attachments active-id])
-            loaded-text @(re-frame/subscribe [:composer/loaded-text active-id])
-            cached-html @(re-frame/subscribe [:composer/cached-html active-id])
-            context     @(re-frame/subscribe [:input/context active-id])
-            tr          @(re-frame/subscribe [:i18n/tr])
+      (let [active-id      @(re-frame/subscribe [:rooms/active-id])
+            uploading?     @(re-frame/subscribe [:input/uploading?])
+            attachments    @(re-frame/subscribe [:composer/attachments active-id])
+            loaded-text    @(re-frame/subscribe [:composer/loaded-text active-id])
+            cached-html    @(re-frame/subscribe [:composer/cached-html active-id])
+            context        @(re-frame/subscribe [:input/context active-id])
+            picker-open?   @(re-frame/subscribe [:ui/inline-emoji-open?])
+            tr             @(re-frame/subscribe [:i18n/tr])
             submit-message! (fn []
                               (when-let [ed @!editor]
                                 (let [text        (.getText ed)
@@ -255,13 +260,14 @@
           (fn [item]
             (when-let [cmd @!sug-command]
               (cmd #js {:props item})))]
-         (when @!picker-open?
+         (when picker-open?
            [emoji-sticker-board
-            {:on-close #(reset! !picker-open? false)
+            {:inline?  true
+             :on-close #(re-frame/dispatch [:ui/close-popover])
              :on-send-sticker
              (fn [mxc alt-text info]
                (re-frame/dispatch [:sdk/send-sticker active-id mxc alt-text info])
-               (reset! !picker-open? false))
+               (re-frame/dispatch [:ui/close-popover]))
              :on-insert-native
              (fn [unicode-char]
                (when-let [ed @!editor]
@@ -275,7 +281,7 @@
                                                       :src (mxc->url url)
                                                       :mxc url}})
                      .run))
-               (reset! !picker-open? false))}])
+               )}])
          (when (and context (= (:mode context) :reply))
            (let [sender-name (truncate-name (-> context :target :sender-name) 32)]
              [:div.input-context-banner
@@ -330,9 +336,12 @@
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
                   :onSuggestionExit  (fn [] (reset! !sug-command nil))}]]
            [plugins/plugin-slot :composer-actions {:room-id active-id}]
-           [timeline-emoji-button !picker-open?]
+           [timeline-emoji-button {:on-click #(if picker-open?
+                                                (re-frame/dispatch [:ui/close-popover])
+                                                (re-frame/dispatch [:ui/open-popover :inline-emoji {}]))
+                                   :active?  picker-open?
+                                   :room-id  active-id}]
            [timeline-send-button {:submit-message! submit-message!
                                   :editor @!editor
-                                  :attachments attachments}]
-           ]]]))))
+                                  :attachments attachments}]]]]))))
 
