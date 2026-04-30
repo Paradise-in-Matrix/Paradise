@@ -343,6 +343,7 @@ Ideally, we should break this apart more later.
                 (.preventDefault e)
                 (.stopPropagation e)
                 (submit-message!))}
+   [plugins/plugin-slot :composer-send {:room-id active-id}]
    [icons/send]])
 
 (defui timeline-emoji-button [!picker-open?]
