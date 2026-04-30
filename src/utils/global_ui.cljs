@@ -180,17 +180,17 @@
 (re-frame/reg-event-db
  :ui/open-popover
  (fn [db [_ id props]]
-   (assoc db :ui/active-popover {:id id :props props})))
+   (assoc db :active-popover {:id id :props props})))
 
 (re-frame/reg-event-db
  :ui/close-popover
  (fn [db _]
-   (dissoc db :ui/active-popover)))
+   (dissoc db :active-popover)))
 
 (re-frame/reg-sub
  :ui/active-popover
  (fn [db _]
-   (:ui/active-popover db)))
+   (:active-popover db)))
 
 (defn popover-root []
   (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
@@ -200,24 +200,24 @@
             {:keys [x y width height backdrop?]
              :or {width 320 height 380 backdrop? true}} props
             close-fn #(re-frame/dispatch [:ui/close-popover])
-            Target   (popover-component id)
-            win-w js/window.innerWidth
-            win-h js/window.innerHeight
-            render-x (max 10 (if (> (+ x width) win-w) (- x width) x))
-            render-y (max 10 (if (> (+ y height) win-h) (- y height) y))]
-        [:<>
-         (when backdrop?
-           [:div.popover-backdrop
-            {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
-             :on-click close-fn
-             :on-context-menu (fn [e] (.preventDefault e) (close-fn))}])
-         [:div.popover-container
-          {:style {:left (str render-x "px")
-                   :top  (str render-y "px")
-                   :position "fixed"
-                   :z-index 12000}}
-          [Target (assoc props :close-fn close-fn)]]]))))
-
+            Target   (popover-component id)]
+        (when Target
+          (let [win-w js/window.innerWidth
+                win-h js/window.innerHeight
+                render-x (max 10 (if (> (+ x width) win-w) (- x width) x))
+                render-y (max 10 (if (> (+ y height) win-h) (- y height) y))]
+            [:<>
+             (when backdrop?
+               [:div.popover-backdrop
+                {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
+                 :on-click close-fn
+                 :on-context-menu (fn [e] (.preventDefault e) (close-fn))}])
+             [:div.popover-container
+              {:style {:left (str render-x "px")
+                       :top  (str render-y "px")
+                       :position "fixed"
+                       :z-index 12000}}
+              [Target (assoc props :close-fn close-fn)]]]))))))
 
 
 
