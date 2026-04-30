@@ -278,6 +278,12 @@ forward.
           (.focus composer)))
       50))))
 
+(re-frame/reg-sub
+ :ui/inline-emoji-open?
+ :<- [:ui/active-popover]
+ (fn [active-popover _]
+   (= (:id active-popover) :inline-emoji)))
+
 #+end_src
 
 
