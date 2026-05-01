@@ -77,7 +77,15 @@
 }
 
 
+.mobile-menu-item {
+    display: none !important;
+}
 
+@media (max-width: 768px) {
+    .mobile-menu-item {
+        display: flex !important;
+    }
+}
 
 
 @media (min-width: 768px) { .hide-on-desktop { display: none !important; } }
