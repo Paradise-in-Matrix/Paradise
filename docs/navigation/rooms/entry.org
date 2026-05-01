@@ -138,7 +138,15 @@ side-effects like too long of a name squishing the SVG (icon).
 }
 
 
+.mobile-menu-item {
+    display: none !important;
+}
 
+@media (max-width: 768px) {
+    .mobile-menu-item {
+        display: flex !important;
+    }
+}
 
 #+end_src
 
