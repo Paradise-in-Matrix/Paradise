@@ -122,6 +122,8 @@ So we define the component contents and then register in the modal multi-method.
 
 ***** CSS
 
+
+
 #+begin_src css :tangle ../../css/lightbox.css
 .lightbox-close-btn {
     position: absolute;
@@ -270,4 +272,4 @@ So we define the component contents and then register in the modal multi-method.
         touch-action: none !important;
     }
 }
-# + end_src;
+#+end_src;
