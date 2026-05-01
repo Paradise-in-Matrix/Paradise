@@ -1,0 +1,47 @@
+
+.room-layout {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  grid-template-columns: 1fr;
+}
+
+.room-layout.with-sidebar {
+  grid-template-columns: 1fr 350px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border-color);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 48px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-title {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05rem;
+}
+
+.sidebar-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow: hidden;
+}
