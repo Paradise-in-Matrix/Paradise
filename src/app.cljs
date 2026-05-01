@@ -275,7 +275,6 @@
     (let [auth-status   @(re-frame/subscribe [:auth/status])
           sidebar-open? @(re-frame/subscribe [:ui/sidebar-open?])
           update-ready? @(re-frame/subscribe [:app/update-available?])
-          safe-area-bottom @(re-frame/subscribe [:ui/safe-area-bottom])
           platform         (.getPlatform js/Capacitor)
           cushion       (if (= platform "ios")
                           "8px"
