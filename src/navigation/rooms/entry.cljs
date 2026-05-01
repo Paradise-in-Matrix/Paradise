@@ -23,7 +23,6 @@
                        (tr [:container.header/join-call])
                        (tr [:container.header/start-call]))
               :icon [icons/phone]
-              :class-name "mobile-menu-item"
               :action (fn []
                         (re-frame/dispatch [:call/init-widget room-id])
                         (re-frame/dispatch [:container/set-main-focus :call]))})
