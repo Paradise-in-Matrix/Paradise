@@ -357,7 +357,7 @@
      (cond
        has-typists?
        [:div.status-content {:key "typing"}
-        [icons/typing-dots {:style {:color "var(--cp-text-muted)"}}]
+        [icons/typing-dots {:width "14px" :height "14px" :style {:color "var(--cp-text-muted)"}}]
         [:span.text (get-status-string tr :typing typing-names)]]
        has-readers?
        [:div.status-content {:key "readers"}
