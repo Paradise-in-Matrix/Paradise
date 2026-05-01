@@ -7,27 +7,102 @@
   transition: background 0.1s ease;
 }
 
+.room-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    cursor: pointer;
+    gap: 10px;
+}
+
+.room-item svg {
+    flex-shrink: 0;
+}
+
+.room-item:hover .room-name {
+    padding-right: 32px;
+}
+
 .room-item:hover { background: var(--bg-hover); }
 .room-item.active { background: var(--bg-selected); }
 
-.room-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.9rem;
-  color: var(--text-normal);
+.room-item:hover {
+    background-color: #35373c;
+    color: #dbdee1;
 }
+
+.room-item.active {
+    background-color: #3f4147 !important;
+    color: #ffffff;
+}
+
+.room-name {
+    font-weight: 600;
+    font-size: .875em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+}
+
+@media (min-width: 768px) { .hide-on-desktop { display: none !important; } }
+@media (max-width: 767px) { .hide-on-mobile { display: none !important; } }
+
+.room-hover-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+}
+
+.room-item:hover .room-hover-actions {
+      opacity: 1;
+}
+
+.call-participants {
+    display: flex;
+}
+
+.participant-avatar-ring {
+    margin-left: -8px;
+    border: 2px solid var(--bg-color);
+    border-radius: 50%;
+}
+
+.desktop-call-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.call-participant-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.room-item.has-unread .room-name {
+      font-weight: 600;
+      color: #ffffff;
+}
+
+
+
 
 
 @media (min-width: 768px) { .hide-on-desktop { display: none !important; } }
 @media (max-width: 767px) { .hide-on-mobile { display: none !important; } }
 
 .room-item-right {
+      z-index: 10;
+      right:0 ;
       display: flex;
       align-items: center;
       margin-left: auto;
       gap: 8px;
+      position: absolute;
 }
 
 .room-hover-actions {
@@ -154,77 +229,6 @@
 }
 
 
-.room-item {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  position: relative;
-  min-height: 32px;
-  transition: background 0.1s ease;
-}
-
-.room-item:hover { background: var(--bg-hover); }
-.room-item.active { background: var(--bg-selected); }
-
-.room-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.9rem;
-  color: var(--text-normal);
-}
-
-@media (min-width: 768px) { .hide-on-desktop { display: none !important; } }
-@media (max-width: 767px) { .hide-on-mobile { display: none !important; } }
-
-.room-item-right {
-      display: flex;
-      align-items: center;
-      margin-left: auto;
-      gap: 8px;
-}
-
-.room-hover-actions {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      opacity: 0;
-      transition: opacity 0.15s ease-in-out;
-}
-
-.room-item:hover .room-hover-actions {
-      opacity: 1;
-}
-
-.call-participants {
-    display: flex;
-}
-
-.participant-avatar-ring {
-    margin-left: -8px;
-    border: 2px solid var(--bg-color);
-    border-radius: 50%;
-}
-
-.desktop-call-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.call-participant-item {
-    display: flex;
-    align-items: center;
-    padding: 4px 8px;
-    gap: 8px;
-    cursor: pointer;
-}
-
-.room-item.has-unread .room-name {
-      font-weight: 600;
-      color: #ffffff;
-}
-
 .notification-badge {
       background-color: #4a4d53;
       color: white;
@@ -241,68 +245,5 @@
 
 .notification-badge.highlight {
     background-color: #f23f43;
-}
-
-.active-call-panel {
-  padding: 8px;
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--surface-2);
-  border-top: 2px solid rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.call-info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.call-status-container {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.call-status-label {
-  color: #43b581;
-  font-weight: bold;
-  font-size: 0.75rem;
-  line-height: 1.2;
-}
-
-.call-room-name {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.hangup-icon-btn {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: #f04747;
-  padding: 4px;
-  margin-right: 10px;
-  transition: transform 0.1s ease;
-}
-
-.hangup-icon-btn:hover {
-  transform: scale(1.1);
-}
-
-.call-controls-grid {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  background: var(--surface-1);
-  border-radius: 4px;
-  padding: 4px 0;
 }
 
