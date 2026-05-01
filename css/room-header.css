@@ -1,10 +1,3 @@
-.room-layout {
-    flex: 1;
-    height: 100vh;
-    display: grid;
-    overflow: hidden;
-}
-
 .room-header {
     display: flex;
     align-items: center;
@@ -13,14 +6,6 @@
     border-bottom: 1px solid #1e1f22;
     background: #313338;
     min-width: 0;
-}
-
-.room-name {
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 0 1 auto;
 }
 
 .room-header-name {
