@@ -24,7 +24,9 @@ This is more or less where the layout and control of the container's contents wi
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [reagent.core :as r]
-   [reagent.dom.client :as rdom]))
+   [reagent.dom.client :as rdom]
+   [plugins :as plugins]
+   [utils.macros :refer [defui]]))
 #+end_src
 
 
