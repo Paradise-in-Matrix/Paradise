@@ -171,7 +171,7 @@ actions, and such. Generally they'll only be visible when hovered.
 .room-item-right {
       z-index: 10;
       right:0 ;
-      display: flex;
+      display: none;
       align-items: center;
       margin-left: auto;
       gap: 8px;
@@ -189,6 +189,14 @@ actions, and such. Generally they'll only be visible when hovered.
 .room-item:hover .room-hover-actions {
       opacity: 1;
 }
+
+@media (hover: hover) and (pointer: fine) {
+    .room-item:hover .room-item-right {
+        display: flex;
+    }
+}
+
+
 #+end_src
 
 
