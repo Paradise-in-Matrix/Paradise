@@ -275,6 +275,11 @@
     (let [auth-status   @(re-frame/subscribe [:auth/status])
           sidebar-open? @(re-frame/subscribe [:ui/sidebar-open?])
           update-ready? @(re-frame/subscribe [:app/update-available?])
+          safe-area-bottom @(re-frame/subscribe [:ui/safe-area-bottom])
+          platform         (.getPlatform js/Capacitor)
+          cushion       (if (= platform "ios")
+                          "8px"
+                          "max(env(safe-area-inset-bottom, 0px), 8px)")
           swipe-props (make-swipe-handlers
                        !drag-state
                        {:on-end (fn [dx]
@@ -299,13 +304,16 @@
          [persistent-call-container]
          (into [:div.app-root
                 (merge {:class (when sidebar-open? "sidebars-open")
-                        :style {:touch-action "pan-y"}}
+                        :style {:touch-action "pan-y"
+                                :padding-bottom cushion
+                                }}
                        swipe-props)]
                [[spaces-sidebar]
                 [room-list]
                 (when sidebar-open?
                   [:div.mobile-overlay {:on-click #(re-frame/dispatch [:ui/set-sidebar false])}])
-                [container]])
+                [container]
+                ])
          [modal-root]
          [popover-root]
          [global-key-listener]
@@ -332,6 +340,7 @@
       (reset! root (rdom/create-root container)))
     (init-window-size-listener!)
     (init-capacitor-listeners!)
+
     (.render @root (r/as-element [main-layout]))))
 
 (defn ^:export init []
