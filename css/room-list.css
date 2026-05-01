@@ -98,16 +98,6 @@
     min-height: 0;
 }
 
-.room-header {
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    height: 48px;
-    border-bottom: 1px solid #1e1f22;
-    background: #313338;
-    min-width: 0;
-}
-
 .filter-bar::-webkit-scrollbar {
     display: none;
 }
