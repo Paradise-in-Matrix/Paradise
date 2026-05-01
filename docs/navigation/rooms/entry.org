@@ -737,7 +737,7 @@ need out.
                         (re-frame/dispatch
                          [:context-menu/open
                           {:x mx :y my
-                           :items (build-room-actions tr id room-name space?)}]))]
+                           :items (build-room-actions tr id room-name space? dm?)}]))]
       (r/as-element
        [room-item {:tr tr
                    :id id
