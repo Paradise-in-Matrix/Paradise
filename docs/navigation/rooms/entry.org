@@ -44,7 +44,6 @@ Eventually I'd like to swap these out with SVGs too, but for now they can stay.
                        (tr [:container.header/join-call])
                        (tr [:container.header/start-call]))
               :icon [icons/phone]
-              :class-name "mobile-menu-item"
               :action (fn []
                         (re-frame/dispatch [:call/init-widget room-id])
                         (re-frame/dispatch [:container/set-main-focus :call]))})
