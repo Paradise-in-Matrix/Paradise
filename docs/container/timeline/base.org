@@ -473,20 +473,6 @@ We also don't want to list our own name, so we remove that too.
 #+end_src
 
 
-**** Jump To? Paginate? Focus Boot? Oh my.
-
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-
-
-
-
-#+end_src
-
-
-
-**** Virtuoso Timeline Component
-
-
 **** Timeline Component
 
 The timeline component itself. It subscribes to the active room id
