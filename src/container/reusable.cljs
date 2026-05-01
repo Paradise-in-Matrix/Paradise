@@ -1,5 +1,6 @@
 (ns container.reusable
   (:require [re-frame.core :as re-frame]
+            [taoensso.timbre :as log]
             [container.timeline.item :refer [event-tile]]
             [navigation.rooms.entry :refer [build-room-actions]]
             [utils.svg :as icons]))
@@ -33,6 +34,8 @@
         call-active?  @(re-frame/subscribe [:call/is-active?])
         room-meta     @(re-frame/subscribe [:rooms/active-metadata])
         final-name    (or (:name room-meta) display-name active-id)
+        is-dm?        (:isDirect room-meta)
+        is-space?     (:isSpace room-meta)
         in-lobby?     (and (= main-focus :timeline) call-active?)
         show-actions? (or (not compact?) (= main-focus :call))]
     [:div.room-header
@@ -43,16 +46,17 @@
         [:h2.room-header-name final-name])]
      (when (and show-actions? active-id)
        [:div.header-actions
-        [:button.header-icon-btn
-         {:title
-          (if in-lobby?
-            (tr [:container.header/join-call])
-            (tr [:container.header/start-call]))
-          :class (when (or (= main-focus :call) call-active?) "active-green")
-          :on-click (fn [_]
-                      (re-frame/dispatch [:call/init-widget active-id])
-                      (re-frame/dispatch [:container/set-main-focus :call]))}
-         [icons/phone]]
+        (when is-dm?
+          [:button.header-icon-btn
+           {:title
+            (if in-lobby?
+              (tr [:container.header/join-call])
+              (tr [:container.header/start-call]))
+            :class (when (or (= main-focus :call) call-active?) "active-green")
+            :on-click (fn [_]
+                        (re-frame/dispatch [:call/init-widget active-id])
+                        (re-frame/dispatch [:container/set-main-focus :call]))}
+           [icons/phone]])
 
         (when (= main-focus :call)
           [:button.header-icon-btn
@@ -75,7 +79,7 @@
                       (re-frame/dispatch [:room/fetch-pinned-events active-id]))}
          [icons/pins {:animate :sink}]]
 
-        [:button.header-icon-btn
+        [:button.header-icon-btn.hide-on-mobile
          {:title (tr [:container.header/member-list])
           :class (when (= side-panel :members) "active")
           :on-click #(re-frame/dispatch [:container/set-side-panel :members])}
@@ -86,8 +90,9 @@
           :on-click (fn [e]
                       (let [mx (.-clientX e)
                             my (.-clientY e)]
-                        (re-frame/dispatch [:context-menu/open {:x mx :y my :items (build-room-actions active-id final-name)}])))}
+                        (re-frame/dispatch [:context-menu/open {:x mx :y my :items (build-room-actions tr active-id final-name is-space? is-dm?)}])))}
          [icons/more-vertical]]])]))
+
 
 (defn message-preview-item [room-id event]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
