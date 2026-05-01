@@ -555,7 +555,7 @@ important.
 
           (cond
             is-call?
-            [icons/speaker {:has-call? has-call? :style {:margin-right "8px"}}]
+            [icons/speaker {:has-call? has-call?}]
             (and (= active-filter "people") (or is-dm? (not space-id)))
             [avatar {:id id :name final-name :url final-avatar :size 24 :status :online}]
             :else
