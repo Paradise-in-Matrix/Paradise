@@ -118,15 +118,6 @@
 }
 
 
-.room-name {
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 0 1 auto;
-}
-
-
 .room-drawer-header {
     display: flex;
     align-items: center;
@@ -192,12 +183,5 @@
     height: 100vh;
     display: grid;
     overflow: hidden;
-}
-.room-name {
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 0 1 auto;
 }
 
