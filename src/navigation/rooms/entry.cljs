@@ -7,20 +7,49 @@
    [utils.svg :as icons]
    [utils.global-ui :refer [avatar long-press-props]]))
 
-(defn build-room-actions [tr room-id room-name is-space?]
-  [{:id "mark-read"
-    :label (tr [:navigation.actions/mark-read])
-    :icon [icons/check]
-    :action #(re-frame/dispatch [:rooms/mark-read room-id])}
-   {:id "copy-link"
-    :label (tr [:navigation.actions/copy-link])
-    :icon [icons/link]
-    :action #(js/console.log "Copy permalink for" room-id)}
-   {:id "leave"
-    :label (if is-space? (tr [:navigation.actions/leave-space]) (tr [:navigation.actions/leave-room]))
-    :icon [icons/leave]
-    :class-name "danger"
-    :action #(re-frame/dispatch [:rooms/leave room-id])}])
+(defn build-room-actions [tr room-id room-name is-space? is-dm?]
+  (remove nil?
+          [{:id "mark-read"
+            :label (tr [:navigation.actions/mark-read])
+            :icon [icons/check]
+            :action #(re-frame/dispatch [:rooms/mark-read room-id])}
+           {:id "copy-link"
+            :label (tr [:navigation.actions/copy-link])
+            :icon [icons/link]
+            :action #(js/console.log "Copy permalink for" room-id)}
+           (when-not is-dm?
+             {:id "call"
+              :label (if in-lobby?
+                       (tr [:container.header/join-call])
+                       (tr [:container.header/start-call]))
+              :icon [icons/phone]
+              :class-name "mobile-menu-item"
+              :action (fn []
+                        (re-frame/dispatch [:call/init-widget room-id])
+                        (re-frame/dispatch [:container/set-main-focus :call]))})
+           {:id "search"
+            :label (tr [:container.header/search])
+            :icon [icons/search]
+            :class-name "mobile-menu-item"
+            :action #(re-frame/dispatch [:container/set-side-panel :search])}
+           {:id "pins"
+            :label (tr [:container.header/pinned-messages])
+            :icon [icons/pins]
+            :class-name "mobile-menu-item"
+            :action (fn []
+                      (re-frame/dispatch [:container/set-side-panel :pins])
+                      (re-frame/dispatch [:room/fetch-pinned-events room-id]))}
+           {:id "members"
+            :label (tr [:container.header/member-list])
+            :icon [icons/members]
+            :class-name "mobile-menu-item"
+            :action #(re-frame/dispatch [:container/set-side-panel :members])}
+           {:id "leave"
+            :label (if is-space? (tr [:navigation.actions/leave-space]) (tr [:navigation.actions/leave-room]))
+            :icon [icons/leave]
+            :class-name "danger"
+            :action #(re-frame/dispatch [:rooms/leave room-id])}]))
+
 
 (defn media-button [active? icon-on icon-off title on-click color-active color-inactive]
   [:button.media-btn
@@ -165,7 +194,7 @@
 
           (cond
             is-call?
-            [icons/speaker {:has-call? has-call? :style {:margin-right "8px"}}]
+            [icons/speaker {:has-call? has-call?}]
             (and (= active-filter "people") (or is-dm? (not space-id)))
             [avatar {:id id :name final-name :url final-avatar :size 24 :status :online}]
             :else
@@ -246,7 +275,7 @@
 
           (cond
             is-call?
-            [icons/speaker {:has-call? has-call? :style {:margin-right "8px"}}]
+            [icons/speaker {:has-call? has-call?}]
             (and (= active-filter "people") (or is-dm? (not space-id)))
             [avatar {:id id :name final-name :url final-avatar :size 24 :status :online}]
             :else
@@ -312,7 +341,7 @@
                         (re-frame/dispatch
                          [:context-menu/open
                           {:x mx :y my
-                           :items (build-room-actions tr id room-name space?)}]))]
+                           :items (build-room-actions tr id room-name space? dm?)}]))]
       (r/as-element
        [room-item {:tr tr
                    :id id
