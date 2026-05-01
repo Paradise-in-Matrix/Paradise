@@ -278,7 +278,7 @@
           platform         (.getPlatform js/Capacitor)
           cushion       (if (= platform "ios")
                           "8px"
-                          "max(env(safe-area-inset-bottom, 0px), 8px)")
+                          "env(safe-area-inset-bottom, 0px)")
           swipe-props (make-swipe-handlers
                        !drag-state
                        {:on-end (fn [dx]
