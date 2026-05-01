@@ -48,18 +48,6 @@
 @media (min-width: 768px) { .hide-on-desktop { display: none !important; } }
 @media (max-width: 767px) { .hide-on-mobile { display: none !important; } }
 
-.room-hover-actions {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      opacity: 0;
-      transition: opacity 0.15s ease-in-out;
-}
-
-.room-item:hover .room-hover-actions {
-      opacity: 1;
-}
-
 .call-participants {
     display: flex;
 }
@@ -96,21 +84,25 @@
 @media (max-width: 767px) { .hide-on-mobile { display: none !important; } }
 
 .room-item-right {
-      z-index: 10;
-      right:0 ;
-      display: none;
+      display: flex;
       align-items: center;
       margin-left: auto;
-      gap: 8px;
+      right: 0;
       position: absolute;
+      flex-shrink: 0;
+      gap: 8px;
 }
 
 .room-hover-actions {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      opacity: 0;
-      transition: opacity 0.15s ease-in-out;
+    position: absolute;
+    right: 0;
+    z-index: 10;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+    padding-left: 20px;
+    background: linear-gradient(to right, transparent, var(--surface-1) 20px);
 }
 
 .room-item:hover .room-hover-actions {
@@ -118,10 +110,14 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-    .room-item:hover .room-item-right {
+    .room-item:hover .room-hover-actions {
         display: flex;
     }
+    .room-item:hover .notification-badge {
+        display: none;
+    }
 }
+
 
 
 
@@ -171,6 +167,8 @@
 .notification-badge.highlight {
     background-color: #f23f43;
 }
+
+
 
 
 .active-call-panel {
