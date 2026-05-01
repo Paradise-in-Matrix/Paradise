@@ -333,9 +333,7 @@ Making sure this is dynamic, but abstract is important for now.
 @import "timeline.css";
 @import "virtualizer.css";
 @import "space.css";
-
-
-
+@import "container.css";
 @import "space-icons.css";
 @import "calls.css";
 @import "attachments.css";
@@ -343,7 +341,6 @@ Making sure this is dynamic, but abstract is important for now.
 @import "global.css";
 @import "lightbox.css";
 @import "login.css";
-@import "misc.css";
 @import "keyframes.css";
 @import "member-list.css";
 @import "base-composer.css";
