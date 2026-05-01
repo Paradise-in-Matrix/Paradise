@@ -473,58 +473,6 @@ We then initialize them as a 'pack'
 }
 
 
-.room-name {
-    display: inline-block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 150px;
-    vertical-align: middle;
-}
-
-
-
-.sidebar-item {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: transparent;
-    color: #888;
-    font-size: 13px;
-    font-weight: bold;
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.15s ease;
-}
-
-.sidebar-item:hover {
-    background-color: #2a2a2a;
-    color: #ccc;
-}
-
-.sidebar-item.active {
-    background-color: #4a90e2;
-    color: #fff;
-}
-
-
-
-.sidebar-item img {
-    pointer-events: none;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.sidebar-item.active img {
-    border-color: #fff;
-}
-
-
-
-
 @media (max-width: 768px) {
     .emoji-popover {
         position: fixed;
