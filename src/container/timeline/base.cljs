@@ -366,11 +366,6 @@
        :else
        [:span.text {:key "empty"} "\u00A0"])]))
 
-
-
-
-
-
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
         room-meta    @(re-frame/subscribe [:rooms/active-metadata])
@@ -386,4 +381,5 @@
        [:<>
         [pretext-timeline active-id]
         [message-input]
-        [status-indicator active-id]])]))
+        [status-indicator active-id]
+        ])]))
