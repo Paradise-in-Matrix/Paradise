@@ -14,6 +14,7 @@
    [overlays.lightbox]
    [overlays.profiles]
    [overlays.reactions]
+   [plugin-storage]
    [auth.events :refer [login-screen]]
    [container.call.call-container :refer [persistent-call-container]]
    [client.config :refer [load-config check-remote-version load-i18n]]
