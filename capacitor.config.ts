@@ -11,9 +11,6 @@ const config: CapacitorConfig = {
         // androidScheme: "https",
     },
     plugins: {
-        StatusBar: {
-            overlaysWebView: true,
-        },
         SplashScreen: {
             launchShowDuration: 3000,
             launchAutoHide: false,
