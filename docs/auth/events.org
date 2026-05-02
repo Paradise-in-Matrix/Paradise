@@ -123,24 +123,24 @@ Probably needs a better name (and logical grouping)
 
 #+begin_src clojurescript :tangle ../../src/auth/events.cljs
 (re-frame/reg-fx
- :idb/delete-session
+ :session/delete-from-store
  (fn [user-id]
-   (let [req (.open js/indexedDB "sw-vault" 1)]
-     (set! (.-onerror req) #(log/error "Failed to open sw-vault for deletion"))
-     (set! (.-onsuccess req)
-           (fn [e]
-             (let [db    (.. e -target -result)
-                   tx    (.transaction db #js ["tokens"] "readwrite")
-                   store (.objectStore tx "tokens")]
-               (.delete store user-id)
-               (log/info "Wiped session from vault:" user-id)))))))
+   (let [store (store/->SessionStore)]
+     (-> (.clear store user-id)
+         (.then #(log/info "Successfully wiped OPFS session and crypto store for:" user-id))
+         (.catch #(log/error "Failed to wipe session for:" user-id %))))
+   (let [req (js/window.indexedDB.deleteDatabase "paradise-settings")]
+     (set! (.-onsuccess req) #(log/info "Successfully wiped paradise-settings database."))
+     (set! (.-onerror req) #(log/error "Failed to wipe paradise-settings."))
+     (set! (.-onblocked req) #(log/warn "Wiping paradise-settings was BLOCKED by an open connection.")))))
+
 
 (re-frame/reg-event-fx
  :session/nuke-single-account
  (fn [{:keys [db]} [_ target-user-id]]
    (let [is-active? (= target-user-id (:active-user-id db))]
      (merge
-      {:idb/delete-session target-user-id
+      {:session/wipe-settings true
        :fx [[:dispatch [:settings/load-accounts]]]}
       (when is-active?
         {:db (assoc db :auth-status :logged-out
@@ -148,13 +148,31 @@ Probably needs a better name (and logical grouping)
                        :rooms/data {}
                        :timeline/current-events [])})))))
 
+(re-frame/reg-fx
+ :session/wipe-settings
+ (fn [_]
+   (let [req (js/window.indexedDB.deleteDatabase "paradise-settings")]
+     (set! (.-onsuccess req) #(log/info "Successfully wiped paradise-settings database."))
+     (set! (.-onerror req) #(log/error "Failed to wipe paradise-settings."))
+     (set! (.-onblocked req) #(log/warn "Wiping paradise-settings was BLOCKED.")))))
+
+
 (re-frame/reg-event-fx
  :sdk/logout
  (fn [{:keys [db]} _]
    (let [user-id (:active-user-id db)]
      (if user-id
-       {:dispatch [:sdk/send-to-engine {:handler :logout-client}]}
-       {:dispatch [:session/nuke-single-account user-id]}))))
+       (do
+         (go
+           (let [pool @state/!engine-pool
+                 res  (<! (main/do-with-pool! pool {:handler :logout-client
+                                                    :arguments {:user-id user-id}}))]
+             (if (= (:status res) "success")
+               (re-frame/dispatch [:session/nuke-single-account user-id])
+               (log/error "Homeserver rejected logout:" (:msg res)))))
+         {})
+       {:dispatch [:session/nuke-everything]}))))
+
 
 (re-frame/reg-event-fx
  :session/nuke-local-state!
@@ -163,15 +181,26 @@ Probably needs a better name (and logical grouping)
      {:db {}
       :browser/hard-wipe store-id})))
 
-
 (re-frame/reg-fx
  :browser/hard-wipe
  (fn [store-id]
    (.clear js/window.localStorage)
-   (when store-id
-     (let [store-name (str "paradise-store-" store-id)]
-       (js/window.indexedDB.deleteDatabase store-name)))
-   (.reload js/window.location)))
+   (let [stores-to-delete (cond-> ["paradise-settings"]
+                            store-id (conj (str "paradise-store-" store-id)))
+         delete-promises
+         (map (fn [db-name]
+                (js/Promise.
+                 (fn [resolve]
+                   (let [req (js/window.indexedDB.deleteDatabase db-name)]
+                     (set! (.-onsuccess req) #(resolve true))
+                     (set! (.-onerror req) #(resolve false))
+                     (set! (.-onblocked req) #(do (log/warn db-name "is blocked!")
+                                                  (resolve false)))))))
+              stores-to-delete)]
+     (-> (js/Promise.all (clj->js delete-promises))
+         (.then (fn []
+                  (log/info "All databases destroyed. Reloading...")
+                  (.reload js/window.location)))))))
 #+end_src
 
 
