@@ -15,6 +15,7 @@
    [worker.timeline]
    [worker.members]
    [worker.composer]
+   [worker.previews :as previews]
    [worker.call]
    [worker.rooms :as rooms]
    [worker-sci-runner :as sci]
@@ -132,9 +133,8 @@
                               (.start sync-service)
                               (spaces/init-space-service! client)
                               (setup-encryption-listeners! client)
-                              )
-
-                            )
+                              (previews/attach-media-preview-listener! client)
+                              ))
                        {:status :success}
                        (catch :default e
                          {:status :error :msg (str e)})))))
