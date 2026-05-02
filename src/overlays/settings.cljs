@@ -65,6 +65,28 @@
    (assoc db :verification/status state-kw
              :verification/error nil)))
 
+(re-frame/reg-event-fx
+ :settings/update-media-preview-policy
+ (fn [{:keys [db]} [_ policy]]
+   (let [policy-kw (keyword policy)]
+     (if-let [pool @state/!engine-pool]
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :set-media-preview-policy
+                                                 :arguments {:policy policy-kw}}))]
+           (when-not (= (:status res) "success")
+             (log/error "Failed to sync media policy to Matrix:" (:msg res)))))
+       (log/warn "Cannot sync media policy: No engine pool"))
+     {:db (assoc-in db [:settings :media-previews] policy-kw)})))
+
+(re-frame/reg-event-db
+ :settings/receive-media-preview-config
+ (fn [db [_ policy]]
+   (assoc-in db [:settings :media-previews] policy)))
+
+(re-frame/reg-sub
+ :settings/media-preview-policy
+ (fn [db _]
+   (get-in db [:settings :media-previews] :off)))
 
 (re-frame/reg-event-fx
  :sdk/submit-verification
@@ -110,14 +132,51 @@
  (fn [db _] (:verification/error db)))
 
 
+(defn advanced-preferences-view []
+  (let [policy       @(re-frame/subscribe [:settings/media-preview-policy])
+        previews-on? (= policy :on)]
+    [:div.settings-section
+     [:h3.settings-subheading (tr [:settings.advanced/prefs-subheading])
+      ]
+     [:div.settings-row.toggle-row
+      [:div.setting-text
+       [:div.setting-title (tr [:settings.advanced/link-previews-title])]
+       [:div.setting-description (tr [:settings.advanced/link-previews-description])]]
+      [:label.custom-toggle
+       [:input {:type "checkbox"
+                :checked previews-on?
+                :on-change #(re-frame/dispatch [:settings/update-media-preview-policy
+                                                (if (.. % -target -checked) :on :off)])}]
+       [:div.toggle-track
+        [:div.toggle-knob]]]]]))
+
+(defn advanced-plugins-view []
+  (let [tr @(re-frame/subscribe [:i18n/tr])]
+    [:div.settings-section.plugins-view-wrapper
+     [:p.verification-description {:style {:margin-bottom "24px"}}
+      (tr [:settings.advanced/description])]
+     [plugins/plugins-installer]]))
+
 (defn advanced-tab []
   (let [tr @(re-frame/subscribe [:i18n/tr])]
-    [:div.settings-tab-content
-     [:h2.settings-heading (tr [:settings.advanced/title])]
-     [:div.settings-section
-      [:p.verification-description
-       (tr [:settings.advanced/description])]
-      [plugins/plugins-installer]]]))
+    (r/with-let [!active-sub-tab (r/atom :preferences)]
+      [:div.settings-tab-content
+       [:h2.settings-heading (tr [:settings.advanced/title])]
+       [:div.sub-tabs-container
+        [:button.sub-tab-btn
+         {:class (when (= @!active-sub-tab :preferences) "active")
+          :on-click #(reset! !active-sub-tab :preferences)}
+         (tr [:settings.advanced/section-prefs])]
+        [:button.sub-tab-btn
+         {:class (when (= @!active-sub-tab :plugins) "active")
+          :on-click #(reset! !active-sub-tab :plugins)}
+         (tr [:settings.plugins/section-title])
+         ]]
+       [:div.settings-spacer {:style {:height "24px"}}]
+       (case @!active-sub-tab
+         :preferences [advanced-preferences-view]
+         :plugins     [advanced-plugins-view])])))
+
 
 
 (def settings-registry
