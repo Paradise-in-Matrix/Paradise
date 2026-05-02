@@ -259,9 +259,8 @@ The sync service is the actual service that tries to sync with the home server.
                               (.start sync-service)
                               (spaces/init-space-service! client)
                               (setup-encryption-listeners! client)
-                              )
-
-                            )
+                              (previews/attach-media-preview-listener! client)
+                              ))
                        {:status :success}
                        (catch :default e
                          {:status :error :msg (str e)})))))
