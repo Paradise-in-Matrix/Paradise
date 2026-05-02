@@ -101,6 +101,28 @@ scaffolding.
    (assoc db :verification/status state-kw
              :verification/error nil)))
 
+(re-frame/reg-event-fx
+ :settings/update-media-preview-policy
+ (fn [{:keys [db]} [_ policy]]
+   (let [policy-kw (keyword policy)]
+     (if-let [pool @state/!engine-pool]
+       (go
+         (let [res (<! (main/do-with-pool! pool {:handler :set-media-preview-policy
+                                                 :arguments {:policy policy-kw}}))]
+           (when-not (= (:status res) "success")
+             (log/error "Failed to sync media policy to Matrix:" (:msg res)))))
+       (log/warn "Cannot sync media policy: No engine pool"))
+     {:db (assoc-in db [:settings :media-previews] policy-kw)})))
+
+(re-frame/reg-event-db
+ :settings/receive-media-preview-config
+ (fn [db [_ policy]]
+   (assoc-in db [:settings :media-previews] policy)))
+
+(re-frame/reg-sub
+ :settings/media-preview-policy
+ (fn [db _]
+   (get-in db [:settings :media-previews] :off)))
 
 (re-frame/reg-event-fx
  :sdk/submit-verification
