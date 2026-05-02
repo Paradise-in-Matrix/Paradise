@@ -38,11 +38,10 @@
             :action (fn []
                       (re-frame/dispatch [:container/set-side-panel :pins])
                       (re-frame/dispatch [:room/fetch-pinned-events room-id]))}
-           {:id "members"
+           (when is-dm? {:id "members"
             :label (tr [:container.header/member-list])
             :icon [icons/members]
-            :class-name "mobile-menu-item"
-            :action #(re-frame/dispatch [:container/set-side-panel :members])}
+            :action #(re-frame/dispatch [:container/set-side-panel :members])})
            {:id "leave"
             :label (if is-space? (tr [:navigation.actions/leave-space]) (tr [:navigation.actions/leave-room]))
             :icon [icons/leave]
