@@ -34,6 +34,7 @@
     },
     "dependencies": {
         "@capacitor-community/electron": "^5.0.1",
+        "@capacitor-community/safe-area": "^8.0.1",
         "@capacitor/android": "^8.3.0",
         "@capacitor/app": "^8.1.0",
         "@capacitor/cli": "^8.3.0",
@@ -41,7 +42,6 @@
         "@capacitor/ios": "^8.3.0",
         "@capacitor/keyboard": "^8.0.3",
         "@capacitor/push-notifications": "^8.0.3",
-        "@capacitor/status-bar": "^8.0.2",
         "@chenglou/pretext": "^0.0.4",
         "@element-hq/element-call-embedded": "^0.16.3",
         "@tiptap/core": "^3.20.0",
