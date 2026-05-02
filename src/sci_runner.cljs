@@ -15,6 +15,8 @@
    [cljs-workers.core :as main]
    [sci-shared]
    [promesa.core]
+
+   [container.timeline.item]
    [input.composer]
    [utils.logger]
    [utils.helpers]
@@ -67,6 +69,7 @@
                         'plugin-error utils.logger/plugin-error
                         'plugin-debug utils.logger/plugin-debug}
       'utils.global-ui (expose-ns utils.global-ui)
+      'container.timeline.item (expose-ns container.timeline.item)
       'utils.macros   (expose-ns utils.macros)
       'utils.helpers  (expose-ns utils.helpers)
       'utils.images   (expose-ns utils.images)
