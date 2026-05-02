@@ -105,11 +105,12 @@ so we'll keep them nicely collected here.
                       (re-frame/dispatch [:room/fetch-pinned-events active-id]))}
          [icons/pins {:animate :sink}]]
 
-        [:button.header-icon-btn.hide-on-mobile
-         {:title (tr [:container.header/member-list])
-          :class (when (= side-panel :members) "active")
-          :on-click #(re-frame/dispatch [:container/set-side-panel :members])}
-         [icons/members]]
+        (when-not is-dm?
+          [:button.header-icon-btn.hide-on-mobile
+           {:title (tr [:container.header/member-list])
+            :class (when (= side-panel :members) "active")
+            :on-click #(re-frame/dispatch [:container/set-side-panel :members])}
+           [icons/members]])
 
         [:button.header-icon-btn
          {:title (tr [:container.header/more-options])
