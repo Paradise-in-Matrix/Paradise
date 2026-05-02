@@ -4,7 +4,7 @@
    [promesa.core :as p]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [client.session-store :refer [SessionStore]]
+   [client.session-store :as session-store :refer [SessionStore]]
    ["ffi-bindings" :as sdk]
    [cljs.core.async.interop :refer-macros [<p!]]
    [cljs.core.async :refer [go]]
@@ -167,6 +167,32 @@
                          {:status :error :msg "No active client"})
                        (catch :default e
                          {:status :error :msg (str e)})))))
+
+(worker/register :logout-client
+  (fn [{:keys [user-id]}]
+    (go
+      (try
+        (when-let [client @state/!client]
+          (<p! (.logout client))
+          (when (fn? (.-free client))
+            (.free client))
+          (reset! state/!client nil))
+
+        (<p! (p/delay 1500))
+
+        (when user-id
+          (let [store (session-store/->SessionStore)]
+            (<p! (.clear store user-id))
+            (log/info "Worker successfully wiped OPFS session for:" user-id)))
+
+        {:status "success"}
+        (catch :default e
+          (log/error "Worker Logout Panic:" e)
+          {:status "error" :msg (str e)})))))
+
+
+
+
 
 
 (worker/register :evaluate-worker-form
