@@ -24,7 +24,9 @@ It is convenient to define the actual items that make up a timeline.
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [inline-editor]]
             [utils.svg :as icons]
-            [utils.net :as net]))
+            [utils.net :as net]
+            [utils.macros :refer [defui]]
+            ))
 #+end_src
 
 
