@@ -26,9 +26,7 @@ modular behavior.
    [reagent.core :as r]
    [client.state :as state]
    [utils.svg :as icons]
-   [plugin-storage]
    [clojure.string :as str]))
-
 #+end_src
 
 
