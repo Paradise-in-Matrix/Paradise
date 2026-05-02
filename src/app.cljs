@@ -21,12 +21,13 @@
    [client.session-store :as store]
    [taoensso.tempura :as tempura :refer [tr]]
    [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay make-swipe-handlers]]
-   ["@capacitor/status-bar" :refer [StatusBar]]
    ["@capacitor/app" :refer [App]]
+   ["@capacitor-community/safe-area" :refer [SafeArea]]
    [utils.macros :refer [i18n-data]]
    [utils.svg :as icons]
    [navigation.rooms.room-list :refer [room-list]]
    [container.base :refer [container]]
+
    ))
 
 #_(def default-db
@@ -265,9 +266,7 @@
                   (re-frame/dispatch [:native/hardware-back]))))
 
 (defn set-status-bar! []
-  (.setBackgroundColor StatusBar #js {:color
-                                      "#1e1f22"})
-  (.setStyle StatusBar #js {:style "DARK"}))
+  (.setSystemBarsStyle SafeArea #js {:style "DARK"}))
 
 
 (defn main-layout []
