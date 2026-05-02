@@ -13,7 +13,9 @@
             [container.members :refer [profile-popover-trigger]]
             [input.base :refer [inline-editor]]
             [utils.svg :as icons]
-            [utils.net :as net]))
+            [utils.net :as net]
+            [utils.macros :refer [defui]]
+            ))
 
 (defmulti calc-item-height
   (fn [msg _width _pretext-cache _theme-metrics]
@@ -371,6 +373,89 @@
        [:div.media-caption
         [message-text content]])]))
 
+(defn extract-first-url [text]
+  (when text
+    (when-let [match (re-find #"https?://[^\s\"'<>]+" text)]
+      (clojure.string/replace match #"[.,:;!?]$" ""))))
+
+
+(re-frame/reg-event-fx
+ :media/fetch-url-preview
+ (fn [{:keys [db]} [_ url]]
+   (when-not (get-in db [:url-previews url])
+     (go
+       (let [res (<! (main/do-with-pool! @state/!engine-pool
+                       {:handler :get-url-preview
+                        :arguments {:url url}}))]
+         (if (= (:status res) "success")
+           (re-frame/dispatch [:media/url-preview-success url (:data res)])
+           (re-frame/dispatch [:media/url-preview-error url])))))
+   {:db (update-in db [:url-previews url] #(or % {:status :loading}))}))
+
+(re-frame/reg-event-db
+ :media/url-preview-success
+ (fn [db [_ url data]]
+   (assoc-in db [:url-previews url] {:status :success :data data})))
+
+(re-frame/reg-event-db
+ :media/url-preview-error
+ (fn [db [_ url]]
+   (assoc-in db [:url-previews url] {:status :error})))
+
+(re-frame/reg-sub
+ :media/url-preview
+ (fn [db [_ url]]
+   (get-in db [:url-previews url])))
+
+(defui link-preview-card [url hs-url]
+  (let [{:keys [status data]} @(re-frame/subscribe [:media/url-preview url])]
+    (cond
+      (= status :loading)
+      [:div.link-preview-container.is-loading
+       [:div.preview-skeleton]]
+
+      (= status :error)
+      nil
+
+      (= status :success)
+      (let [{:keys [og:title og:description og:image og:site_name]} data
+            img-url  (when og:image
+                       (if (clojure.string/starts-with? og:image "mxc://")
+                         (mxc->url og:image {:homeserver hs-url :type :thumbnail :width 400 :height 200})
+                         og:image))
+            hostname (try (.-hostname (js/URL. url)) (catch :default _ url))
+            site     (or og:site_name hostname)]
+        (when (or og:title og:description)
+          [:a.rich-embed-card {:href url :target "_blank" :rel "noopener noreferrer"}
+           [:div.embed-content
+            [:div.embed-site site]
+            (when og:title
+              [:div.embed-title og:title])
+            (when og:description
+              [:div.embed-description og:description])]
+           (when img-url
+             [:div.embed-thumbnail
+              [:img {:src img-url}]])])))))
+
+(defui message-link-preview [msg-type-tag raw-body]
+  (let [first-url (when (#{"Text" "Notice" "Emote"} msg-type-tag)
+                    (extract-first-url raw-body))]
+    (when first-url
+      (let [hs-url        @(re-frame/subscribe [:sdk/homeserver-url])
+            policy        @(re-frame/subscribe [:settings/media-preview-policy])
+            room-meta     @(re-frame/subscribe [:rooms/active-metadata])
+            is-private?   (= (:join-rule room-meta) "invite")
+            show-preview? (or (= policy :on)
+                              (and (= policy :private) is-private?))]
+        (when show-preview?
+          (r/create-class
+           {:component-did-mount
+            (fn []
+              (re-frame/dispatch [:media/fetch-url-preview first-url]))
+            :reagent-render
+            (fn []
+              [link-preview-card first-url hs-url])}))))))
+
 (defn reaction-row [{:keys [reactions my-id members-map active-room event-id]}]
   [:div.reactions-row
    (for [[emoji count senders] reactions]
@@ -489,7 +574,8 @@
 
 
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
-  (let [is-edited? (:is-edited? content-map)]
+  (let [is-edited? (:is-edited? content-map)
+        raw-body   (:body content-map)]
     [:div.message-render-container
      (when in-reply-to
        [:div.timeline-reply-banner
@@ -512,7 +598,8 @@
        "File"    [file-message event content-map tr]
        [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
      (when is-edited?
-       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
+       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])
+     [message-link-preview msg-type-tag raw-body]]))
 
 (defn calc-reply-height [content theme-metrics]
   (if (:in-reply-to content)
