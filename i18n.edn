@@ -159,8 +159,13 @@
    :advanced {
               :description  "Install custom modifications. Proceed with caution."
               :title "Plugins & Themes"
+              :section-prefs "Preferences"
+              :link-previews-description  "Automatically fetch and display rich previews for URLs in chat messages."
+              :link-previews-title  "Link Previews"
+              :prefs-subheading "Chat Preferences"
               }
    :plugins {
+             :section-title "Plugins & Themes"
              :security-title "Security Warning"
              :plugin-request "The plugin %1 is requesting to load external JavaScript from the internet."
              :warning-message "Only allow this if you absolutely trust the developer. Malicious scripts can compromise your session."
