@@ -5,6 +5,46 @@
   background: #2f3136;
 }
 
+.plugins-container-card {
+  background: var(--bg-secondary, rgba(128, 128, 128, 0.05));
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.split-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.install-column {
+  flex: 1 1 240px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.list-column {
+  flex: 2 1 300px;
+  display: flex;
+  flex-direction: column;
+  padding-left: 24px;
+  border-left: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
+}
+
+@media (max-width: 700px) {
+  .list-column {
+    padding-left: 0;
+    border-left: none;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
+  }
+  .install-column {
+    max-width: 100%;
+  }
+}
+
 .theme-section {
   margin-bottom: 32px;
   padding-bottom: 24px;
