@@ -90,14 +90,27 @@
            (set! (.-onsuccess put-req) #(resolve true))
            (set! (.-onerror put-req) #(resolve false))))))))
 
+(defn- delete-db! [db-name]
+  (js/Promise.
+   (fn [resolve _]
+     (try
+       (let [request (.deleteDatabase js/indexedDB db-name)]
+         (set! (.-onsuccess request) #(do (log/info "Destroyed IDB:" db-name) (resolve true)))
+         (set! (.-onerror request) #(do (log/error "Error deleting IDB:" db-name) (resolve false)))
+         (set! (.-onblocked request) #(do (log/warn "BLOCKED deleting IDB:" db-name) (resolve false))))
+       (catch :default e
+         (log/error "Fatal crash attempting to delete IDB:" db-name "Error:" e)
+         (resolve false))))))
+
 (defn- delete-store-impl! [store-id]
-  (let [store-name (str "paradise-store-" store-id)]
-    (js/Promise.
-     (fn [resolve _]
-       (let [request (.deleteDatabase js/indexedDB store-name)]
-         (set! (.-onsuccess request) #(resolve true))
-         (set! (.-onerror request) #(resolve false))
-         (set! (.-onblocked request) #(resolve false)))))))
+  (let [base-name (str "paradise-store-" store-id)]
+    (.allSettled js/Promise
+     #js [(delete-db! base-name)
+          (delete-db! (str base-name "::matrix-sdk-state"))
+          (delete-db! (str base-name "::matrix-sdk-crypto"))
+          (delete-db! (str base-name "::event_cache"))
+          (delete-db! (str base-name "::media"))])))
+
 
 #_(defn- sync-to-sw-vault! [sessions-obj]
   (let [user-keys (js/Object.keys sessions-obj)]
@@ -163,11 +176,12 @@
 
 (defn- clear-session-impl! [user-id]
   (p/let [sessions (load-raw-sessions-opfs)
-          data (aget sessions user-id)]
-    (when-let [sid (and data (aget data "storeId"))]
-      (delete-store-impl! sid))
+          data     (aget sessions user-id)
+          sid      (if data (aget data "storeId") nil)
+          _        (if sid (delete-store-impl! sid) (p/resolved true))]
     (js-delete sessions user-id)
     (save-raw-sessions-opfs! sessions)))
+
 
 (deftype SessionStore []
   Object
