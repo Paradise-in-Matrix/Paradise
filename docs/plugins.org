@@ -147,73 +147,78 @@ on the fly.
             current-theme  @(re-frame/subscribe [:ui/current-theme])
             custom-theme?  (and (string? current-theme)
                                 (str/starts-with? current-theme "http"))]
-        [:div.plugin-installer-panel
-         [:div.theme-section
-          [:h3 (tr [:settings.plugins/themes-title])]
+        [:div.plugin-installer-panel {:style {:display "flex" :flex-direction "column" :gap "24px"}}
 
-          [:div.plugin-input-row
-           [:input.form-input.plugin-input
-            {:type "text"
-             :placeholder (tr [:settings.plugins/placeholder-theme-url])
-             :value @theme-url-input
-             :on-change #(reset! theme-url-input (.. % -target -value))}]
-           [:button.form-button.plugin-action-btn
-            {:disabled (empty? @theme-url-input)
-             :on-click #(do
-                          (re-frame/dispatch [:ui/switch-theme @theme-url-input])
-                          (reset! theme-url-input ""))}
-            (tr [:settings.plugins/apply])]]
-          (when custom-theme?
-            [:div.active-theme-card
-             [:div.active-theme-info
-              [:span.active-theme-label
-               (tr [:settings.plugins/active-custom-theme])]
-              [:span.active-theme-value current-theme]]
-             [:button.form-button.destructive.reset-theme-btn
-              {:on-click #(re-frame/dispatch [:ui/reset-theme])}
-              (tr [:settings.plugins/reset-default])]])]
+         [:div.plugins-container-card.split-layout
+          [:div.install-column
+           [:h3.settings-subheading {:style {:margin-top 0}} (tr [:settings.plugins/themes-title])]
+           [:div.plugin-input-row
+            [:input.form-input.plugin-input
+             {:type "text"
+              :placeholder (tr [:settings.plugins/placeholder-theme-url])
+              :value @theme-url-input
+              :on-change #(reset! theme-url-input (.. % -target -value))}]
+            [:button.form-button.plugin-action-btn
+             {:disabled (empty? @theme-url-input)
+              :on-click #(do
+                           (re-frame/dispatch [:ui/switch-theme @theme-url-input])
+                           (reset! theme-url-input ""))}
+             (tr [:settings.plugins/apply])]]]
+          [:div.list-column
+           (when custom-theme?
+             [:div.active-theme-card
+              [:div.active-theme-info
+               [:span.active-theme-label (tr [:settings.plugins/active-custom-theme])]
+               [:span.active-theme-value current-theme]]
+              [:button.form-button.destructive.reset-theme-btn
+               {:on-click #(re-frame/dispatch [:ui/reset-theme])}
+               (tr [:settings.plugins/reset-default])]])]]
 
-         [:div.plugin-section
-          [:h3 (tr [:settings.plugins/plugins-title])]
-          [:div.plugin-input-row
-           [:input.form-input.plugin-input
-            {:type "text"
-             :placeholder (tr [:settings.plugins/placeholder-plugin-url])
-             :value @plugin-url-input
-             :on-change #(reset! plugin-url-input (.. % -target -value))}]
-           [:button.form-button.plugin-action-btn
-            {:disabled (empty? @plugin-url-input)
-             :on-click #(do
-                          (re-frame/dispatch [:plugins/install-from-url @plugin-url-input])
-                          (reset! plugin-url-input ""))}
-            (tr [:settings.plugins/install])]]
+         [:div.plugins-container-card.split-layout
+          [:div.install-column
+           [:h3.settings-subheading {:style {:margin-top 0}} (tr [:settings.plugins/plugins-title])]
+           [:div.plugin-input-row {:style {:flex-direction "column"}}
+            [:input.form-input.plugin-input
+             {:type "text"
+              :placeholder (tr [:settings.plugins/placeholder-plugin-url])
+              :value @plugin-url-input
+              :on-change #(reset! plugin-url-input (.. % -target -value))}]
+            [:button.form-button.plugin-action-btn
+             {:disabled (empty? @plugin-url-input)
+              :on-click #(do
+                           (re-frame/dispatch [:plugins/install-from-url @plugin-url-input])
+                           (reset! plugin-url-input ""))}
+             (tr [:settings.plugins/install])]]]
 
-          (when (seq active-plugins)
-           [:<>
-            [:h4.active-plugins-header (tr [:settings.plugins/active-plugins])]
-            [:div.active-plugins-list
-             (for [plugin active-plugins]
-               (let [url      (:source-url plugin)
-                     enabled? (not (contains? disabled-urls url))]
-                 ^{:key (:id plugin)}
-                 [:div.active-plugin-item
-                  [:div.active-plugin-meta
-                   [:div {:style {:display "flex" :align-items "center" :gap "8px"}}
-                    [:span.active-plugin-name (:name plugin (tr [:settings.plugins/unknown-plugin]))]
-                    [:span.active-plugin-version (str "v" (:version plugin "1.0.0"))]]
-                   [:span.active-plugin-desc (:description plugin (tr [:settings.plugins/no-description]))]]
-                  [:div {:style {:display "flex" :align-items "center" :gap "16px"}}
-                   [:label.custom-toggle
-                    [:input {:type "checkbox"
-                             :checked enabled?
-                             :on-change #(re-frame/dispatch [:plugins/toggle-plugin url (.. % -target -checked)])}]
-                    [:div.toggle-track
-                     [:div.toggle-knob]]]
+          [:div.list-column
+           (when (seq active-plugins)
+            [:<>
+             [:h4.active-plugins-header {:style {:margin-top 0 :padding-top 0 :border-top "none"}}
+              (tr [:settings.plugins/active-plugins])]
+             [:div.active-plugins-list
+              (for [plugin active-plugins]
+                (let [url      (:source-url plugin)
+                      enabled? (not (contains? disabled-urls url))]
+                  ^{:key (:id plugin)}
+                  [:div.active-plugin-item
+                   [:div.active-plugin-meta
+                    [:div {:style {:display "flex" :align-items "center" :gap "8px"}}
+                     [:span.active-plugin-name (:name plugin (tr [:settings.plugins/unknown-plugin]))]
+                     [:span.active-plugin-version (str "v" (:version plugin "1.0.0"))]]
+                    [:span.active-plugin-desc (:description plugin (tr [:settings.plugins/no-description]))]]
+                   [:div {:style {:display "flex" :align-items "center" :gap "16px"}}
+                    [:label.custom-toggle
+                     [:input {:type "checkbox"
+                              :checked enabled?
+                              :on-change #(re-frame/dispatch [:plugins/toggle-plugin url (.. % -target -checked)])}]
+                     [:div.toggle-track
+                      [:div.toggle-knob]]]
 
-                   [:button.uninstall-plugin-btn
-                    {:title (tr [:settings.plugins/uninstall-plugin])
-                     :on-click #(re-frame/dispatch [:plugins/uninstall-url url])}
-                    [icons/trash]]]]))]])]]))))
+                    [:button.uninstall-plugin-btn
+                     {:title (tr [:settings.plugins/uninstall-plugin])
+                      :on-click #(re-frame/dispatch [:plugins/uninstall-url url])}
+                     [icons/trash]]]]))]])]]]))))
+
 #+end_src
 
 
