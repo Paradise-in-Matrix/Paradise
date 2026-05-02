@@ -33,7 +33,7 @@
       "timeline-loading"  (re-frame/dispatch [:timeline/set-loading (:room-id data) (:loading? data)])
       "typing-update"     (re-frame/dispatch [:sdk/update-typing-users (:room-id data) (:users data)])
       "pagination-status" (re-frame/dispatch [:sdk/update-pagination-status (:room-id data) (:status data)])
-
+      "media-preview-config" (re-frame/dispatch [:settings/receive-media-preview-config (keyword (:policy data))])
 
       ;; band-aid syncs
       "pins-sync"  (re-frame/dispatch [:room/sync-pinned-ids (:room-id data) (:pinned-ids data)])
