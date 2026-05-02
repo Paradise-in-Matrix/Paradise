@@ -92,52 +92,53 @@
         (prune-cache! name max-items)))))
 
 (js/self.addEventListener "fetch"
-  (fn [event]
-    (let [request      (.-request event)
-          method       (.-method request)
-          request-url  (js/URL. (.-url request))
-          path         (.-pathname request-url)
-          auth-path?   (str/includes? path "/_matrix/client/v1/media/")
-          legacy-path? (or (str/includes? path "/_matrix/media/v3/")
-                           (str/includes? path "/_matrix/media/v1/"))]
-      (when (= method "GET")
-        (cond
-          auth-path?
-          (.respondWith event
-            (p/let [cache  (js/caches.open cache-name)
-                    cached (.match cache request)]
-              (if cached
-                cached
-                (p/let [_       (wait-for-session!)
-                        session (or (get @active-sessions (.-clientId event))
-                                    (first (vals @active-sessions)))
-                        token   (or (:accessToken session) (:token session))
-                        hs-url  (or (:homeserverUrl session) (:hsUrl session) (:hs_url session))]
-                  (if (or (not token)
-                          (not hs-url)
-                          (not= (.-origin request-url) (.-origin (js/URL. hs-url))))
-                    (js/Response.error)
-                    (let [headers (js/Headers. (.-headers request))]
-                      (.set headers "Authorization" (str "Bearer " token))
-                      (p/let [resp (js/fetch request-url #js {:headers headers
-                                                              :mode "cors"
-                                                              :credentials "omit"})]
-                        (when (and (.-ok resp) (< (js/parseInt (.get (.-headers resp) "content-length") 10) 10485760))
-                         (.put cache request (.clone resp)))
-                        resp)))))))
+                          (fn [event]
+                            (let [request      (.-request event)
+                                  method       (.-method request)
+                                  request-url  (js/URL. (.-url request))
+                                  path         (.-pathname request-url)
+                                  auth-path?   (str/includes? path "/_matrix/client/v1/media/")
+                                  legacy-path? (or (str/includes? path "/_matrix/media/v3/")
+                                                   (str/includes? path "/_matrix/media/v1/"))]
+                              (when (= method "GET")
+                                (if (.has (.-headers request) "Authorization")
+                                  nil
+                                  (cond
+                                    auth-path?
+                                    (.respondWith event
+                                                  (p/let [cache  (js/caches.open cache-name)
+                                                          cached (.match cache request)]
+                                                    (if cached
+                                                      cached
+                                                      (p/let [_       (wait-for-session!)
+                                                              session (or (get @active-sessions (.-clientId event))
+                                                                          (first (vals @active-sessions)))
+                                                              token   (or (:accessToken session) (:token session))
+                                                              hs-url  (or (:homeserverUrl session) (:hsUrl session) (:hs_url session))]
+                                                        (if (or (not token)
+                                                                (not hs-url)
+                                                                (not= (.-origin request-url) (.-origin (js/URL. hs-url))))
+                                                          (js/Response.error)
+                                                          (let [headers (js/Headers. (.-headers request))]
+                                                            (.set headers "Authorization" (str "Bearer " token))
+                                                            (p/let [resp (js/fetch request-url #js {:headers headers
+                                                                                                    :mode "cors"
+                                                                                                    :credentials "omit"})]
+                                                              (when (and (.-ok resp) (< (js/parseInt (.get (.-headers resp) "content-length") 10) 10485760))
+                                                                (.put cache request (.clone resp)))
+                                                              resp)))))))
 
-          legacy-path?
-          (.respondWith event
-            (p/let [cache  (js/caches.open cache-name)
-                    cached (.match cache request)]
-              (if cached
-                cached
-                (p/let [resp (js/fetch request-url #js {:mode "cors"
-                                                        :credentials "omit"})]
-                  (when (and (.-ok resp) (< (js/parseInt (.get (.-headers resp) "content-length") 10) 10485760))
-                    (.put cache request (.clone resp)))
-                  resp))))
-          :else nil)))))
+                                    legacy-path?
+                                    (.respondWith event
+                                                  (p/let [cache  (js/caches.open cache-name)
+                                                          cached (.match cache request)]
+                                                    (if cached
+                                                      cached
+                                                      (p/let [resp (js/fetch request)]
+                                                        (when (and (.-ok resp) (< (js/parseInt (.get (.-headers resp) "content-length") 10) 10485760))
+                                                          (.put cache request (.clone resp)))
+                                                        resp))))
+                                    :else nil))))))
 
 
 
