@@ -796,7 +796,8 @@ state for now.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
-  (let [is-edited? (:is-edited? content-map)]
+  (let [is-edited? (:is-edited? content-map)
+        raw-body   (:body content-map)]
     [:div.message-render-container
      (when in-reply-to
        [:div.timeline-reply-banner
@@ -819,7 +820,8 @@ state for now.
        "File"    [file-message event content-map tr]
        [:span.body (tr [:container.timeline.status/unsupported] [msg-type-tag])])
      (when is-edited?
-       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])]))
+       [:span.timeline-edited-label (tr [:container.timeline.status/edited])])
+     [message-link-preview msg-type-tag raw-body]]))
 
 (defn calc-reply-height [content theme-metrics]
   (if (:in-reply-to content)
