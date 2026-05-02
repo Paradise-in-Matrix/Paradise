@@ -1311,6 +1311,7 @@ I should clean this up, but at least it is grouped with the code for now
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow-y: auto;
   gap: 16px;
 }
 
