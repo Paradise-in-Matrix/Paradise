@@ -347,6 +347,7 @@ Making sure this is dynamic, but abstract is important for now.
 @import "member-list.css";
 @import "base-composer.css";
 @import "update-banner.css";
+@import "timeline-item.css";
 @import "reaction-modal.css";
 @import "profiles.css";
 @import "search.css";
