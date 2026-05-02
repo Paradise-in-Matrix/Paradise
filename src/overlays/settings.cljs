@@ -133,7 +133,8 @@
 
 
 (defn advanced-preferences-view []
-  (let [policy       @(re-frame/subscribe [:settings/media-preview-policy])
+  (let [tr @(re-frame/subscribe [:i18n/tr])
+        policy       @(re-frame/subscribe [:settings/media-preview-policy])
         previews-on? (= policy :on)]
     [:div.settings-section
      [:h3.settings-subheading (tr [:settings.advanced/prefs-subheading])
