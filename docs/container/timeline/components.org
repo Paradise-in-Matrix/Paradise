@@ -16,8 +16,7 @@ The components for the timeline. Need to move these to the correct spot.
             [taoensso.timbre :as log]
             [utils.helpers :refer [truncate-name]]
             [container.timeline.item :as item]
-            ["@chenglou/pretext" :refer [prepare layout]]
-            [container.timeline.item :refer [connected-event-tile]]))
+            ["@chenglou/pretext" :refer [prepare layout]]))
 #+end_src
 
 **** Code
