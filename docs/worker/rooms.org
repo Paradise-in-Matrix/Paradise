@@ -235,15 +235,21 @@ we rely on the list for our room list view behaviors (even if the space loads a
     (RoomListEntriesDynamicFilterKind.All.
      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Favourite.)
                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+
+    "invites"
+    (RoomListEntriesDynamicFilterKind.All.
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Invite.)
+                        (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
     "other"
     (RoomListEntriesDynamicFilterKind.All.
      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.Group})
-                        (RoomListEntriesDynamicFilterKind.NonLeft.)
+                        (RoomListEntriesDynamicFilterKind.Joined.)
                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
 
     (RoomListEntriesDynamicFilterKind.All.
-     #js {:filters #js [(RoomListEntriesDynamicFilterKind.NonLeft.)
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Joined.)
                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})))
+
 #+end_src
 
 #+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
