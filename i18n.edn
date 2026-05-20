@@ -172,6 +172,7 @@
     :view-chat "View Chat & Lobby"
     :filters {:all "Other"
               :unread "Unread"
+              :invites "Invites"
               :people "DMs"}
     :empty-states {:no-rooms "No rooms here..."
                    :no-results "No results found"}
