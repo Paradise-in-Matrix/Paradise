@@ -474,6 +474,7 @@ entire room list to reload. Hopefully not.
     [:div.filter-bar
      (for [[id label-key] [["people" :navigation.room-list.filters/people]
                            ["unread" :navigation.room-list.filters/unread]
+                           ["invites" :navigation.room-list.filters/invites]
                            ["other"    :navigation.room-list.filters/all] ]]
        ^{:key id}
        [:button.filter-btn
