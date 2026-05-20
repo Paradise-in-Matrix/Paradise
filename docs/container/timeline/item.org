@@ -1085,12 +1085,6 @@ state for now.
                           (when node
                             (.unobserve @visibility-observer node)))))}
          [event-tile-render item hs-url is-mobile? my-id tr]]))))
-
-(defn connected-event-tile [room-id item-stub]
-  (let [item-data @(re-frame/subscribe [:timeline/event room-id (:id item-stub)])]
-    (if item-data
-      [event-tile item-data]
-      [:div.timeline-item-loading])))
 #+end_src
 
 
