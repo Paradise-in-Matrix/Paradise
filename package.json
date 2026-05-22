@@ -53,6 +53,7 @@
         "emojibase-data": "^17.0.0",
         "ffi-bindings": "^1.0.6",
         "matrix-widget-api": "^1.17.0",
+        "eve-native": "github:SeniorCareMarket/eve",
         "nbb": "^1.4.206",
         "react": "^19",
         "react-dom": "^19",
