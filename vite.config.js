@@ -134,12 +134,20 @@ export default defineConfig(({ mode }) => {
                 input: {
                     main: path.resolve(__dirname, "build/index.html"),
                     engine: path.resolve(__dirname, "build/engine.js"),
+                    virtualizer: path.resolve(
+                        __dirname,
+                        "build/virtualizer.js"
+                    ),
                 },
                 output: {
                     entryFileNames: (chunkInfo) => {
-                        if (chunkInfo.name === "engine") {
-                            return "engine.js";
+                        if (
+                            chunkInfo.name === "engine" ||
+                            chunkInfo.name === "virtualizer"
+                        ) {
+                            return `${chunkInfo.name}.js`;
                         }
+
                         return "assets/[name]-[hash].js";
                     },
                     assetFileNames: "assets/[name].[ext]",
