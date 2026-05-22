@@ -14,15 +14,20 @@
         :output-dir "build"
         :asset-path "/"
         :modules {:base   {:entries []}
+                  :eve-shared {:entries [eve.alpha]
+                               :depends-on #{:base}}
                   :main   {:entries [client.core]
-                           :depends-on #{:base}
+                           :depends-on #{:eve-shared}
                            :exports {init client.core/init}}
                   :sw     {:entries [service-worker]
                            :web-worker true
                            :depends-on #{:base}}
                   :engine {:entries [worker.core]
                            :web-worker true
-                           :depends-on #{:base}}}
+                           :depends-on #{:base}}
+                  :virtualizer {:entries [worker.virtualizer]
+                                :web-worker true
+                                :depends-on #{:eve-shared}}}
 
         :js-options
         {:js-provider :import
