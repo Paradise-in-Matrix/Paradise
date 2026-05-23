@@ -2,14 +2,13 @@
  :builds
  {:app {:target :esm
         :npm-deps false
-        :build-hooks [;;[build-hooks/generate-lang-map]
+        :build-hooks [[lambda-lifter/hook]
                       [build-hooks/include-root-files]
                       [build-hooks/include-themes]
                       [build-hooks/stamp-version]
                       [build-hooks/include-css]
                       [build-hooks/copy-wasm]
                       [build-hooks/copy-element-call]
-                      ;;[build-hooks/tangle-hook]
                       ]
         :output-dir "build"
         :asset-path "/"
