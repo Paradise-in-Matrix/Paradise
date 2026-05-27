@@ -24,6 +24,10 @@
                   :engine {:entries [worker.core]
                            :web-worker true
                            :depends-on #{:base}}
+                           :depends-on #{:base}
+                           #_#{:eve-shared}
+
+                           }
                   :virtualizer {:entries [virtualizer.base]
                                 :web-worker true
                                 :depends-on #{:eve-shared}}}
