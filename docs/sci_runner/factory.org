@@ -1,0 +1,103 @@
+
+** Factory
+
+**** Preface
+
+But only technically.
+
+We need a neater way to pass around functions to the SCI instances across threads.
+This may be worth revisiting also to see if we can streamline it further.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
+(ns sci-runner.factory
+  (:require [sci.core :as sci]
+            [clojure.walk :as walk]
+            [sci-runner.shared :as sci-shared]
+            [sci.configs.reagent.reagent :as sci-reagent]
+            [sci.configs.re-frame.re-frame :as sci-re-frame]))
+#+end_src
+
+
+**** Code
+
+
+We now need to ensure anonymous functions are pulled out of named
+functions into their own 'named' function to avoid trying to send a function
+across the thread boundary
+
+#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
+(defn extract-and-hash-fns [body]
+  (let [extracted-fns (atom {})
+        walked-body
+        (walk/postwalk
+         (fn [node]
+           (if (and (seq? node) (or (= 'fn (first node)) (= 'fn* (first node))))
+             (let [fn-hash (keyword "fn" (str (hash (pr-str node))))]
+               (swap! extracted-fns assoc fn-hash node)
+               fn-hash)
+             node))
+         body)]
+    [@extracted-fns walked-body]))
+
+#+end_src
+
+Ensures override is treated as valid code in the interpreted instance.
+
+#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
+(defn create-defoverride-macro [env-type !overrides-atom !plugin-id-atom virtualizer-walk-ast-fn]
+  (sci/new-macro-var
+   'defoverride
+   (fn [_form _env comp-name fqn & tail]
+     (let [plugin-id   @!plugin-id-atom
+           has-doc?    (string? (first tail))
+           docstring   (if has-doc? (first tail) nil)
+           tail'       (if has-doc? (rest tail) tail)
+           args        (first tail')
+           body        (rest tail')
+           [extracted-fns hoisted-body] (extract-and-hash-fns body)
+           final-body (if (and (= env-type :virtualizer) virtualizer-walk-ast-fn)
+                        (map virtualizer-walk-ast-fn hoisted-body)
+                        hoisted-body)
+           ui-registrations (when (= env-type :ui)
+                              (map (fn [[hash-kw fn-form]]
+                                     `(swap! client.registry/!anon-fns assoc ~hash-kw ~fn-form))
+                                   extracted-fns))]
+       `(do
+          ~@ui-registrations
+          (defn ~comp-name ~@(when docstring [docstring]) ~args ~@final-body)
+          (swap! ~!overrides-atom assoc ~fqn
+                 {:plugin-id ~plugin-id :fn ~comp-name}))))))
+
+#+end_src
+
+
+For now we'll keep the thread awareness simple. This should likely need to know 'less' about the overall context
+at a later point though.
+
+#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
+(defn build-context [env-type thread-state extra-namespaces]
+  (let [{:keys [!overrides !components !slots !current-plugin !virtualizer-pool virtualizer-walk-ast-fn re-frame-mock]} thread-state
+        is-ui?     (= env-type :ui)
+        is-virt?   (= env-type :virtualizer)
+        is-worker? (= env-type :worker)]
+    (sci/init
+     {:classes sci-shared/common-classes
+      :namespaces
+      (merge
+       sci-shared/common-namespaces
+       {'user         {'defoverride (create-defoverride-macro env-type !overrides !current-plugin virtualizer-walk-ast-fn)}
+        'sci-runner   {'!current-eval-plugin !current-plugin}
+        'client.registry {'!active-overrides !overrides
+                          '!components       (or !components (atom {}))
+                          '!slots            (or !slots (atom {}))}
+        'client.state    {'!virtualizer-pool (if is-ui? !virtualizer-pool (atom nil))}}
+       (when (or is-ui? is-virt?)
+         (merge (:namespaces sci-reagent/config)
+                (:namespaces sci-re-frame/config)))
+       (when is-virt?
+         {'re-frame.core re-frame-mock})
+       extra-namespaces)})))
+#+end_src
