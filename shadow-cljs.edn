@@ -21,9 +21,12 @@
                   :sw     {:entries [service-worker]
                            :web-worker true
                            :depends-on #{:base}}
+                  ;; exists solely for decryption
+                  :media {:entries [media.core]
+                          :web-worker true
+                          :depends-on #{:base}}
                   :engine {:entries [worker.core]
                            :web-worker true
-                           :depends-on #{:base}}
                            :depends-on #{:base}
                            #_#{:eve-shared}
 
