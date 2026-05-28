@@ -69,8 +69,13 @@ Now we want to just create a pool of one for the rust-sdk to execute on.
                                :on-stream handle-worker-stream!})))
   (when-not @state/!media-pool
     (reset! state/!media-pool
-            (main/create-pool 3 "engine.js"
-                              {:worker-opts #js {:type "module"}}))))
+            (main/create-pool 3 "media.js"
+                              {:worker-opts #js {:type "module"}})))
+  (when-not @state/!virtualizer-pool
+    (reset! state/!virtualizer-pool
+            (main/create-pool 1 "virtualizer.js"
+                              {:worker-opts #js {:type "module"}
+                               :on-stream handle-worker-stream!}))))
 #+end_src
 
 
@@ -101,7 +106,7 @@ linked.
         mm-chan  (js/MessageChannel.)
         mm-port1 (.-port1 mm-chan)
         mm-port2 (.-port2 mm-chan)
-        
+
         me-chan  (js/MessageChannel.)
         me-port1 (.-port1 me-chan)
         me-port2 (.-port2 me-chan)]
