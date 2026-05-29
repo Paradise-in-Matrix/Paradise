@@ -512,11 +512,11 @@ overwrite the components class.
 
 (defn inject-script! [url]
   (p/create
-   (fn [resolve reject]
+   (fn [resolve-fn reject]
      (let [script (.createElement js/document "script")]
        (set! (.-src script) url)
        (set! (.-crossOrigin script) "anonymous")
-       (set! (.-onload script) #(resolve true))
+       (set! (.-onload script) #(resolve-fn true))
        (set! (.-onerror script) #(reject (str "Failed to load script: " url)))
        (.appendChild js/document.head script)))))
 
