@@ -30,7 +30,7 @@ unified global threading experience.
 
 Some tags will choke up the walk as CLJS isn't entirely 1:1 with CLJ
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn read-cljs [s]
   (binding [*data-readers* {}
             *default-data-reader-fn* tagged-literal]
@@ -53,7 +53,7 @@ Some tags will choke up the walk as CLJS isn't entirely 1:1 with CLJ
 We can amusingly implement this feature very easy. Compared to say Java's dependency injection
 which has a bit more nuance and often involves annotations.
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn inject-requires [ns-form requires-list]
   (if (empty? requires-list)
     ns-form
@@ -93,7 +93,7 @@ Currently we're only really doing two operations. Wrapping functions and swappin
 Hiccup vectors.
 
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn generate-registry-code [registry]
   (if (empty? registry)
     ""
@@ -116,7 +116,7 @@ Hiccup vectors.
 This is more or less where we actually perform the body of work to walk the AST and utilize
 
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn instrument-host-file [ast-form extra-requires]
   (let [current-ns (atom "user")
         skip-instrument? (atom false)]
@@ -165,7 +165,7 @@ We more or less want to ensure we register as much as possible. This can always
 be expanded later.
 
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn get-top-level-defs [zloc]
   (let [defs (atom #{})]
     (loop [loc (z/down zloc)]
@@ -188,7 +188,7 @@ We need to check if it is a token and evaluates the sexpr
 to capture free variables from the surrounding lexical scope.
 This is used to make the de-anonymized functions 'work'.
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn extract-free-vars [zloc top-level-defs]
   (let [syms (atom #{})]
     (z/postwalk
@@ -225,7 +225,7 @@ In fact, this was what necessitated building out this build hook.
 
 
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn rewrite-lambdas [code]
   (let [zloc (z/of-string code {:track-position? true})
         root-zloc (or (z/up zloc) zloc)
@@ -287,7 +287,7 @@ For now it is mostly unused.
 
 Have to avoid registering in the few files that do not need it.
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn skip-file? [code]
   (re-find #"\(ns\s+(utils\.macros|client\.registry|client\.state|client\.core)" code))
 #+end_src
@@ -296,7 +296,7 @@ Have to avoid registering in the few files that do not need it.
 
 ***** Process File
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn process-file [file out-file]
   (let [raw-code (slurp file)]
     (if (skip-file? raw-code)
@@ -329,7 +329,7 @@ Have to avoid registering in the few files that do not need it.
 We do a form of caching here in addition to performing the process file.
 This keeps subsequent re-compilations feeling snappy.
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn process-directory [src-dir out-dir]
   (let [dir (io/file src-dir)
         out-dir-file (io/file out-dir)
@@ -374,7 +374,7 @@ This keeps subsequent re-compilations feeling snappy.
 **** Define the Hook
 
 
-#+begin_src clojurescript :tangle ../hooks/lambda_lifter.clj
+#+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn hook
   {:shadow.build/stage :configure}
   [build-state & _args]
