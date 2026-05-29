@@ -48,3 +48,21 @@ This allows us to neatly create states and provide a single component to the mai
   (fn [{:keys [render-fn] :as props}]
     [render-fn props]))
 #+end_src
+
+
+
+**** Multi-method Context Menu
+
+
+#+begin_src clojurescript :tangle ../../src/overlays/base.cljs
+(defmulti context-menu-component identity)
+
+(defmethod context-menu-component :default [menu-id]
+  (fn [_props]
+    [:div {:style {:padding "10px" :color "red"}}
+     (str "Missing context menu: " menu-id)]))
+
+(defmethod context-menu-component :plugin-portal [_]
+  (fn [{:keys [render-fn] :as props}]
+    [render-fn props]))
+#+end_src
