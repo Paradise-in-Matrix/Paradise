@@ -47,36 +47,33 @@ them collected together
 
 
 
-**** Global Context Menu
+**** Context Menu Root
 
 
 ***** Reframe events and subscriptions
 
 #+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
 (re-frame/reg-event-db
- :context-menu/open
- (fn [db [_ {:keys [x y items]}]]
-   (assoc db :context-menu {:open? true
-                            :x x
-                            :y y
-                            :items items})))
+ :ui/open-context-menu
+ (fn [db [_ id props]]
+   (assoc db :active-context-menu {:id id :props props})))
 
 (re-frame/reg-event-db
- :context-menu/close
+ :ui/close-context-menu
  (fn [db _]
-   (assoc db :context-menu {:open? false :x 0 :y 0 :items []})))
+   (dissoc db :active-context-menu)))
 
 (re-frame/reg-sub
- :context-menu/state
+ :ui/active-context-menu
  (fn [db _]
-   (:context-menu db {:open? false})))
+   (:active-context-menu db)))
 #+end_src
 
 
 ***** Function
 
 #+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
-(defui global-context-menu []
+(defn ^:ui context-menu-root []
   (r/with-let [!drag-y (r/atom 0)
                !start-y (r/atom 0)
                !safe-to-click? (r/atom false)
@@ -88,15 +85,15 @@ them collected together
                                 (.removeEventListener js/window "touchend" enable-clicks! true)
                                 (.removeEventListener js/window "pointerup" enable-clicks! true)
                                 (.removeEventListener js/window "touchcancel" enable-clicks! true))]
-    (let [{:keys [open? x y items]} @(re-frame/subscribe [:context-menu/state])]
-      (when-not open?
+    (let [active-menu @(re-frame/subscribe [:ui/active-context-menu])]
+      (when-not active-menu
         (reset! !drag-y 0)
         (reset! !start-y 0)
         (reset! !safe-to-click? false)
         (when @!listener-active?
           (enable-clicks!)))
 
-      (when (and open? (not @!safe-to-click?) (not @!listener-active?))
+      (when (and active-menu (not @!safe-to-click?) (not @!listener-active?))
         (if is-mobile?
           (do
             (reset! !listener-active? true)
@@ -105,16 +102,15 @@ them collected together
             (.addEventListener js/window "touchcancel" enable-clicks! true))
           (enable-clicks!)))
 
-      (when open?
-        (let [menu-width  200
-              item-height (if is-mobile? 48 32)
-              menu-height (* (count items) item-height)
-              render-x (if (> (+ x menu-width) js/window.innerWidth)
-                         (- x menu-width)
-                         x)
-              render-y (if (> (+ y menu-height) js/window.innerHeight)
-                         (- y menu-height)
-                         y)
+      (when active-menu
+        (let [{:keys [id props]} active-menu
+              {:keys [x y]} props
+              close-fn #(re-frame/dispatch [:ui/close-context-menu])
+              Target   (context-menu-component id)
+              menu-width  200
+              menu-height 250
+              render-x (if (> (+ x menu-width) js/window.innerWidth) (- x menu-width) x)
+              render-y (if (> (+ y menu-height) js/window.innerHeight) (- y menu-height) y)
 
               handle-ptr-down (fn [e]
                                 (reset! !start-y (.-clientY e))
@@ -123,17 +119,15 @@ them collected together
                                 (when (pos? @!start-y)
                                   (let [delta (- (.-clientY e) @!start-y)]
                                     (reset! !drag-y (max 0 delta)))))
-              handle-ptr-up (fn [e]
-                              (if (> @!drag-y 100)
-                                (re-frame/dispatch [:context-menu/close])
-                                (reset! !drag-y 0))
-                              (reset! !start-y 0)
-                              (.releasePointerCapture (.-target e) (.-pointerId e)))]
-
+              handle-ptr-up   (fn [e]
+                                (if (> @!drag-y 100)
+                                  (close-fn)
+                                  (reset! !drag-y 0))
+                                (reset! !start-y 0)
+                                (.releasePointerCapture (.-target e) (.-pointerId e)))]
 
           [click-away-wrapper
-           {:on-close #(re-frame/dispatch [:context-menu/close])
-            :z-index 9998}
+           {:on-close close-fn :z-index 9998}
            [:div.universal-context-menu
             {:class (when is-mobile? "mobile-sheet")
              :on-context-menu (fn [e] (.preventDefault e))
@@ -151,17 +145,8 @@ them collected together
                        :z-index 99999
                        :pointer-events (if @!safe-to-click? "auto" "none")})}
             [:div.mobile-drag-handle]
-            (for [{:keys [id label action class-name icon]} items]
-              ^{:key (or id label)}
-              [:div.context-menu-item
-               {:class class-name
-                :on-click (fn [e]
-                            (.stopPropagation e)
-                            (action)
-                            (re-frame/dispatch [:context-menu/close]))}
-               (when icon [:span.item-icon icon])
-               [:span.item-label label]])]])))))
-
+            (when Target
+              [Target (assoc props :close-fn close-fn)])]])))))
 #+end_src
 
 
