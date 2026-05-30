@@ -467,42 +467,6 @@ much simpler.
 
 #+end_src
 
-#+begin_src txt
-#+end_src
-
-
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
-(defn global-reaction-picker []
-  (let [picker-state @(re-frame/subscribe [:msg/active-reaction-picker])]
-    (when picker-state
-      (let [{:keys [room-id msg-id x y]} picker-state
-            width  320
-            height 380
-            render-x (if (> (+ x width) js/window.innerWidth)
-                       (- x width)
-                       x)
-            render-y (if (> (+ y height) js/window.innerHeight)
-                       (- y height)
-                       y)]
-        [:div.dynamic-reaction-wrapper
-         {:style {:position "fixed"
-                  :left (str render-x "px")
-                  :top (str render-y "px")
-                  :z-index 11000}}
-         [emoji-sticker-board
-          {:on-close #(re-frame/dispatch [:msg/close-reaction-picker])
-           :on-insert-emoji (fn [shortcode _url]
-                              (re-frame/dispatch [:sdk/send-reaction room-id msg-id shortcode])
-                              (re-frame/dispatch [:msg/close-reaction-picker]))
-           :on-send-sticker (fn [& _] (log/warn "No stickers in reactions!"))}]]))))
-#+end_src
-
-***** CSS
-
-
-#+begin_src css :tangle ../../css/global.css
-
-#+end_src
 
 **** Long Press Properties
 
@@ -563,7 +527,6 @@ much simpler.
                           (.stopPropagation e)
                           (.preventDefault e))))
    :on-touch-cancel (fn [_] (clear-long-press!))})
-
 #+end_src
 
 
