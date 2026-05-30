@@ -16,7 +16,7 @@ them collected together
    [clojure.string :as str]
    [reagent.core :as r]
    [utils.macros :refer [defui]]
-   [overlays.base :refer [modal-component popover-component]]
+   [overlays.base :refer [modal-component popover-component context-menu-component]]
    [utils.svg :as icons]
    [utils.images :refer [mxc-image]]
    ))
