@@ -13,8 +13,32 @@ is that the entirety of the client should be able to be modded.
 I imagine initial mod support will be somewhat limited, but as I continue
 development on the project we can provide more and more functionality.
 
-So starting this we'll opt to keep it on the simpler side to just showcase
-modular behavior.
+Currently the implementation is functional, but some improvements are needed.
+The improvements, however, would require namespace changes and some re-organization
+so for now we'll continue with this simpler mechanism.
+
+At a later time the goal would be to instead prefix with paradise to the namespace
+so we can more easily expose to SCI which namespaces we should expose.
+Then building on that we need to expand the threading identities to cover the
+namespaces more clearly.
+Many files in the project belong to the UI scope and a large chunk of the others
+belong to the engine scope (worker).
+
+The remaining two thread identities are media and virtualizer.
+The virtualizer ideally would be lifted away from the repo when the thread
+solution is more finalized, and the media pool is rather specific (but should
+be exposable).
+
+Then we can create an easier mechanism for loading plugin functions into threads
+because they can target FQN and the FQN can be associated with certain
+thread identities. So for say the engine pool to be added to we'd then be able to
+do something like
+(ns paradise.engine.some-plugin)
+
+and it'd be associated with the engine thread innately.
+
+
+
 
 
 **** Imports
