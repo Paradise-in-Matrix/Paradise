@@ -138,12 +138,14 @@ export default defineConfig(({ mode }) => {
                         __dirname,
                         "build/virtualizer.js"
                     ),
+                    media: path.resolve(__dirname, "build/media.js"),
                 },
                 output: {
                     entryFileNames: (chunkInfo) => {
                         if (
                             chunkInfo.name === "engine" ||
-                            chunkInfo.name === "virtualizer"
+                            chunkInfo.name === "virtualizer" ||
+                            chunkInfo.name === "media"
                         ) {
                             return `${chunkInfo.name}.js`;
                         }
