@@ -8,8 +8,7 @@
                       [build-hooks/stamp-version]
                       [build-hooks/include-css]
                       [build-hooks/copy-wasm]
-                      [build-hooks/copy-element-call]
-                      ]
+                      [build-hooks/copy-element-call]]
         :output-dir "build"
         :asset-path "/"
         :modules {:base   {:entries []}
