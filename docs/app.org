@@ -30,11 +30,17 @@ actual UI components themselves.
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [clojure.string :as str]
+   [re-frame.db :as db]
+   [client.state :as state]
    [reagent.core :as r]
+   [eve.alpha :as eve]
+   [eve.atom :as ea]
+   [eve.mem :as mem]
    [reagent.dom.client :as rdom]
    [navigation.spaces.bar :refer [spaces-sidebar]]
    [client.key-handler :refer [global-key-listener]]
    [overlays.notifications :as notifications]
+   [overlays.messages]
    [overlays.settings]
    [overlays.invites]
    [overlays.creation]
@@ -54,8 +60,7 @@ actual UI components themselves.
    [utils.macros :refer [i18n-data defui]]
    [utils.svg :as icons]
    [navigation.rooms.room-list :refer [room-list]]
-   [container.base :refer [container]]
-   ))
+   [container.base :refer [container]]))
 #+end_src
 
 
