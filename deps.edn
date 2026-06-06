@@ -3,6 +3,8 @@
         org.clojure/clojurescript {:mvn/version "1.11.132"}
         thheller/shadow-cljs {:mvn/version "2.26.2"}
         com.taoensso/timbre {:mvn/version "6.8.0"}
+        com.cognitect/transit-cljs {:mvn/version "0.8.280"}
+        juji/editscript {:mvn/version "0.7.0"}
         rewrite-clj/rewrite-clj {:mvn/version "1.2.54"}
         reagent/reagent {:mvn/version "2.0.1"}
         com.taoensso/tempura {:mvn/version "1.5.4"}
