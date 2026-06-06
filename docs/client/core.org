@@ -13,7 +13,11 @@ pieces.
   (:require
    [utils.logger :as logger]
    [re-frame.core :as re-frame]
+   [goog.object]
    [app :as app]
+   ["react" :as react]
+   [re-frame.db :as db]
+   [reagent.core :as r]
    [promesa.core :as p]
    [client.state :as state]
    [client.session-store :as store]
