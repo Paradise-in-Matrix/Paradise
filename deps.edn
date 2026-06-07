@@ -17,6 +17,9 @@
                                :git/sha "0ee7acd86aca1f9b32e566408ba43f901491f2b9"}
         eve/eve {:git/url "https://github.com/SeniorCareMarket/eve"
                  :git/sha "10760f1c67d491d1a1ac3b6156a6801809292e81"}
+        ;;eve/eve {:git/url "https://github.com/SeniorCareMarket/eve"
+          ;;       :git/sha "10760f1c67d491d1a1ac3b6156a6801809292e81"}
+        eve/eve {:local/root "../eve"}
         org.babashka/sci {:mvn/version "0.12.51"}
         org.babashka/sci.configs {:git/url "https://github.com/babashka/sci.configs"
                      :git/sha "a785be2090991bf99ddc1c8cb4923a7217f6e098"}
