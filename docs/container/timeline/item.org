@@ -33,23 +33,6 @@ It is convenient to define the actual items that make up a timeline.
 #+end_src
 
 
-**** Item Height Multi-Method
-
-
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defmulti calc-item-height
-  (fn [msg _width _pretext-cache _theme-metrics]
-    (let [type (:type msg)
-          tag (:content-tag msg)]
-      (cond
-        (or (= type :virtual) (= type "virtual") (str/starts-with? (str (:id msg)) "virtual-divider")) :virtual
-        (and tag (not (#{"MsgLike" "Image" "Video" "Sticker" "File" "Text"} tag))) :system-or-state
-        :else :message))))
-
-#+end_src
-
-
-
 **** Reactions
 
 
@@ -431,26 +414,6 @@ read receipts. This prevents any sort of spamming to the home server.
         (js/URL.revokeObjectURL url)))))
 
 
-(defn calc-media-height [content actual-tag available-w theme-metrics]
-  (let [info          (or (:info content)
-                          (get-in content [:inner :info])
-                          (get-in content [:inner :content :info]))
-        w             (js/parseFloat (:w info 0))
-        h             (js/parseFloat (:h info 0))
-        valid-dims?   (and (pos? w) (pos? h))
-        default-ratio (case actual-tag "Video" 1.77 "Sticker" 1.0 1.33)
-        calc-w        (if valid-dims? (min w available-w 400) 300)
-        calc-h        (if valid-dims?
-                        (min (* calc-w (/ h w)) 350)
-                        (min (/ calc-w default-ratio) 350))
-        media-margin  (:media-margin theme-metrics 0)
-        is-edited?    (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
-        raw-txt       (or (:body content) (get-in content [:inner :content :body]) (:caption content) (get-in content [:inner :content :caption]))
-        has-caption?  (seq raw-txt)
-
-        edited-h      (if (and is-edited? (not has-caption?)) (:edited-label-h theme-metrics 16) 0)]
-    (+ calc-h media-margin edited-h)))
-
 
 
 #+end_src
@@ -606,37 +569,6 @@ read receipts. This prevents any sort of spamming to the home server.
             (fn []
               [link-preview-card first-url hs-url])}))))))
 
-(defn calc-link-preview-height [msg available-w url-previews theme-metrics]
-  (let [content (:content msg)
-        raw-txt (or (:body msg) (:body content) (get-in content [:inner :content :body]) "")
-        first-url (extract-first-url raw-txt)]
-    (if first-url
-      (let [preview (get url-previews first-url)
-            status  (:status preview)]
-        (cond
-          (= status :error) 0
-
-          (= status :success)
-          (let [{:keys [og:title og:description og:site_name]} (:data preview)]
-            (if (or og:title og:description)
-              (let [margin-top 8
-                    padding-y  24
-                    site-h     (if (seq og:site_name) 16 0)
-                    title-len  (count og:title)
-                    title-h    (cond (zero? title-len) 0
-                                     (> title-len 45)  38
-                                     :else             19)
-                    desc-len   (count og:description)
-                    desc-h     (cond (zero? desc-len) 0
-                                     (> desc-len 90)  54
-                                     (> desc-len 45)  36
-                                     :else            18)
-                    elements   (remove str/blank? [og:site_name og:title og:description])
-                    gaps-h     (max 0 (* (dec (count elements)) 6))]
-                (+ margin-top padding-y site-h title-h desc-h gaps-h))
-              0))
-          :else 108))
-      0)))
 #+end_src
 
 
@@ -769,12 +701,6 @@ individual's display name.
      ^{:key emoji}
      [reaction-pill emoji count senders my-id active-room event-id reactions])])
 
-
-(defn calc-reaction-height [msg theme-metrics]
-  (if (seq (:reactions msg))
-    (:reaction-row-h theme-metrics 24)
-    0))
-
 #+end_src
 
 
@@ -800,9 +726,6 @@ individual's display name.
    [:span.system-icon icon]
    [:span.system-text text]])
 
-(defmethod calc-item-height :system-or-state [_msg _width _pretext-cache theme-metrics]
-  (:system-event-h theme-metrics 52))
-
 (defn date-divider [ts]
   [:div.timeline-date-separator
    [:div.separator-line]
@@ -819,8 +742,6 @@ individual's display name.
      ]))
 
 
-(defmethod calc-item-height :virtual [_msg _width _pretext-cache theme-metrics]
-  (:virtual-divider-h theme-metrics 49))
 
 (defn virtual-item [item]
  [:div.timeline-item-virtual-wrapper
@@ -944,11 +865,6 @@ library itself some context of deferred components...
      [message-link-preview msg-type-tag raw-body]]))
 
 
-(defn calc-reply-height [content theme-metrics]
-  (if (:in-reply-to content)
-    (:reply-banner-h theme-metrics 32.4)
-    0))
-
 (defn timeline-body [item content active-room is-editing-this?]
   (let [{:keys [tag inner in-reply-to]} content
         reply-id  (:event-id in-reply-to)
@@ -965,95 +881,6 @@ library itself some context of deferred components...
        [render-message-content tr (or m-tag "Text") m-content in-reply-to reply-msg item])
      :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
 
-
-(defn calc-text-height [msg available-w pretext-cache theme-metrics]
-  (let [content    (:content msg)
-        is-edited? (or (:is-edited? content) (get-in content [:inner :content :is-edited?]))
-        txt-str    (str (:clean-text msg))
-        cache-key  (str (:id msg) "-" available-w "-" (boolean is-edited?) "-" (hash txt-str))
-        cached     (get @pretext-cache cache-key)]
-    (if cached
-      cached
-      (let [html-txt (str (:clean-html msg))
-            has-url? (boolean (re-find #"https?://[^\s]+" txt-str))
-            measure-str (if has-url?
-                          (str/replace txt-str #"https?://[^\s]+"
-                                       (fn [url-match]
-                                         (let [url (if (coll? url-match) (first url-match) url-match)]
-                                           (str/replace url #"([/=?&._:-])" "$1\u200B"))))
-                          txt-str)
-
-            is-quote?       (str/includes? html-txt "<blockquote")
-            has-code-block? (or (str/includes? txt-str "```")
-                                (str/includes? html-txt "<pre>"))
-
-            wrap-buffer (cond
-                          is-quote? (:quote-wrap-buffer theme-metrics 19)
-                          has-url?  (:url-wrap-buffer theme-metrics 40)
-                          :else     0)
-
-            safe-available-w (max 0 (- available-w wrap-buffer))
-            font-str         (if has-code-block?
-                               (:code-font theme-metrics "13.68px 'fira code', monospace")
-                               (:font theme-metrics "15.2px Inter, sans-serif"))
-            base-lh          (if has-code-block?
-                               (:code-line-height theme-metrics 20.52)
-                               (:line-height theme-metrics 22.8))
-
-            code-padding     (if has-code-block? (:code-padding theme-metrics 28) 0)
-
-            prep    (try (prepareWithSegments measure-str font-str #js {:whiteSpace "pre-wrap" :wordBreak "normal"}) (catch js/Error _ nil))
-            raw     (try (when prep (layoutWithLines prep safe-available-w base-lh)) (catch js/Error _ nil))
-            total-h (if raw (.-height raw) base-lh)
-
-            lines-arr   (if raw (.-lines raw) #js [])
-            len         (.-length lines-arr)
-            last-line-w (if (pos? len) (.-width (aget lines-arr (dec len))) 0)
-
-            edited-w   (:edited-label-w theme-metrics 40)
-            edited-tax (if (and is-edited? (> (+ last-line-w edited-w) safe-available-w)) base-lh 0)
-
-            has-html?  (seq html-txt)
-            v-tax      (if has-html?
-                         (:html-vertical-tax theme-metrics 0)
-                         (:text-vertical-tax theme-metrics 0))
-
-            final-h (+ total-h code-padding edited-tax v-tax)]
-
-        (swap! pretext-cache assoc cache-key final-h)
-        final-h))))
-
-
-(defmethod calc-item-height :message [msg width pretext-cache theme-metrics]
-  (let [is-sequence-start? (not (:merge-with-prev? msg))
-        content            (:content msg)
-        avatar-h          (:avatar-h theme-metrics 36)
-        avatar-col-w      (:avatar-col-w theme-metrics 46)
-        header-h          (:header-h theme-metrics 26.8)
-        seq-padding       (:seq-padding theme-metrics 10)
-        merged-padding    (:merged-padding theme-metrics 0)
-        message-padding-x (:message-padding-x theme-metrics 40)
-        available-w       (max 0 (- width avatar-col-w message-padding-x))
-        reply-h     (calc-reply-height content theme-metrics)
-        reaction-h  (calc-reaction-height msg theme-metrics)
-        tags-present #{(:tag content) (get-in content [:inner :tag]) (:content-tag msg)}
-        actual-tag   (first (filter #{"Image" "Video" "Sticker"} tags-present))
-        is-media?    (boolean actual-tag)
-        body-h      (if is-media?
-                      (let [m-h     (calc-media-height content actual-tag available-w theme-metrics)
-                            raw-txt (or (:body content) (get-in content [:inner :content :body]) (:caption content) (get-in content [:inner :content :caption]))
-                            t-h     (if (seq raw-txt) (calc-text-height msg available-w pretext-cache theme-metrics) 0)]
-                        (+ m-h t-h))
-                      (calc-text-height msg available-w pretext-cache theme-metrics))]
-
-    (if is-sequence-start?
-      (+ (max avatar-h (+ header-h body-h reply-h)) seq-padding reaction-h)
-
-      (+ body-h reply-h merged-padding reaction-h)
-      #_
-
-      (max avatar-h (+ body-h reply-h merged-padding reaction-h))
-      )))
 
 (defn event-tile-render [item hs-url is-mobile? my-id tr]
   (let [active-room  @(re-frame/subscribe [:rooms/active-id])
