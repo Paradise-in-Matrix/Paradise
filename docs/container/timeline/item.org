@@ -73,7 +73,6 @@ It is convenient to define the actual items that make up a timeline.
  :sdk/homeserver-url
  (fn [db _]
    (:homeserver-url db)))
-
 #+end_src
 
 
@@ -81,7 +80,6 @@ It is convenient to define the actual items that make up a timeline.
 **** Item Reframe Events, Effects, and Subscriptions
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-
 (re-frame/reg-event-fx
  :sdk/toggle-reaction
  (fn [_ [_ room-id event-id emoji-key]]
@@ -122,9 +120,6 @@ It is convenient to define the actual items that make up a timeline.
                                                                 :ffi-content ffi-content}}}))]
          (log/info "Edit dispatch result:" res))))
    {:dispatch [:input/clear-context room-id]}))
-
-
-
 #+end_src
 
 
