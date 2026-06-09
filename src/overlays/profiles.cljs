@@ -8,11 +8,9 @@
    [utils.images :refer [mxc-image]]
    [plugins :as plugins]))
 
-
-
-
-(defui profile-preview-content [{:keys [member tags]}]
-  (let [pl         (:power-level member)
+(defn ^:ui profile-preview-content [args]
+  (let [{:keys [member tags]} args
+        pl         (:power-level member)
         tag-data   (get tags (keyword (str pl)))
         role-name  (:name tag-data)
         role-color (or (:color tag-data) "var(--text-primary)")
