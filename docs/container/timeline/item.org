@@ -324,14 +324,13 @@ read receipts. This prevents any sort of spamming to the home server.
                                   m'))))
       res)))
 
+
 (defn message-text [{:keys [body html]}]
    (if (seq html)
     (into [:span.body.formatted] (memoized-sanitize html))
      [:span.body (linkify-text body)]))
+
 #+end_src
-
-
-***** TODO Properly support lazy loaded media (to prevent layout shifts). Later decrypted messages are problematic here.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 (defn async-media-wrapper [event content {:keys [class default-ratio]} render-fn]
