@@ -190,7 +190,6 @@ that is currently on screen.
    (if-let [room-id (:active-room-id db)]
      (reduce (fn [d id] (assoc-in d [:read-receipts :pending room-id] id)) db event-ids)
      db)))
-
 #+end_src
 
 
@@ -230,13 +229,11 @@ read receipts. This prevents any sort of spamming to the home server.
          (when (seq visible-ids)
            (re-frame/dispatch [:msg/mark-visible-batch visible-ids]))))
      #js {:threshold 0.5})))
-
 #+end_src
 
 
 
 
-**** However and Context Menus for Items
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
