@@ -246,6 +246,13 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 
+
+#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+(defn event-menu [mx my current-item active-room my-id]
+  (log/error current-item)
+  (re-frame/dispatch
+   [:ui/open-context-menu :message-actions
+    {:x mx :y my :item (js->clj current-item :keywordize-keys true) :active-room active-room :my-id my-id}]))
 #+end_src
 
 
