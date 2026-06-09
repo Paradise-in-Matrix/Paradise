@@ -257,8 +257,9 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn message-hover-toolbar [item active-room current-user-id tr]
-  (let [react-str (tr [:container.timeline.item/react])
+(defn message-hover-toolbar [item active-room current-user-id]
+  (let [tr @(re-frame/subscribe [:i18n/tr])
+        react-str (tr [:container.timeline.item/react])
         reply-str (tr [:container.timeline.item/reply])
         edit-str  (tr [:container.timeline.item/edit-message])
         more-str  (tr [:container.timeline.item/more])]
@@ -282,12 +283,14 @@ read receipts. This prevents any sort of spamming to the home server.
           [icons/smiley]]
          [:div.toolbar-btn
           {:title reply-str
-           :on-click #(re-frame/dispatch [:input/set-context active-room :reply item])}
+           :on-click #(re-frame/dispatch
+                       [:input/set-context active-room :reply item])}
           [icons/reply]]
          (when (:is-own? item)
            [:div.toolbar-btn
             {:title edit-str
-             :on-click #(re-frame/dispatch [:input/set-context active-room :edit item])}
+             :on-click #(re-frame/dispatch
+                         [:input/set-context active-room :edit item])}
             [icons/edit]])
          [:div.toolbar-btn
           {:title more-str
