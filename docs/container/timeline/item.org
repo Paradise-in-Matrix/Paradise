@@ -883,7 +883,8 @@ library itself some context of deferred components...
             [swipe-to-action-wrapper
              {:can-edit? is-own?
               :enabled? is-mobile?
-              :on-action (fn [action] (re-frame/dispatch [:input/set-context active-room action item]))
+              :on-action (fn [action]
+                           (re-frame/dispatch [:input/set-context active-room action item]))
               :wrapper-props (merge (long-press-props
                                      #(event-menu %1 %2 item active-room my-id)
                                      )
@@ -904,6 +905,7 @@ library itself some context of deferred components...
                                :event-id (:event-or-transaction-id item)}])]]
             [:<>
              [sub-virtual-items content-tag item sender-name]]))))))
+
 
 #+end_src
 
