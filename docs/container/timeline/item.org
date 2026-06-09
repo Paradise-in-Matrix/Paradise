@@ -83,21 +83,21 @@ It is convenient to define the actual items that make up a timeline.
 (re-frame/reg-event-fx
  :sdk/toggle-reaction
  (fn [_ [_ room-id event-id emoji-key]]
-   (main/do-with-pool! @state/!engine-pool {:handler :toggle-reaction
+   (mesh/do-with-thread! :engine-pool {:handler :toggle-reaction
                                             :arguments {:room-id room-id :event-id event-id :emoji emoji-key}})
    {}))
 
 (re-frame/reg-event-fx
  :msg/toggle-pin
  (fn [_ [_ room-id msg-id]]
-   (main/do-with-pool! @state/!engine-pool {:handler :toggle-pin
+   (mesh/do-with-thread! :engine-pool {:handler :toggle-pin
                                             :arguments {:room-id room-id :msg-id msg-id}})
    {}))
 
 (re-frame/reg-event-fx
  :msg/delete
  (fn [_ [_ room-id msg-id]]
-   (main/do-with-pool! @state/!engine-pool {:handler :redact-event
+   (mesh/do-with-thread! :engine-pool {:handler :redact-event
                                             :arguments {:room-id room-id :msg-id msg-id}})
    {}))
 
@@ -109,7 +109,7 @@ It is convenient to define the actual items that make up a timeline.
    (let [msg-tag     (get-in item [:content :inner :tag])
          ffi-content (get-in item [:content :inner :content :ffi-content])]
      (go
-       (let [res (<! (main/do-with-pool! @state/!engine-pool
+       (let [res (<! (mesh/do-with-thread! :engine-pool
                                          {:handler :send-message
                                           :arguments {:room-id room-id
                                                       :text text
@@ -137,7 +137,7 @@ that is currently on screen.
 (re-frame/reg-event-fx
  :room/mark-read
  (fn [_ [_ room-id event-id]]
-   (main/do-with-pool! @state/!engine-pool {:handler :mark-read
+   (mesh/do-with-thread! :engine-pool {:handler :mark-read
                                             :arguments {:room-id room-id :event-id event-id}})
    {}))
 
@@ -150,7 +150,7 @@ that is currently on screen.
          (when (not= (get-in db [:read-receipts :sent room-id]) event-id)
            (go
              (try
-               (let [res (<! (main/do-with-pool! @state/!engine-pool
+               (let [res (<! (mesh/do-with-thread! :engine-pool
                                                  {:handler :send-receipt
                                                   :arguments {:room-id room-id :event-id event-id}}))]
                  (if (= (:status res) "success")
