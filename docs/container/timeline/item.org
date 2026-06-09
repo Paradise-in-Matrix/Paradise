@@ -332,60 +332,46 @@ read receipts. This prevents any sort of spamming to the home server.
 
 #+end_src
 
+
+
+
+***** TODO Properly support lazy loaded media (to prevent layout shifts). Later decrypted messages are problematic here.
+
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn async-media-wrapper [event content {:keys [class default-ratio]} render-fn]
-  (r/with-let [room-id      @(re-frame/subscribe [:rooms/active-id])
-               event-id     (:id event)
-               info         (:info content)
-               source-url   (:source content)
-               source-map   (:source-map content)
-               w            (:w info)
-               h            (:h info)
-               valid-dims?  (and (number? w) (pos? w) (number? h) (pos? h))
-               style        (if valid-dims?
-                              {:aspect-ratio (str w " / " h)
-                               :max-width (str "min(" w "px, 400px)")
-                               :max-height (str "min(" h "px, 350px)")
-                               :background "var(--bg-secondary)"}
-                              {:aspect-ratio (str default-ratio)
-                               :max-width "300px"
-                               :background "var(--bg-secondary)"})
-               !blob-url    (r/atom nil)
-               _   (go
-                     (let [pool @state/!media-pool
-                           {:keys [token hs-url]} @net/!auth-context
-                           res  (<! (main/do-with-pool! pool {:handler :get-media
-                                                              :arguments {:room-id room-id
-                                                                          :source source-url
-                                                                          :event-id event-id
-                                                                          :source-map source-map
-                                                                          :hs-url hs-url
-                                                                          :token token}}))]
-                       (case (:status res)
-                         "unencrypted"
-                         (reset! !blob-url (:url res))
-                         "success"
-                         (let [buffer (:bytes res)
-                               blob   (js/Blob. #js [buffer] #js {:type (or (:mimetype info) "image/png")})
-                               url    (js/URL.createObjectURL blob)]
-                           (reset! !blob-url url))
-                         "error"
-                         (log/error "Media load failed:" (:msg res))
-                         (log/error "Unknown status from worker:" res))))]
-    (let [url @!blob-url]
-      [:div.media-container {:class class :style style}
-       (if url
-         (render-fn url (or (:caption content) (:filename content) "media"))
-         [:div.message-image-placeholder
-          {:style {:width "100%" :height "100%" :display "flex" :align-items "center" :justify-content "center"}}
-          [:div.spinner]])])
-    (finally
-      (when-let [url @!blob-url]
-        (js/URL.revokeObjectURL url)))))
+(defn ^:ui async-media-wrapper [event content {:keys [class default-ratio tag-type on-click controls style]}]
+  (let [info        (:info content)
+        w           (:w info)
+        h           (:h info)
+        valid-dims? (and (number? w) (pos? w) (number? h) (pos? h))
+        container-style (if valid-dims?
+                          {:aspect-ratio (str w " / " h)
+                           :max-width (str "min(" w "px, 400px)")
+                           :max-height (str "min(" h "px, 350px)")
+                           :background "var(--bg-secondary)"
+                           :position "relative"
+                           :overflow "hidden"}
+                          {:aspect-ratio (str default-ratio)
+                           :max-width "300px"
+                           :background "var(--bg-secondary)"
+                           :position "relative"
+                           :overflow "hidden"})
+        alt-text (or (:caption content) (:filename content) "media")]
 
-
-
-
+    [:div.media-container {:class class :style container-style}
+     [:div.message-image-placeholder
+      {:style {:position "absolute" :inset 0 :display "flex" :align-items "center" :justify-content "center"}}
+      [:div.spinner]]
+     [media
+      {:mxc (:source content)
+       :source-map (:source-map content)
+       :tag-type tag-type
+       :alt alt-text
+       :mime-type (get-in content [:info :mimetype])
+       :room-id (:room_id event)
+       :event-id (:id event)
+       :on-click on-click
+       :controls controls
+       :style (merge {:width "100%" :height "100%" :display "block" :object-fit "contain"} style)}]]))
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
