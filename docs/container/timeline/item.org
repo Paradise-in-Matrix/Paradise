@@ -298,10 +298,8 @@ read receipts. This prevents any sort of spamming to the home server.
                        (.stopPropagation e)
                        (let [mx (.-clientX e)
                              my (.-clientY e)]
-                         (re-frame/dispatch
-                         [:context-menu/open
-                           {:x mx :y my
-                            :items (build-message-actions tr item active-room current-user-id mx my)}])))}
+
+                         (event-menu mx my item active-room current-user-id)))}
           [icons/more]]]))))
 #+end_src
 
