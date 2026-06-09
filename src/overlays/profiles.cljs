@@ -1,10 +1,12 @@
 (ns overlays.profiles
   (:require
-   [overlays.base :refer [popover-component]]
+   [overlays.base :refer [popover-component
+                          context-menu-component]]
+   [taoensso.timbre :as log]
+   [re-frame.core :as re-frame]
    [utils.global-ui :refer [avatar]]
    [utils.images :refer [mxc-image]]
-   [plugins :as plugins]
-   [utils.macros :refer [defui]]))
+   [plugins :as plugins]))
 
 
 
