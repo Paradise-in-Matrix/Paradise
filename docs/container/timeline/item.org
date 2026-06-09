@@ -913,19 +913,24 @@ library itself some context of deferred components...
 ******* TODO Need to improve read receipt consistency
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn event-tile [item-id hs-url is-mobile? my-id tr]
-  (let [active-room @(re-frame/subscribe [:rooms/active-id])]
-    (fn [item-id hs-url is-mobile? my-id tr]
-      (let [item @(re-frame/subscribe [:timeline/event active-room item-id])]
-        [:div {:data-event-id item-id
-               :style {:width "100%"}
-               :ref (fn [node]
-                      (when @visibility-observer
-                        (if (and node (:unread? item))
-                          (.observe @visibility-observer node)
-                          (when node
-                            (.unobserve @visibility-observer node)))))}
-         [event-tile-render item hs-url is-mobile? my-id tr]]))))
+(defn event-tile [layout-node]
+  (let [id         (:id layout-node)
+        unread?    (:unread? layout-node)
+        pojo       (:worker-data layout-node)
+        react-tree (get-cached-react-tree id pojo)]
+
+    (react/createElement "div"
+                         #js {:key id
+                              :data-event-id id
+                              :style #js {:width "100%"}
+                              :ref (fn [node]
+                                     (when @visibility-observer
+                                       (if (and node unread?)
+                                         (.observe @visibility-observer node)
+                                         (when node
+                                           (.unobserve @visibility-observer node)))))}
+                         react-tree)))
+
 #+end_src
 
 
