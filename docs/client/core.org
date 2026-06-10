@@ -154,20 +154,19 @@ linked.
                          :arguments {:identity-id :media-pool :port vm-port2}
                          :transfer  [:port]})
 
-    (cljs-workers.mesh/register-thread! :media-pool mm-port1)
+    (mesh/register-thread! :media-pool mm-port1)
     (main/do-with-pool! media-pool
                         {:handler   :register-port
                          :arguments {:identity-id :main-thread :port mm-port2}
                          :transfer  [:port]})
 
-    (cljs-workers.mesh/register-thread! :engine-pool me-port1)
+    (mesh/register-thread! :engine-pool me-port1)
     (main/do-with-pool! engine-pool
                         {:handler   :register-port
                          :arguments {:identity-id :main-thread :port me-port2}
                          :transfer  [:port]})
 
-    (cljs-workers.mesh/register-thread! :virtualizer-pool mv-port1)
-
+    (mesh/register-thread! :virtualizer-pool mv-port1)
     (main/do-with-pool! virtualizer-pool
                         {:handler   :register-port
                          :arguments {:identity-id :main-thread :port mv-port2}
@@ -177,7 +176,6 @@ linked.
                         {:handler   :register-port
                          :arguments {:identity-id :virtualizer-pool :port vv-port1}
                          :transfer  [:port]})
-
     (main/do-with-pool! virtualizer-pool
                         {:handler   :register-port
                          :arguments {:identity-id :virtualizer-loopback :port vv-port2}
