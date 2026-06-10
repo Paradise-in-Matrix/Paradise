@@ -1,0 +1,61 @@
+
+** SCI Runner Engine
+
+**** Preface
+
+The SCI Runner for the Engine thread(s)
+These have to be broken up to avoid
+any circular dependency and to
+ensure each thread has its own
+SCI runner context.
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/sci_runner/engine.cljs
+(ns sci-runner.engine
+  (:require [sci.core :as sci]
+            [sci-runner.shared]
+            [cljs-workers.worker :as worker]
+            [worker.state :as state]
+            [utils.net :as net]
+            [sci-runner.factory :as factory]))
+#+end_src
+
+
+
+**** Constants
+
+#+begin_src clojurescript :tangle ../../src/sci_runner/engine.cljs
+(defonce !current-eval-plugin (atom nil))
+(defonce !worker-overrides (atom {}))
+#+end_src
+
+**** SCI sauce
+
+#+begin_src clojurescript :tangle ../../src/sci_runner/engine.cljs
+(def worker-namespaces
+  {'worker.state {'register-handler state/register-handler
+                  '!client state/!client
+                  '!media-cache state/!media-cache}
+   'utils.net {'fetch net/fetch}
+   'cljs-workers.worker {'register worker/register}})
+
+(def worker-context
+  (factory/build-context
+   :worker
+   {:!current-plugin   !current-eval-plugin
+    :!overrides        !worker-overrides
+    :!components       nil
+    :!slots            nil
+    :!virtualizer-pool nil}
+   worker-namespaces))
+
+(defn evaluate-worker-form [plugin-id form-str]
+  (reset! !current-eval-plugin plugin-id)
+  (try
+    (sci/eval-string* worker-context form-str)
+    {:status "success"}
+    (catch :default e
+      {:status "error" :msg (str e)})))
+
+#+end_src
