@@ -50,16 +50,31 @@ we've made interop with the WASM bindings.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
 (re-frame/reg-event-db
+ :app/worker-redraw-ping
+ (fn [db _]
+   (assoc db :_last-worker-ping (js/Date.now))))
 
+(re-frame/reg-sub-raw
+ :timeline/worker-data
+ (fn [_ [_ room-id source]]
+   (reagent.ratom/make-reaction
+    (fn []
+      (get-in @!local-timeline-data [room-id (keyword source)] [])))))
 
 (re-frame/reg-sub
+ :timeline/events
+ (fn [[_ room-id]]
+   [(re-frame/subscribe [:timeline/worker-data room-id :focused])
+    (re-frame/subscribe [:timeline/worker-data room-id :live])])
+ (fn [[focused live] _]
+   (if (empty? focused) live focused)))
 
 (re-frame/reg-sub
  :timeline/events-map
  (fn [[_ room-id]]
-   (re-frame/subscribe [:timeline/current-events room-id]))
+   (re-frame/subscribe [:timeline/events room-id]))
  (fn [events _]
-   (into {} (map (juxt :id identity) events))))
+   (reduce (fn [acc ev] (assoc acc (:id ev) ev)) {} events)))
 
 (re-frame/reg-sub
  :timeline/event
@@ -67,6 +82,8 @@ we've made interop with the WASM bindings.
    (re-frame/subscribe [:timeline/events-map room-id]))
  (fn [events-map [_ _room-id event-id]]
    (get events-map event-id)))
+
+
 
 (re-frame/reg-event-fx
  :sdk/boot-timeline
