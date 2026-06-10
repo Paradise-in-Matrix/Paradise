@@ -612,8 +612,8 @@ providing the encapsulation and parsing for us.
                 ])
          [modal-root]
          [popover-root]
-         [global-key-listener]
-         [global-context-menu]]
+         [context-menu-root]
+         [global-key-listener]]
         [:div "Unknown State"]))))
 
 #+end_src
