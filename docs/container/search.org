@@ -84,7 +84,7 @@ nice clean filter instructions and provide more complex search options.
 For now though, text search will do.
 
 #+begin_src clojurescript :tangle ../../src/container/search.cljs
-(defn search []
+(defn ^:ui search []
   (let [active-room  @(re-frame/subscribe [:rooms/active-id])
         search-state @(re-frame/subscribe [:room/search-state active-room])
         loading?     (:loading? search-state)
