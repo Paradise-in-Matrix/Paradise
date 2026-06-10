@@ -52,7 +52,7 @@ actual UI components themselves.
    [plugin-storage]
    [auth.events :refer [login-screen]]
    [container.call.call-container :refer [persistent-call-container]]
-   [client.config :refer [load-config check-remote-version load-i18n]]
+   [client.config :refer [load-config check-remote-version load-i18n eve-enabled?]]
    [client.state :refer [!config]]
    [client.session-store :as store]
    [taoensso.tempura :as tempura :refer [tr]]
