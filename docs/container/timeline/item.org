@@ -853,13 +853,6 @@ library itself some context of deferred components...
      :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
 
 
-
-(defn event-menu [mx my current-item active-room my-id]
-  (re-frame/dispatch
-   [:ui/open-context-menu :message-actions
-    {:x mx :y my :item current-item :active-room active-room :my-id my-id}]))
-
-
 (defn ^:ui event-tile-render [item]
   (let [active-room  @(re-frame/subscribe [:rooms/active-id])
         hs-url       @(re-frame/subscribe [:sdk/homeserver-url])
