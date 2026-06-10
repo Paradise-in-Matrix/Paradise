@@ -20,8 +20,10 @@ pieces.
    [reagent.core :as r]
    [promesa.core :as p]
    [client.state :as state]
+   [client.config :refer [eve-enabled?]]
    [client.session-store :as store]
    [cljs-workers.core :as main]
+   [cljs-workers.mesh :as mesh]
    [cljs.core.async :refer [go <!]]
    [taoensso.timbre :as log]))
 #+end_src
