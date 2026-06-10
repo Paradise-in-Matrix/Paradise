@@ -444,6 +444,7 @@ We also don't want to list our own name, so we remove that too.
 
 (def default-metrics {:font "16px sans-serif" :line-height 22.8})
 
+
 (defn pretext-timeline [room-id]
   (let [on-load-older   #(re-frame/dispatch [:sdk/back-paginate room-id])
         on-load-newer   #(re-frame/dispatch [:sdk/forward-paginate room-id])
@@ -459,36 +460,31 @@ We also don't want to list our own name, so we remove that too.
             loading-forward? @(re-frame/subscribe [:timeline/loading-forward? room-id])
             back-dead?       @(re-frame/subscribe [:timeline/back-dead? room-id])
             jump-target      @(re-frame/subscribe [:timeline/jump-target-id room-id])
-            focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])
-            hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
-            is-mobile?       @(re-frame/subscribe [:ui/mobile?])
-            my-profile       @(re-frame/subscribe [:sdk/profile])
-            my-id            (:user-id my-profile)
-            tr               @(re-frame/subscribe [:i18n/tr])
-            render-item      (fn [layout-node]
-                              ^{:key (:id layout-node)}
-                               [event-tile (:id layout-node) hs-url is-mobile? my-id tr])]
+            focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])]
         [virtualized-list
-         {:items                   events
-          :items-map               events-map
-          :loading-older?          loading?
-          :loading-newer?          loading-forward?
-          :older-dead?             back-dead?
-          :jump-target-id          jump-target
-          :focus-mode?             focus-mode?
-          :on-load-older           on-load-older
-          :on-load-newer           on-load-newer
-          :on-jump-live            on-jump-live
-          :estimate-fn             timeline-estimate-fn
-          :extract-metrics-fn      extract-timeline-metrics
-          :default-theme-metrics   default-metrics
-          :wrapper-class           "timeline-wrapper"
-          :scroll-container-class  "timeline-messages"
-          :render-item             render-item
-          :render-empty-state      render-empty
-          :render-jump-button      render-jump
-          :render-loading-overlay  render-loading
-          :render-measuring-sticks render-sticks}]))))
+         {:items                    events
+          :items-map                events-map
+          :loading-older?           loading?
+          :loading-newer?           loading-forward?
+          :older-dead?              back-dead?
+          :jump-target-id           jump-target
+          :focus-mode?              focus-mode?
+          :on-load-older            on-load-older
+          :on-load-newer            on-load-newer
+          :on-jump-live             on-jump-live
+          :on-layout-context-change (fn [w t m] (re-frame/dispatch [:sdk/update-layout-context room-id w t m]))
+          :extract-metrics-fn       extract-timeline-metrics
+          :default-theme-metrics    default-metrics
+          :wrapper-class            "timeline-wrapper"
+          :scroll-container-class   "timeline-messages"
+          :render-item              event-tile
+          :render-empty-state       render-empty
+          :render-jump-button       render-jump
+          :render-loading-overlay   render-loading
+          :render-measuring-sticks  render-sticks}]))))
+
+
+
 #+end_src
 
 
