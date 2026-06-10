@@ -239,10 +239,7 @@ rooms.
                                        (apply-matrix-diffs current-events updates wrap-item))))
                            (p/then (fn [next-events]
                                      (swap! !timeline-arrays assoc q-key next-events)
-                                     (worker/stream! {:type "timeline-diff"
-                                                      :room-id room-id
-                                                      :source source
-                                                      :events next-events})))
+                                     (push-timeline-diff! room-id source next-events)))
                            (p/catch (fn [err] (log/error "Timeline Diff Panic:" err))))))))))
 #+end_src
 
