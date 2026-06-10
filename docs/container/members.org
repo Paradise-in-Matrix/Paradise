@@ -31,9 +31,6 @@ diffs like Timeline, Spaces, and Rooms.
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
    [client.state :as state]))
-
-
-
 #+end_src
 
 
@@ -345,24 +342,7 @@ We definitely want some color though.
 
 ***** Right Click Menu
 
-
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
-(defn build-member-actions [{:keys [user-id display-name]} active-room]
-  (let [tr           @(re-frame/subscribe [:i18n/tr])]
-    [{:id "view-profile"
-      :label (tr [:container.member-actions/view-profile])
-      :action #(log/info "View profile for:" user-id)}
-     {:id "mention"
-      :label (tr [:container.member-actions/mention] [display-name])
-      :action #(log/info "Mention:" user-id)}
-     {:id "message"
-      :label (tr [:container.member-actions/message])
-      :action #(log/info "DM:" user-id)}
-     {:id "kick"
-      :label (tr [:container.member-actions/kick])
-      :class-name "text-danger"
-      :action #(log/info "Kick:" user-id)}]))
-#+end_src
+Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
 
 
 ***** Component
