@@ -57,12 +57,13 @@ aspect.
       (when role-name
         [:div.profile-preview-role-row
          (when icon-mxc
-           [mxc-image {:mxc icon-mxc
+           [media {:mxc icon-mxc
                        :class "member-item-role-icon"
                        :alt role-name}])
          [:span.profile-preview-role-text {:style {:color role-color}}
           role-name]])
       [plugins/plugin-slot :profile-actions {:member member}]]]))
+
 
 (defmethod popover-component :profile-preview [_]
   profile-preview-content)
