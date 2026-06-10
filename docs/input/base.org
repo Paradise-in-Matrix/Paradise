@@ -95,10 +95,9 @@ it.
 Important to note we must do this here as this is when the browser is loading the
 buffer of data so we can actually check the data associated and pass it on.
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
-
 (defn extract-metadata [raw-file]
   (p/create
-   (fn [resolve _]
+   (fn [resolve-fn _]
      (let [mime      (.-type raw-file)
            is-image? (str/starts-with? mime "image/")
            is-video? (str/starts-with? mime "video/")
@@ -118,14 +117,15 @@ buffer of data so we can actually check the data associated and pass it on.
                        (set! (.-onload el)
                              (fn []
                                (js/URL.revokeObjectURL url)
-                               (resolve (assoc base-att :width (.-width el) :height (.-height el)))))
+                               (resolve-fn (assoc base-att :width (.-width el) :height (.-height el)))))
                        (set! (.-onloadedmetadata el)
                              (fn []
                                (js/URL.revokeObjectURL url)
-                               (resolve (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
+                               (resolve-fn (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
                      (set! (.-src el) url))
-                   (resolve base-att)))))
+                   (resolve-fn base-att)))))
        (.readAsArrayBuffer reader raw-file)))))
+
 
 (re-frame/reg-event-fx
  :sdk/handle-file-drop
