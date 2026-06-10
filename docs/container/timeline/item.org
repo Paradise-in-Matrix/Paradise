@@ -238,7 +238,7 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn translated-label [k]
+(defn ^:ui translated-label [k]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:span (tr k)]))
 
@@ -248,8 +248,7 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn event-menu [mx my current-item active-room my-id]
-  (log/error current-item)
+(defn ^:ui event-menu [mx my current-item active-room my-id]
   (re-frame/dispatch
    [:ui/open-context-menu :message-actions
     {:x mx :y my :item (js->clj current-item :keywordize-keys true) :active-room active-room :my-id my-id}]))
@@ -257,7 +256,7 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn message-hover-toolbar [item active-room current-user-id]
+(defn ^:ui message-hover-toolbar [item active-room current-user-id]
   (let [tr @(re-frame/subscribe [:i18n/tr])
         react-str (tr [:container.timeline.item/react])
         reply-str (tr [:container.timeline.item/reply])
@@ -325,7 +324,7 @@ read receipts. This prevents any sort of spamming to the home server.
       res)))
 
 
-(defn message-text [{:keys [body html]}]
+(defn ^:ui message-text [{:keys [body html]}]
    (if (seq html)
     (into [:span.body.formatted] (memoized-sanitize html))
      [:span.body (linkify-text body)]))
@@ -375,7 +374,7 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn image-message [event content]
+(defn ^:ui image-message [event content]
   [:div.image-attachment-container
    [async-media-wrapper event content
     {:class "media-image"
@@ -397,7 +396,7 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn video-message [event content]
+(defn ^:ui video-message [event content]
   [:div.video-attachment-container
    [async-media-wrapper event content
     {:class "media-video"
@@ -410,7 +409,7 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn sticker-message [event content]
+(defn ^:ui sticker-message [event content]
   [async-media-wrapper event content
    {:class "media-sticker"
     :default-ratio 1.0
@@ -419,7 +418,7 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn file-message [event content tr]
+(defn ^:ui file-message [event content tr]
   (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
         {:keys [caption source info]} content]
     [:div.file-attachment-container
@@ -490,7 +489,7 @@ working on deferred rendered components.
    (get-in db [:inline-playing url] false)))
 
 
-(defn link-preview-card [url hs-url]
+(defn ^:ui link-preview-card [url hs-url]
   (let [{:keys [status data]} @(re-frame/subscribe [:media/url-preview url])]
     (cond
       (= status :loading)
@@ -520,7 +519,7 @@ working on deferred rendered components.
              [:div.embed-thumbnail
               [:img {:src img-url}]])])))))
 
-(defn message-link-preview [msg-type-tag raw-body room-id]
+(defn ^:ui message-link-preview [msg-type-tag raw-body room-id]
   (let [first-url (when (#{"Text" "Notice" "Emote"} msg-type-tag)
                     (extract-first-url raw-body))]
     (when first-url
@@ -631,7 +630,7 @@ individual's display name.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
 
-(defn reaction-pill [emoji count senders my-id active-room event-id reactions]
+(defn ^:ui reaction-pill [emoji count senders my-id active-room event-id reactions]
   (let [members-map @(re-frame/subscribe [:room/members-map active-room])
         hover-text (->> senders
                         (map (fn [uid]
@@ -667,7 +666,7 @@ individual's display name.
      [:span.reaction-count {:style {:pointer-events "none"}} count]]))
 
 
-(defn reaction-row [{:keys [reactions my-id active-room event-id]}]
+(defn ^:ui reaction-row [{:keys [reactions my-id active-room event-id]}]
    [:div.reactions-row
     (for [[emoji count senders] reactions]
      ^{:key emoji}
@@ -679,7 +678,7 @@ individual's display name.
 **** State Event Rendering
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn state-event-view [{:keys [sender-name content]}]
+(defn ^:ui state-event-view [{:keys [sender-name content]}]
   (let [{:keys [tag inner]} content]
     [:div.timeline-state-event
      [:span
@@ -693,19 +692,19 @@ individual's display name.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn system-event-view [icon text]
+(defn ^:ui system-event-view [icon text]
   [:div.timeline-system-event
    [:span.system-icon icon]
    [:span.system-text text]])
 
-(defn date-divider [ts]
+(defn ^:ui date-divider [ts]
   [:div.timeline-date-separator
    [:div.separator-line]
    [:span.separator-text (format-divider-date ts)]
    [:div.separator-line]])
 
 
-(defn new-message []
+(defn ^:ui new-message []
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.new-messages-separator
      [:div.separator-line]
@@ -715,14 +714,14 @@ individual's display name.
 
 
 
-(defn virtual-item [item]
+(defn ^:ui virtual-item [item]
  [:div.timeline-item-virtual-wrapper
        (case (:tag item)
          "DateDivider" [date-divider (:ts item)]
          "ReadMarker" [new-message]
            [system-event-view "-" (:tag item)])])
 
-(defn sub-virtual-items [content-tag item sender-name]
+(defn ^:ui sub-virtual-items [content-tag item sender-name]
   (let [tr               @(re-frame/subscribe [:i18n/tr])]
     (cond
       (= content-tag "RoomMembership")
@@ -744,7 +743,7 @@ It isn't quite ready for that yet, but we can get it to a dynamically functional
 state for now.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
+(defn ^:ui timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
   [:div.timeline-avatar-wrapper
    {:class (when merge-with-prev? "is-merged")}
   (when (and (= content-tag "MsgLike") (not merge-with-prev?))
@@ -753,7 +752,7 @@ state for now.
               :url (:avatar-url popover-member) :size 36 :status :online :shape :circle}]])])
 
 
-(defn timeline-header [ts merge-with-prev? popover-member custom-tags active-room]
+(defn ^:ui timeline-header [ts merge-with-prev? popover-member custom-tags active-room]
   [:div.timeline-header
    [profile-popover-trigger popover-member custom-tags active-room nil
     [:span.timeline-sender-name (truncate-name (:display-name popover-member) 20)]]
@@ -800,7 +799,7 @@ library itself some context of deferred components...
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
+(defn ^:ui render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
   (let [is-edited? (:is-edited? content-map)
         raw-body   (:body content-map)
         room-id    (:room-id event)
@@ -837,7 +836,7 @@ library itself some context of deferred components...
      [message-link-preview msg-type-tag raw-body]]))
 
 
-(defn timeline-body [item content active-room is-editing-this?]
+(defn ^:ui timeline-body [item content active-room is-editing-this?]
   (let [{:keys [tag inner in-reply-to]} content
         reply-id  (:event-id in-reply-to)
         tr               @(re-frame/subscribe [:i18n/tr])
@@ -861,7 +860,7 @@ library itself some context of deferred components...
     {:x mx :y my :item current-item :active-room active-room :my-id my-id}]))
 
 
-(defn event-tile-render [item]
+(defn ^:ui event-tile-render [item]
   (let [active-room  @(re-frame/subscribe [:rooms/active-id])
         hs-url       @(re-frame/subscribe [:sdk/homeserver-url])
         is-mobile?   @(re-frame/subscribe [:ui/mobile?])
