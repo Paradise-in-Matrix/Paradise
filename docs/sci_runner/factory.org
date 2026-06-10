@@ -26,7 +26,8 @@ This may be worth revisiting also to see if we can streamline it further.
 
 We now need to ensure anonymous functions are pulled out of named
 functions into their own 'named' function to avoid trying to send a function
-across the thread boundary
+across the thread boundary.
+
 
 #+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
 (defn extract-and-hash-fns [body]
