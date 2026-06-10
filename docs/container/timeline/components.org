@@ -10,13 +10,9 @@ The components for the timeline. Need to move these to the correct spot.
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/components.cljs
 (ns container.timeline.components
-  (:require [reagent.core :as r]
-            [re-frame.core :as re-frame]
+  (:require [re-frame.core :as re-frame]
             [clojure.string :as str]
-            [taoensso.timbre :as log]
-            [utils.helpers :refer [truncate-name]]
-            [container.timeline.item :as item]
-            ["@chenglou/pretext" :refer [prepare layout]]))
+            ))
 #+end_src
 
 **** Code
