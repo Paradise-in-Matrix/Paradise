@@ -262,26 +262,6 @@ React object that will be hydrated on the other end.
                        (recalculate-and-stream! room-id source))
                      {:status :success})))
 
-(worker/register :precompile-timeline
-                 (fn [data]
-                   (let [{:keys [eve-events hs-url is-mobile? my-id tr active-room custom-tags members-map]} data
-                         override  (get @state/!worker-overrides :event-tile-render)
-                         render-fn (or override
-                                       (get @state/!worker-components :event-tile-render)
-                                       container.timeline.item/event-tile-render)]
-                     (if-not render-fn
-                       {:status "error" :msg "event-tile-render not found in worker registry!"}
-                       (let [compiled-chunk
-                             (mapv (fn [item]
-                                     (let [cljs-item (eve.atom/eve->cljs item)
-                                           hiccup-ast (render-fn cljs-item hs-url is-mobile? my-id tr)
-                                           expanded   (parsing/expand-hiccup hiccup-ast)
-                                           pojo-vdom  (parsing/hiccup->pojo expanded)]
-                                       (assoc cljs-item :worker-data pojo-vdom)))
-                                   eve-events)]
-                         {:status "success"
-                          :data compiled-chunk})))))
-
 
 ;; still using old call form
 ;; need to globally update all to use mesh form
