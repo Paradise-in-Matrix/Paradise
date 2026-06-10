@@ -36,6 +36,7 @@ actual UI components themselves.
    [eve.alpha :as eve]
    [eve.atom :as ea]
    [eve.mem :as mem]
+   [eve.deftype-proto.alloc :as alloc]
    [reagent.dom.client :as rdom]
    [navigation.spaces.bar :refer [spaces-sidebar]]
    [client.key-handler :refer [global-key-listener]]
