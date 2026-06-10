@@ -49,60 +49,10 @@ we've made interop with the WASM bindings.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-(re-frame/reg-sub
- :timeline/raw-events
- (fn [db [_ room-id]]
-   (let [focused-data (get-in db [:timeline-data room-id :focused] [])
-         live-data    (get-in db [:timeline-data room-id :live] [])]
-;;     live-data
-(if (and (vector? focused-data) (empty? focused-data))
-  live-data
-  focused-data
-
- ;;    (if (empty? focused-data) focused-data live-data)
-     ))))
-
 (re-frame/reg-event-db
- :sdk/update-timeline
- (fn [db [_ room-id source new-raw-events]]
-   (if (get-in db [:timeline-subs room-id source])
-     (let [path             [:timeline-data room-id source]
-           existing-events  (get-in db path [])
-           extract-id       (fn [e]
-                              (let [e-kw (if (map? e) (update e :type keyword) e)]
-                                (or (get-event-id e-kw)
-                                    (:event_id e)
-                                    (:event-id e)
-                                    (:internal-id e))))
-           existing-map     (into {} (map (juxt extract-id identity) existing-events))
-           processed-events (mapv
-                             (fn [e]
-                               (let [event-id     (extract-id e)
-                                     cached-event (get existing-map event-id)]
-                                 (if (and cached-event (= (:raw cached-event) e))
-                                   cached-event
-                                   (process-raw-event e source))))
-                             new-raw-events)]
-       (assoc-in db path processed-events))
-     (do
-       (log/warn "Ghost diff dropped: Timeline" source "is dead for room:" room-id)
-       db))))
+
 
 (re-frame/reg-sub
- :timeline/sorted-events
- (fn [[_ active-room]]
-   (re-frame/subscribe [:timeline/raw-events active-room]))
- (fn [raw-events _]
-   raw-events
-   ))
-
-(re-frame/reg-sub
- :timeline/current-events
- (fn [[_ active-room]]
-   (re-frame/subscribe [:timeline/sorted-events active-room]))
- (fn [sorted-events]
-   (enrich-timeline-items sorted-events)
-   ))
 
 (re-frame/reg-sub
  :timeline/events-map
