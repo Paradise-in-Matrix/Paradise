@@ -379,7 +379,7 @@ We also don't want to list our own name, so we remove that too.
 (re-frame/reg-sub
  :timeline/latest-readers
  (fn [[_ room-id _]]
-   [(re-frame/subscribe [:timeline/current-events room-id])
+   [(re-frame/subscribe [:timeline/events room-id])
     (re-frame/subscribe [:sdk/profile])])
  (fn [[events profile] _]
    (let [my-id         (:user-id profile)
@@ -450,7 +450,7 @@ We also don't want to list our own name, so we remove that too.
         render-sticks   (fn [ruler-ref-fn] [timeline-measuring-sticks ruler-ref-fn])
         render-jump     (fn [do-jump! is-focused?] [timeline-jump-button do-jump! is-focused?])]
     (fn [room-id]
-      (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
+      (let [events           @(re-frame/subscribe [:timeline/events room-id])
             events-map       @(re-frame/subscribe [:timeline/events-map room-id])
             loading?         @(re-frame/subscribe [:timeline/loading-more? room-id])
             loading-forward? @(re-frame/subscribe [:timeline/loading-forward? room-id])
