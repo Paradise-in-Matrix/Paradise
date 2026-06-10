@@ -1,0 +1,328 @@
+
+** Base
+
+
+**** Preface
+This could... probably be better named.
+However, it is the base of the offloaded rendering
+mechanism.
+Effectively, our goal is to avoid rendering on the main thread
+the timeline as much as possible as the timeline is a potentially
+very taxing resource. It also gives us control of our performance
+and makes myself cognizant of the nuance involved in browser
+rendering.
+
+
+There are a number of key aspects considered when crafting this and rationales
+behind the choices made.
+The concept to perform the runtime evaluation of components off the main thread
+isn't at all novel and popular chat applications utilize a similar concept.
+The idea being that the timeline being the main source of re-renders could
+seize the overall UI and impact the UX. So we start from that concept. Sure,
+we won't see scaling issues like that immediately, but it leads into another
+point.
+
+The Reagent Hiccup compiler is a bit too slow to be reasonably useful
+for a fast moving virtual list. Even if it wasn't the SCI runtime
+evaluation of ClojureScript certainly is. And we want to provide plugin
+support to EVERY component. Everything should be swappable. So the only
+reasonable way to avoid a bottleneck is to avoid evaluation off the main thread
+itself.
+
+So to plainly list the problems needing to be solved:
+- Account for SCI evaluating the components
+- Registering the functions at compile time
+- Creating a loose LSP to extract and contextualize anonymous functions
+- Map the extracted functions and pass the map over the boundary and rehydrate
+- Process deeply nested Reagent components Hiccup without the Hiccup compiler
+- Ensure that on click behavior (functions) persist over the thread boundary
+- Ensure the structure of the object transmitted can be rehydrated
+- Measure the components without a DOM using Pretext
+- Enable the usage of Re-frame across threads
+
+
+For the SCI evaluation we continue to use the same registry pattern, but
+did opt to register ALL methods ahead of compile time instead of with a
+macro that is evaluated at compile time.
+The lambda lifter documents expand on this a bit more, but like
+much of this it is written often after the fact.
+
+
+For deeply nested Reagent components it is a combination of dehydration,
+lambdas extraction, and Re-frame app db synchronization. Effectively
+making a lightweight Hiccup compiler. Honestly, not entirely sure
+it is more efficient, but it is functional off the main thread and
+aids in building out an object that can cross thread boundaries.
+We eventually create a React object and then pass the POJO for
+said object so that on the other side it can be rehydrated with
+the previously mentioned bits.
+
+For Pretext measurement we have to provide it a 'fake DOM'
+From what I can tell, this wasn't actually too hard to execute and appears
+to be working perfectly. So we're actually able to perform the measurements
+of the components entirely off the main thread too. This aids dramatically
+in performance as well.
+
+The multi-thread app-db is an interesting issue and a library I stumbled
+across made by a very intelligent individual seemed perfect for this.
+Eve. It enables using the SharedArrayBuffer to store real CLJS objects.
+The SharedArrayBuffer and Eve have similar pattern stipulations that
+the app-db inherently abides by anyway. So it shouldn't have functions
+or raw JS objects stored within it in ideal scenarios.
+So it also aids in ensuring plugin devs would avoid writing anti-patterns
+with re-frame.
+
+However, the one shortcoming to Eve is that Android Webviews lack the ability
+to use SharedArrayBuffers.
+https://issues.chromium.org/issues/404645676
+https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer
+You can find numerous other open issues on the topic, but Google seems adamant
+about not adding them.
+SharedArrayBuffers work everywhere else though, so I felt it perhaps still
+worthwhile to use Eve.
+
+
+We don't have a heavy load on the app-db, so as a back up we manual synchronize
+the app-db using transit and editscript. Transit aids in transmitting CLJS
+objects across thread boundaries. Which is amusing as we worked to convert
+them into JS objects that can be transmitted for the offloaded rendering) but
+fundamentally it isn't useful here as we want the app-db to stay pure.
+They've likely done a far better job than I ever could hope in that pursuit,
+and then editscript is used for making diffs between CLJS objects.
+Basically we diff check the app-db and only bother sending the diffs over.
+We can keep the actual payloads much smaller doing this.
+From testing the two mechanisms work well and perhaps at some point
+we can lean more on Eve.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+(ns virtualizer.base
+  (:require [cljs-workers.worker :as worker]
+            [sci-runner.virtualizer :as sci-runner]
+            [taoensso.timbre :as log]
+            [virtualizer.state :as state]
+            [eve.alpha :as eve]
+            [eve.atom :as ea]
+            [eve.mem :as mem]
+            [re-frame.db :as db]
+            [eve.wasm-mem :as wasm-mem]
+            [eve.deftype-proto.alloc :as alloc]
+            [goog.object]
+            [container.timeline.base]
+            [navigation.rooms.room-list]
+            [app]
+            [container.timeline.item :refer [event-tile-render]]
+            [container.members]
+            [virtualizer.parsing :as parsing]
+            [virtualizer.measurements :as measurements]))
+
+#+end_src
+
+
+**** Disable Reframe Complaints
+
+Web worker threads have no DOM and so Re-frame will complaining
+
+**** TODO Maybe move to re-frame.db directly?
+
+#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+
+
+(re-frame.loggers/set-loggers! {:warn (fn [& _])})
+#+end_src
+
+
+
+**** Cache and Constants
+
+#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+(def !event-cache (atom {}))
+(def !layout-context (atom {}))
+(def !room-events (atom {}))
+(defonce !applying-remote-patch? (atom false))
+#+end_src
+
+
+**** Eve SharedArrayBuffer Atom
+
+Here we create the payload to pass ot Eve so that it can use the
+same SharedArrayBuffer object as the main thread. We then
+assign the thread's app-db to use the same range and thus...
+we have a thread synced app-db.
+
+One downside with Eve is the lack of consistent documentation. It would be
+a helpful project to contribute to as the concept and functionality is
+amazingly useful.
+
+That said, this was more trial and error to get a functional prototype
+using the library.
+
+Due to limitations in Android Webviews we also have a fallback
+to set up the transit-cljs and editscript versions here if the
+client isn't using COEP. It may be advisable to avoid COEP anyway
+for inline video players on all platforms.
+
+
+#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+(worker/register :bind-app-db
+  (fn [{:keys [eve-payload ports]}]
+    (let [mode          (keyword (:mode eve-payload))
+          initial-state (:initial-state eve-payload)
+          db-port       (first ports)]
+      (cond
+        (nil? eve-payload)
+        (do
+          (js/console.error "[Worker] FATAL: eve-payload is null.")
+          {:status :error :msg "eve-payload is null"})
+
+        (= mode :async)
+        (let [reader    (t/reader :json)
+              writer    (t/writer :json)
+              start-db  (if initial-state (t/read reader initial-state) {})
+              !local-db (atom start-db)]
+          (set! (.-onmessage db-port)
+                (fn [msg]
+                  (let [edits (t/read reader (.-data msg))]
+                    (reset! !applying-remote-patch? true)
+                    (try
+                      (swap! !local-db e/patch (edit/edits->script edits))
+                      (finally
+                        (reset! !applying-remote-patch? false))))))
+
+          (add-watch !local-db :sync-to-ui
+                     (fn [_ _ old-state new-state]
+                       (when-not @!applying-remote-patch?
+                         (let [edits (e/get-edits (e/diff old-state new-state {:algo :quick}))]
+                           (when (seq edits)
+                             (.postMessage db-port (t/write writer edits)))))))
+
+          (db/set-eve-atom! !local-db)
+          {:status :db-bound-async})
+
+        :else
+        (let [root-sab      (:root-sab eve-payload)
+              rmap-sab      (:rmap-sab eve-payload)
+              slab-sabs     (:slab-sabs eve-payload)
+              atom-slot-idx (:atom-slot-idx eve-payload)]
+          (alloc/init-worker-slabs! slab-sabs root-sab nil)
+          (let [root-r       (mem/js-sab-region root-sab)
+                rmap-r       (mem/js-sab-region rmap-sab)
+                slot-idx     (ea/register-worker! {:root-r root-r} 2)
+                domain-state {:root-r root-r :rmap-r rmap-r :base-path nil
+                              :slot-idx slot-idx :retire-q (atom [])
+                              :flush-ts (doto (make-array 1) (aset 0 0))}
+                eve-atom     (ea/->MmapAtom domain-state atom-slot-idx)]
+
+            (db/set-eve-atom! eve-atom)
+            (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
+            {:status :db-bound-sab}))))))
+
+#+end_src
+
+
+**** (Re)calculate and Stream
+
+This performs the measurements and the parsing to generate the prebuilt
+React object that will be hydrated on the other end.
+
+#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+(defn recalculate-and-stream! [room-id source]
+  (let [raw-events (get-in @!room-events [room-id source])
+        ctx        (get @!layout-context room-id {:width 400 :theme {:font "16px sans-serif" :line-height 22.8} :measured {}})
+        layout     (measurements/apply-layout raw-events (:width ctx) (:theme ctx) (:measured ctx))
+        laid-out   (measurements/strip-layout-metadata (:items layout))
+        ast-nodes  (parsing/build-ast-tree laid-out)
+        clean-ast  (mapv #(select-keys % [:id :bottom :height :worker-data :type :ts :unread?]) ast-nodes)
+        js-ast     (to-array
+                    (map (fn [node]
+                           #js {"id"          (:id node)
+                                "bottom"      (:bottom node)
+                                "height"      (:height node)
+                                "type"        (:type node)
+                                "ts"          (:ts node)
+                                "unread?"     (:unread? node)
+                                "worker-data" (:worker-data node)})
+                         clean-ast))
+        lambda-paths (parsing/extract-lambda-paths js-ast)]
+    (worker/stream!
+     js/self
+     #js {"type"         "timeline-ready"
+          "room-id"      room-id
+          "source"       source
+          "ast-nodes"    js-ast
+          "lambda-paths" lambda-paths}
+     true)))
+
+(worker/register :recalculate-timeline
+                 (fn [{:keys [room-id]}]
+                   (let [sources (keys (get @!room-events room-id))]
+                     (doseq [source sources]
+                       (recalculate-and-stream! room-id source))
+                     {:status :success})))
+
+(worker/register :precompile-timeline
+                 (fn [data]
+                   (let [{:keys [eve-events hs-url is-mobile? my-id tr active-room custom-tags members-map]} data
+                         override  (get @state/!worker-overrides :event-tile-render)
+                         render-fn (or override
+                                       (get @state/!worker-components :event-tile-render)
+                                       container.timeline.item/event-tile-render)]
+                     (if-not render-fn
+                       {:status "error" :msg "event-tile-render not found in worker registry!"}
+                       (let [compiled-chunk
+                             (mapv (fn [item]
+                                     (let [cljs-item (eve.atom/eve->cljs item)
+                                           hiccup-ast (render-fn cljs-item hs-url is-mobile? my-id tr)
+                                           expanded   (parsing/expand-hiccup hiccup-ast)
+                                           pojo-vdom  (parsing/hiccup->pojo expanded)]
+                                       (assoc cljs-item :worker-data pojo-vdom)))
+                                   eve-events)]
+                         {:status "success"
+                          :data compiled-chunk})))))
+
+
+;; still using old call form
+;; need to globally update all to use mesh form
+(worker/register :update-layout-context
+                 (fn [{:keys [arguments]}]
+                   (let [{:keys [room-id width theme measured]} arguments
+                         old-ctx (get @!layout-context room-id)]
+                     (when (or (not= width (:width old-ctx)) (not= theme (:theme old-ctx)))
+                       (reset! measurements/!pretext-cache {}))
+
+                     (swap! !layout-context assoc room-id {:width width :theme theme :measured measured})
+                     (let [sources (keys (get @!room-events room-id))]
+                       (doseq [source sources]
+                         (recalculate-and-stream! room-id source)))
+
+                     {:status :success})))
+
+
+(worker/register :process-timeline-diff
+                 (fn [{:keys [events room-id source]}]
+                   (let [processed-events (mapv
+                                           (fn [e]
+                                             (let [eid    (measurements/extract-id e)
+                                                   cached (get @!event-cache eid)]
+                                               (if (and cached (= (:raw cached) e))
+                                                 cached
+                                                 (let [new-event (parsing/precompile-event-data e source)]
+                                                   (swap! !event-cache assoc eid (assoc new-event :raw e))
+                                                   new-event))))
+                                           events)
+                         enriched-events  (measurements/enrich-timeline-items processed-events)]
+                     (swap! !room-events assoc-in [room-id source] enriched-events)
+                     (recalculate-and-stream! room-id source)
+                     {:status :success})))
+
+#+end_src
+
+
+**** Thread Initialization
+
+This just kicks off the thread.
+#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+(worker/bootstrap)
+#+end_src
