@@ -14,7 +14,6 @@ so we'll keep them nicely collected here.
   (:require [re-frame.core :as re-frame]
             [container.timeline.item :refer [event-tile-render]]
             [navigation.rooms.entry :refer [build-room-actions]]
-            [utils.macros :refer [defui]]
             [utils.svg :as icons]))
 #+end_src
 
