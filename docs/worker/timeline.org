@@ -199,6 +199,27 @@ help anyone later who wants to make changes to aspects of the timeline.
 
 **** Timeline Queue
 
+
+***** Intercept
+
+We actually don't want to render on the main thread, so we send this
+instead to the virtualizer pool.
+It may be reasonable eventually to reduce the executed logic on the
+main thread even more and just make a 'rendering' pool, but for now
+we'll be sticking with just doing the virtualizer this way.
+
+
+#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+(defn push-timeline-diff! [room-id source events]
+  (log/debug "Sending timeline diff via Mesh to virtualizer...")
+  (mesh/do-with-thread! :virtualizer-pool
+                        {:handler :process-timeline-diff
+                         :arguments {:events events
+                                     :room-id room-id
+                                     :source source}}))
+#+end_src
+
+
 This is our diff trigger method. On a diff returned from the Rust SDK
 It then takes the diff and tells reframe what to update the timeline
 to now display. This could be just *adding* a single message or swapping
