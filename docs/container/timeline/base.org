@@ -434,10 +434,13 @@ We also don't want to list our own name, so we remove that too.
 
 
 #+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-(defn timeline-estimate-fn [msg width !prepared-cache !measured-atom theme]
-  (if (= (:id msg) "read-marker")
-    (:virtual-divider-h theme 49)
-    (calc-item-height msg width !prepared-cache theme)))
+
+(re-frame/reg-event-fx :sdk/update-layout-context
+                       (fn [{:keys [db]} [_ room-id width theme measured]]
+                         (main/do-with-pool! @state/!virtualizer-pool
+                                             {:handler :update-layout-context
+                                              :arguments {:room-id room-id :width width :theme theme :measured measured}})
+                         {}))
 
 (def default-metrics {:font "16px sans-serif" :line-height 22.8})
 
