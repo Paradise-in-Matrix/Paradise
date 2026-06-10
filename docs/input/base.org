@@ -61,30 +61,8 @@ We'll need a way to generically upload to Matrix for anything from updating avat
          (.readAsArrayBuffer reader file)
          {:db (assoc (re-frame/db) :uploading-files? true)})
        (do (log/warn "Missing file for upload") {})))))
-
 #+end_src
 
-
-
-**** File Upload
-
-Through a bit of trial and error (and exploring the FFI bindings)
-we can start to flesh out a file upload. Now direct file uploading is almost
-always undesirable. However, it does help us get a feel for the most complex
-message action possible. So we establish it as a reframe event, then we needed
-to determine what the correct input for the file-info was. We did  this by
-directly just checking the FFI bindings. Same for the upload-source, and the
-upload-params. Since we're a good bit behind the current version of the sdk
-we can't just use their published docs sadly. Though, when the sdk version
-used is updated those are an excellent source to aid in visualizing how
-these map with decently descriptive documentation surrounding.
-
-https://matrix-org.github.io/matrix-rust-sdk/
-
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
-
-
-#+end_src
 
 
 
