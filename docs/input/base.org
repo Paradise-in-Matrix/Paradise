@@ -278,7 +278,7 @@ This is the editor used for editing to be specific. Outside that it likely won't
 be used.
 
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
-(defui inline-editor [item active-id]
+(defn ^:ui inline-editor [item active-id]
   (r/with-let [!editor (r/atom nil)]
     (fn [item active-id]
       (let [m-content    (get-in item [:content :inner :content])
@@ -322,7 +322,7 @@ Ideally, we should break this apart more later.
 
 #+begin_src clojurescript :tangle ../../src/input/base.cljs
 
-(defui timeline-send-button [{:keys [submit-message! editor attachments]}]
+(defn ^:ui timeline-send-button [{:keys [submit-message! editor attachments]}]
   [:button.timeline-send-btn
    {:on-click (fn [e]
                 (.preventDefault e)
@@ -331,7 +331,7 @@ Ideally, we should break this apart more later.
    [plugins/plugin-slot :composer-send {:room-id active-id}]
    [icons/send]])
 
-(defui timeline-emoji-button [{:keys [on-click active? room-id]}]
+(defn ^:ui timeline-emoji-button [{:keys [on-click active? room-id]}]
   [:button.timeline-emoji-btn
    {:on-click (fn [e]
                 (.stopPropagation e)
@@ -339,7 +339,7 @@ Ideally, we should break this apart more later.
    [icons/smiley]
    [plugins/plugin-slot :composer-emojis {:room-id room-id}]])
 
-(defui message-input []
+(defn ^:ui message-input []
   (r/with-let [!editor       (r/atom nil)
                !sug-command  (r/atom nil)]
     (fn []
@@ -456,6 +456,7 @@ Ideally, we should break this apart more later.
 
 
 #+end_src
+
 
 ***** CSS
 
