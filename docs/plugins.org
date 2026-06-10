@@ -516,7 +516,7 @@ overwrite the components class.
    [cljs.core.async.interop :refer-macros [<p!]]
    [promesa.core :as p]
    [cljs-workers.core :as main]
-   [sci-runner :as runner]
+   [sci-runner.ui :as runner]
    [client.state :as state]
    ))
 
@@ -524,8 +524,6 @@ overwrite the components class.
 
 
 #+begin_src clojurescript :tangle ../src/plugin_storage.cljs
-
-
 (defn inject-css! [id url]
   (when-not (.getElementById js/document id)
     (let [link (.createElement js/document "link")]
