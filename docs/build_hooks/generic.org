@@ -1,5 +1,8 @@
 
-** Build Hooks
+** Generic Build Hooks
+
+
+**** Preface
 
 There are some operations that we need to perform before compilation.
 Shadow-cljs offers a tool called Build Hooks in which you can
@@ -8,7 +11,7 @@ of the program itself.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
+#+begin_src clojurescript :tangle ../../hooks/build_hooks.clj
 (ns build-hooks
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
@@ -27,7 +30,7 @@ worry about the code itself.
 
 ***** WASM
 
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
+#+begin_src clojurescript :tangle ../../hooks/build_hooks.clj
 (defn copy-wasm
   {:shadow.build/stage :flush}
   [build-state & args]
@@ -41,36 +44,10 @@ worry about the code itself.
 #+end_src
 
 
-***** i18n
-
-However, for dynamic resource allocation... Vite doesn't have a great way to do this
-So instead we want to do this BEFORE ShadowCLJS compiles even so that we can be
-sure our translation files are present in time.
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
-#_(defn generate-lang-map
-{:shadow.build/stage :configure}
-  [build-state & args]
-  (let [source-dir (io/file "node_modules/@element-hq/web-shared-components/src/i18n/strings")
-        target-dir (io/file "build/i18n")
-        files (filter #(.endsWith (.getName %) ".json") (file-seq source-dir))]
-    (println "Syncing I18n JSONs to resources/public/i18n...")
-    (.mkdirs target-dir)
-    (let [mapping (into {} (for [f files]
-                             (let [name (.getName f)
-                                   lang (second (re-find #"^([^.]+)" name))]
-                               (io/copy f (io/file target-dir name))
-                               [lang (str "/i18n/" name)])))
-          content (str "(ns client.i18n-map)\n\n"
-                       "(def urls " (pr-str mapping) ")")]
-      (io/make-parents "src/client/i18n_map.cljs")
-      (spit "src/client/i18n_map.cljs" content))
-    build-state))
-#+end_src
-
 
 ***** Themes
 
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
+#+begin_src clojurescript :tangle ../../hooks/build_hooks.clj
 (defn include-themes
   {:shadow.build/stage :flush}
   [build-state & args]
@@ -94,7 +71,7 @@ sure our translation files are present in time.
 
 ***** CSS files
 
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
+#+begin_src clojurescript :tangle ../../hooks/build_hooks.clj
 (defn include-css
   {:shadow.build/stage :flush}
   [build-state & args]
@@ -118,7 +95,7 @@ sure our translation files are present in time.
 
 ***** Root files
 
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
+#+begin_src clojurescript :tangle ../../hooks/build_hooks.clj
 (defn include-root-files
   {:shadow.build/stage :compile-prepare}
   [build-state & args]
@@ -136,7 +113,7 @@ sure our translation files are present in time.
 
 ***** Element call
 
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
+#+begin_src clojurescript :tangle ../../hooks/build_hooks.clj
 (defn copy-element-call
   {:shadow.build/stage :flush}
   [build-state & args]
@@ -166,7 +143,7 @@ sure our translation files are present in time.
 
 ***** Version stamping config.edn
 
-#+begin_src clojurescript :tangle ../src/build_hooks.clj
+#+begin_src clojurescript :tangle ../../hooks/build_hooks.clj
 (defn stamp-version
   {:shadow.build/stage :configure}
   [build-state & _]
