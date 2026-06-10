@@ -20,14 +20,8 @@ aspect.
    [taoensso.timbre :as log]
    [re-frame.core :as re-frame]
    [utils.global-ui :refer [avatar]]
-#+end_src
-
-
-
-**** Modal
-
-
-#+begin_src clojurescript :tangle ../../src/overlays/profiles.cljs
+   [utils.images :refer [media]]
+   [plugins :as plugins]))
 
 #+end_src
 
