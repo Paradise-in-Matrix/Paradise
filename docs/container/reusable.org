@@ -51,7 +51,7 @@ so we'll keep them nicely collected here.
 ***** Room Header Component
 
 #+begin_src clojurescript :tangle ../../src/container/reusable.cljs
-(defui room-header [{:keys [display-name compact? active-id]}]
+(defn ^:ui room-header [{:keys [display-name compact? active-id]}]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         main-focus    @(re-frame/subscribe [:container/main-focus])
         side-panel    @(re-frame/subscribe [:container/side-panel])
@@ -284,7 +284,7 @@ Now we also can supply a reusable container for those events
 as often times these on-off events are useful to be used as a jump-to.
 
 #+begin_src clojurescript :tangle ../../src/container/reusable.cljs
-(defn message-preview-item [room-id event]
+(defn ^:ui message-preview-item [room-id event]
   (let [tr         @(re-frame/subscribe [:i18n/tr])
         hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
         is-mobile?       @(re-frame/subscribe [:ui/mobile?])
