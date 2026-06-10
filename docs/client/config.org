@@ -42,3 +42,20 @@ can always update the version if needed.
         (p/then :version)
         (p/catch (fn [_] nil)))))
 #+end_src
+
+
+A quick way to provide a global enable or disable of Eve.
+For now Eve will remain disabled.
+Frankly, if we can avoid COEP (since iOS and Firefox do not
+support credentialless, that'd be ideal).
+Additionally, Android Webview doesn't support SharedArrayBuffer.
+In concept, Eve is amazing. However, this may need to remain
+shut-off for the foreseeable future.
+
+#+begin_src clojurescript :tangle ../../src/client/config.cljs
+(defonce eve-enabled?
+  false
+  #_(and (exists? js/SharedArrayBuffer)
+       (exists? js/crossOriginIsolated)
+       js/crossOriginIsolated))
+#+end_src
