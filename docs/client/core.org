@@ -185,6 +185,40 @@ linked.
 #+end_src
 
 
+These extend the Eve types to include behaviors we commonly use
+and expect.
+Likely to be moved, however.
+
+#+begin_src clojurescript :tangle ../../src/client/core.cljs
+(extend-type eve.vec/EveVector
+  IReversible
+  (-rseq [coll]
+    (let [c (count coll)]
+      (when (pos? c)
+        (map #(nth coll %) (range (dec c) -1 -1))))))
+
+
+
+(extend-type eve.map/EveHashMap
+  IEquiv
+  (-equiv [this other]
+    (and (instance? eve.map/EveHashMap other)
+         (= (.-offset__ this) (.-offset__ other))))
+  IHash
+  (-hash [this]
+    (hash (.-offset__ this))))
+
+(extend-type eve.vec/EveVector
+  IEquiv
+  (-equiv [this other]
+    (and (instance? eve.vec/EveVector other)
+         (= (.-offset__ this) (.-offset__ other))))
+  IHash
+  (-hash [this]
+    (hash (.-offset__ this))))
+#+end_src
+
+
 **** Bootstrapping and Sync Reframe events
 
 We intend to this to be passed as a callback where needed and handle any client
@@ -214,6 +248,7 @@ to a cleaner pattern.
                "error"   (log/error "Bootstrap failed:" (:msg boot-res))))
            (log/error "WASM failed to load!" (:msg init-res))))))
    {}))
+
 
 
 (re-frame/reg-event-fx
