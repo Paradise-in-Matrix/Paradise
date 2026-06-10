@@ -682,6 +682,34 @@ when we detatch and reload (basically when you hit control + s to save).
     (init-window-size-listener!)
     (init-capacitor-listeners!)
     (.render @root (r/as-element [main-layout]))))
+#+end_src
+
+
+***** Eve Instantiation
+
+#+begin_src clojurescript :tangle ../src/app.cljs
+(defn get-eve-worker-payload [eve-atom]
+      (let [ds       (.-domain-state ^js eve-atom)
+            transfer (eve/sab-transfer-data eve-atom)]
+        {:root-sab      (:root-sab ds)
+         :rmap-sab      (:rmap-sab ds)
+         :slab-sabs     (:slab-sabs transfer)
+         :atom-slot-idx (.-atom-slot-idx ^js eve-atom)}))
+
+(defn init-eve []
+      (when eve-enabled?
+      (alloc/init! :capacities {0 50000
+                                1 50000
+                                2 25000
+                                3 25000
+                                4 10000
+                                5 10000})
+      (let [eve-db (ea/atom {})
+            full-payload (get-eve-worker-payload eve-db)]
+        (reset! state/!shared-app-db eve-db)
+        (reset! state/!eve-app-db-payload full-payload)
+        (re-frame.db/set-eve-atom! eve-db))))
+
 
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
