@@ -30,8 +30,8 @@ we've made interop with the WASM bindings.
             [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
             [utils.svg :as icons]
             [virtualizer.core :refer [virtualized-list]]
-            [container.timeline.item :refer [calc-item-height event-tile]]
-            [virtualizer.core :refer [virtualized-list]]
+            [container.timeline.hydrator :refer [!local-timeline-data]]
+            [container.timeline.item :refer [event-tile]]
             [container.timeline.components :refer [timeline-empty-state
                                                    timeline-jump-button
                                                    timeline-loading-overlay
