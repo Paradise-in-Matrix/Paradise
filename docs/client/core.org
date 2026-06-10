@@ -98,41 +98,43 @@ linked.
 
 
 #+begin_src clojurescript :tangle ../../src/client/core.cljs
-
 (defn bind-workers! [engine-pool media-pool virtualizer-pool app-db-payload]
   (let [ev-chan  (js/MessageChannel.)
         ev-port1 (.-port1 ev-chan)
         ev-port2 (.-port2 ev-chan)
-
         vm-chan  (js/MessageChannel.)
         vm-port1 (.-port1 vm-chan)
         vm-port2 (.-port2 vm-chan)
-
         mv-chan  (js/MessageChannel.)
         mv-port1 (.-port1 mv-chan)
         mv-port2 (.-port2 mv-chan)
-
         vv-chan  (js/MessageChannel.)
         vv-port1 (.-port1 vv-chan)
         vv-port2 (.-port2 vv-chan)
-
         mm-chan  (js/MessageChannel.)
         mm-port1 (.-port1 mm-chan)
         mm-port2 (.-port2 mm-chan)
-
         me-chan  (js/MessageChannel.)
         me-port1 (.-port1 me-chan)
-        me-port2 (.-port2 me-chan)]
+        me-port2 (.-port2 me-chan)
+        db-chan  (js/MessageChannel.)
+        db-port1 (.-port1 db-chan)
+        db-port2 (.-port2 db-chan)]
 
-    (main/do-with-pool! virtualizer-pool
-                        {:handler   :bind-app-db
-                         :arguments {:eve-payload app-db-payload}})
-
-    ;; Need to sort out buffer allocation better
-    ;; commented out the shadow-cljs.edn bit too
-    #_(main/do-with-pool! engine-pool
+    (if eve-enabled?
+      (main/do-with-pool! virtualizer-pool
                           {:handler   :bind-app-db
                            :arguments {:eve-payload app-db-payload}})
+      (do
+        (db/set-async-broadcaster! (fn [payload] (.postMessage db-port1 payload)))
+        (set! (.-onmessage db-port1) (fn [e] (db/apply-remote-patch! (.-data e))))
+
+        (main/do-with-pool! virtualizer-pool
+                            {:handler   :bind-app-db
+                             :arguments {:eve-payload {:mode :async
+                                                       :initial-state (db/get-encoded-state)}
+                                         :port        db-port2}
+                             :transfer  [:port]})))
 
     (main/do-with-pool! engine-pool
                         {:handler   :register-port
