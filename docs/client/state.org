@@ -8,7 +8,6 @@ This may be move-able there too, but will let it remain for now.
 
 #+begin_src clojurescript :tangle ../../src/client/state.cljs
 (ns client.state
-  (:require [reagent.core :as r]))
   (:require [reagent.core :as r]
             [eve.atom :as ea]))
 
