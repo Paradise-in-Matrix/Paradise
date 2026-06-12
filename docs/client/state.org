@@ -9,11 +9,19 @@ This may be move-able there too, but will let it remain for now.
 #+begin_src clojurescript :tangle ../../src/client/state.cljs
 (ns client.state
   (:require [reagent.core :as r]))
+  (:require [reagent.core :as r]
+            [eve.atom :as ea]))
+
+(defonce !shared-app-db (ea/atom {}))
+(defonce !eve-app-db-payload (atom nil))
 
 (defonce !engine-pool (atom nil))
 (defonce !media-pool (atom nil))
+(defonce !virtualizer-pool (atom nil))
 (defonce !config (atom nil))
+
 (defonce !components (r/atom {}))
+(defonce !pure-fns (atom {}))
 (defonce !active-overrides (r/atom {}))
 (defonce !slots (r/atom {}))
 
@@ -42,7 +50,4 @@ This may be move-able there too, but will let it remain for now.
                    (map (fn [[slot-id items]]
                           [slot-id (into [] (remove #(= (name (:plugin-id % "unknown")) target-str) items))])
                         slots))))))
-
-(set! (.-dumpRegistry js/window) #(clj->js @!components))
-
 #+end_src
