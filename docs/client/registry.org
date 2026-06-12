@@ -17,8 +17,6 @@ function context to all threads as much as they need, at least.
 #+end_src
 
 
-
-
 **** Code
 
 ***** Defs
