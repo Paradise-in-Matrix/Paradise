@@ -1,12 +1,14 @@
 
-**** Worker State
+** Engine State
 
 This file is rather short as it just stores the states to be shared
 around throughout the web worker.
 
-#+begin_src clojurescript :tangle ../../src/worker/state.cljs
-(ns worker.state)
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/state.cljs
+(ns paradise.engine.state)
 
+
+(defonce !shared-app-db (atom nil))
 (defonce !client (atom nil))
 (defonce !media-cache (atom {}))
 (defonce !plugin-handlers (atom {}))
