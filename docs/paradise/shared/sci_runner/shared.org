@@ -13,8 +13,8 @@ can.
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/sci_runner/shared.cljs
-(ns sci-runner.shared
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/shared.cljs
+(ns paradise.shared.sci-runner.shared
   (:require [sci.core :as sci]
             [cljs.core.async.impl.dispatch :as dispatch]
             [cljs.core.async.impl.ioc-helpers]
@@ -22,13 +22,13 @@ can.
             [cljs.core.async]
             [promesa.core]
             [clojure.string]
-            [utils.macros :refer [expose-ns]]))
+            [paradise.shared.utils.macros :refer [expose-ns]]))
 #+end_src
 
 
 **** SCI Sauce
 
-#+begin_src clojurescript :tangle ../../src/sci_runner/shared.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/shared.cljs
 (def async-namespaces
   {'cljs.core.async (expose-ns cljs.core.async)
    'cljs.core.async.interop
