@@ -8,20 +8,20 @@ pieces.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/client/core.cljs
-(ns client.core
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
+(ns paradise.shared.client.core
   (:require
-   [utils.logger :as logger]
+   [paradise.shared.utils.logger :as logger]
    [re-frame.core :as re-frame]
    [goog.object]
-   [app :as app]
+   [paradise.ui.app :as app]
    ["react" :as react]
    [re-frame.db :as db]
    [reagent.core :as r]
    [promesa.core :as p]
-   [client.state :as state]
-   [client.config :refer [eve-enabled?]]
-   [client.session-store :as store]
+   [paradise.shared.client.state :as state]
+   [paradise.shared.client.config :refer [eve-enabled?]]
+   [paradise.shared.client.session-store :as store]
    [cljs-workers.core :as main]
    [cljs-workers.mesh :as mesh]
    [cljs.core.async :refer [go <!]]
@@ -35,7 +35,7 @@ So we need to initialize the web worker more or less immediately
 
 Now we want these to behave as a stream, so we register them and what
 reframe event they should trigger here.
-#+begin_src clojurescript :tangle ../../src/client/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (defn handle-worker-stream! [data]
   (let [is-map?  (map? data)
         msg-type (if is-map? (:type data) (goog.object/get data "type"))
@@ -54,7 +54,10 @@ reframe event they should trigger here.
             room-id    (get-val "room-id" :room-id)
             ast-nodes  (get-val "ast-nodes" :ast-nodes)
             paths      (get-val "lambda-paths" :lambda-paths)]
-        (re-frame/dispatch [:timeline/set-virtualized-data room-id source-str ast-nodes paths])
+
+        (swap! state/!ast-handoff assoc room-id {:ast-nodes ast-nodes :paths paths})
+
+        (re-frame/dispatch [:timeline/process-virtualized-data room-id source-str])
         (re-frame/dispatch [:app/worker-redraw-ping]))
 
       "widget-message"         (re-frame/dispatch [:call/recv-widget-message (get-val "data" :data)])
@@ -69,11 +72,10 @@ reframe event they should trigger here.
       "pin-update"             (re-frame/dispatch [:room/update-pinned-event (get-val "room-id" :room-id) (get-val "event" :event)])
 
       nil)))
-
 #+end_src
 
 Now we want to just create a pool of one for the rust-sdk to execute on.
-#+begin_src clojurescript :tangle ../../src/client/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (defn init-worker! []
   (when-not @state/!engine-pool
     (reset! state/!engine-pool
@@ -97,7 +99,7 @@ of the worker threads themselves (like above) in which they are already
 linked.
 
 
-#+begin_src clojurescript :tangle ../../src/client/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (defn bind-workers! [engine-pool media-pool virtualizer-pool app-db-payload]
   (let [ev-chan  (js/MessageChannel.)
         ev-port1 (.-port1 ev-chan)
@@ -189,15 +191,13 @@ These extend the Eve types to include behaviors we commonly use
 and expect.
 Likely to be moved, however.
 
-#+begin_src clojurescript :tangle ../../src/client/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (extend-type eve.vec/EveVector
   IReversible
   (-rseq [coll]
     (let [c (count coll)]
       (when (pos? c)
         (map #(nth coll %) (range (dec c) -1 -1))))))
-
-
 
 (extend-type eve.map/EveHashMap
   IEquiv
@@ -226,7 +226,7 @@ operations here up until the point in which the client is 'started'.
 
 This is also where we establish our thread pools. Eventually we'll move
 to a cleaner pattern.
-#+begin_src clojurescript :tangle ../../src/client/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (re-frame/reg-event-fx
  :app/bootstrap
  (fn [_ [_ target-user-id]]
@@ -273,7 +273,7 @@ to a cleaner pattern.
 **** Initialize the application!
 
 Provides the entry-point for the application that Vite and the index.html enter from.
-#+begin_src clojurescript  :tangle ../../src/client/core.cljs
+#+begin_src clojurescript  :tangle ../../../../src/paradise/shared/client/core.cljs
 (defn ^:export init []
   (init-worker!)
   (app/init)
