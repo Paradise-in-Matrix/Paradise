@@ -1,23 +1,34 @@
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
-(ns client.session-store
+
+** Client Session Store
+
+
+**** Preface
+
+File with methods to help us store our client configurations and such.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
+(ns paradise.shared.client.session-store
   (:require [promesa.core :as p]
             [cljs.reader :as reader]
             [taoensso.timbre :as log]
             ["ffi-bindings" :as sdk]))
 #+end_src
 
-*** Constants and Utilities
+**** Constants and Utilities
 
 First, we define the file used in OPFS.
 This is the "root" file under which all user sessions will be serialized.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (def ^:private file-name "mx_session_v3.json")
 #+end_src
 
 
 We need a helper to verify we can actually find the Rust classes.
 This grabs the Session constructor from the matrix_sdk namespace within our bundle.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- get-session-class []
   (let [sdk-root (if (.-Session sdk) sdk (.-default sdk))]
     (if sdk-root
@@ -26,12 +37,12 @@ This grabs the Session constructor from the matrix_sdk namespace within our bund
 #+end_src
 
 
-*** Persistence Helpers
+**** Persistence Helpers
 
 We need standard low-level helpers to read and write raw JSON to the OPFS.
 We keep these as simple JavaScript object operations to avoid unnecessary overhead from
 converting back and forth to Clojure maps constantly.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- load-raw-sessions-opfs []
   (p/let [dir (.. js/navigator -storage getDirectory)
           file-handle (.getFileHandle dir file-name #js {:create true})
@@ -65,7 +76,7 @@ converting back and forth to Clojure maps constantly.
 
 We also need a cryptographic implementation for generating passphrases.
 The Rust SDK uses this passphrase to encrypt the IndexedDB where the actual keys and messages live.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn generate-passphrase []
   (let [array (js/Uint8Array. 32)]
     (.getRandomValues js/crypto array)
@@ -73,7 +84,7 @@ The Rust SDK uses this passphrase to encrypt the IndexedDB where the actual keys
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- generate-uuid []
   (if (and (exists? js/crypto) (exists? (.-randomUUID js/crypto)))
     (.randomUUID js/crypto)
@@ -94,7 +105,7 @@ Webviews or browsers, IndexedDB will work just fine for this.
 OPFS is unideal for the main thread to use and we don't really
 *need* it.
 
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- open-settings-db []
   (p/create
    (fn [resolve-fn _]
@@ -148,13 +159,13 @@ OPFS is unideal for the main thread to use and we don't really
 
 
 
-*** IndexedDB Management
+**** IndexedDB Management
 
 This function handles the deletion of the encrypted database.
 It wraps the raw IDBRequest in a Promise so we can await its
 completion before clearing the session metadata.
 We standardize on the name prefix closura-store-.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- delete-db! [db-name]
   (js/Promise.
    (fn [resolve-fn _]
@@ -189,7 +200,7 @@ so the choice to do this isn't inherently worse.
 
 This is removed. Will clean up in the future.
 
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 #_(defn- sync-to-sw-vault! [sessions-obj]
   (let [user-keys (js/Object.keys sessions-obj)]
     (when (pos? (.-length user-keys))
@@ -221,7 +232,7 @@ This is removed. Will clean up in the future.
 #+end_src
 
 
-*** Implementation Logic
+**** Implementation Logic
 
 These functions form the "brain" of the store.
 They are defined outside the deftype for easier testing and cleaner syntax.
@@ -229,7 +240,7 @@ They are defined outside the deftype for easier testing and cleaner syntax.
 
 This re-hydrates the Rust Session objects. The data in localStorage is just JSON;
 we must pass it into Session.new() so the SDK can use it.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- load-sessions-impl []
   (p/let [sessions (load-raw-sessions-opfs)
           Session (get-session-class)]
@@ -244,7 +255,7 @@ we must pass it into Session.new() so the SDK can use it.
 #+end_src
 
 Updates a specific user's session while preserving others.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- save-session-impl! [session passphrase store-id]
   (p/let [user-id (.-userId session)
           sessions (load-raw-sessions-opfs)
@@ -260,7 +271,7 @@ Updates a specific user's session while preserving others.
 
 Removed
 
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 #_(defn- clear-sw-vault-user! [user-id]
   (let [request (.open js/indexedDB "sw-vault" 1)]
     (set! (.-onsuccess request)
@@ -272,7 +283,7 @@ Removed
 #+end_src
 
 Removes the specific user's database and metadata.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (defn- clear-session-impl! [user-id]
   (p/let [sessions (load-raw-sessions-opfs)
           data     (aget sessions user-id)
@@ -284,12 +295,12 @@ Removes the specific user's database and metadata.
 #+end_src
 
 
-*** The SessionStore Class
+**** The SessionStore Class
 
 Finally, we wrap everything in a deftype. This compiles to a JavaScript class,
 making it compatible with the patterns expected by the Matrix SDK and UI layers.
 We use Object to implement the methods directly on the prototype.
-#+begin_src clojurescript :tangle ../../src/client/session_store.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/session_store.cljs
 (deftype SessionStore []
   Object
   (loadSessions [this]
