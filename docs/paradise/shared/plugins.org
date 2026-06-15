@@ -43,13 +43,13 @@ and it'd be associated with the engine thread innately.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../src/plugins.cljs
-(ns plugins
+#+begin_src clojurescript :tangle ../../../src/paradise/shared/plugins.cljs
+(ns paradise.shared.plugins
   (:require
    [re-frame.core :as re-frame]
    [reagent.core :as r]
-   [client.state :as state]
-   [utils.svg :as icons]
+   [paradise.shared.client.state :as state]
+   [paradise.shared.utils.svg :as icons]
    [clojure.string :as str]))
 #+end_src
 
@@ -70,7 +70,7 @@ for a defoverride pattern and we'll define UI components
 with a defui macro that builds a registry. Then it is
 much more trivial to actually replace the component directly.
 
-#+begin_src clojurescript :tangle ../src/plugins.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/shared/plugins.cljs
 (defn build-wrapped-component [base-comp wrappers]
   (reduce (fn [acc-comp plugin]
             (fn [props]
@@ -83,14 +83,14 @@ much more trivial to actually replace the component directly.
 Need to ensure the components get memoized otherwise a parent component
 remounting will destroy the wrapped one and obliterate state.
 
-#+begin_src clojurescript :tangle ../src/plugins.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/shared/plugins.cljs
 (def memoized-wrapped-component (memoize build-wrapped-component))
 #+end_src
 
 
 As for the actual plugin slots they just need to check wrap the components
 and provide a default if no plugin exists.
-#+begin_src clojurescript :tangle ../src/plugins.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/shared/plugins.cljs
 (defn plugin-slot [slot-id props & children]
   (let [plugins   (state/get-slot slot-id)
         wrappers  (filter :wrapper plugins)
@@ -112,7 +112,7 @@ and provide a default if no plugin exists.
 We quite literally want to keep a registry, and want to be able to apply mods
 on the fly.
 
-#+begin_src clojurescript :tangle ../src/plugins.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/shared/plugins.cljs
 (re-frame/reg-event-db
  :plugin/register
  (fn [db [_ slot-id plugin-map]]
@@ -248,7 +248,7 @@ on the fly.
 
 ***** Installer CSS
 
-#+begin_src css :tangle ../css/plugin.css
+#+begin_src css :tangle ../../../css/plugin.css
 .plugin-installer-panel {
   border: 1px solid #36393f;
   padding: 20px;
@@ -411,7 +411,7 @@ on the fly.
 
 
 
-#+begin_src css :tangle ../css/plugin.css
+#+begin_src css :tangle ../../../css/plugin.css
 
   .security-modal-overlay {
       position: fixed;
@@ -507,8 +507,8 @@ overwrite the components class.
 
 ***** Imports
 
-#+begin_src clojurescript :tangle ../src/plugin_storage.cljs
-(ns plugin-storage
+#+begin_src clojurescript :tangle ../../../src/paradise/shared/plugin_storage.cljs
+(ns paradise.shared.plugin-storage
   (:require
    [re-frame.core :as rf]
    [cljs.reader :as reader]
@@ -516,14 +516,14 @@ overwrite the components class.
    [cljs.core.async.interop :refer-macros [<p!]]
    [promesa.core :as p]
    [cljs-workers.core :as main]
-   [sci-runner.ui :as runner]
-   [client.state :as state]
+   [paradise.shared.sci-runner.ui :as runner]
+   [paradise.shared.client.state :as state]
    ))
 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../src/plugin_storage.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/shared/plugin_storage.cljs
 (defn inject-css! [id url]
   (when-not (.getElementById js/document id)
     (let [link (.createElement js/document "link")]
