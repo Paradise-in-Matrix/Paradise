@@ -1,0 +1,15 @@
+
+
+
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/state.cljs
+(ns paradise.virtualizer.state)
+
+(defonce !worker-components (atom {}))
+
+(defonce !worker-overrides (atom {}))
+
+(defonce !client (atom nil))
+
+(defonce !shared-app-db (atom nil))
+
+#+end_src
