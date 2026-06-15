@@ -1,12 +1,12 @@
 
 
 
-#+begin_src clojurescript :tangle ../../src/client/config.cljs
-(ns client.config
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/config.cljs
+(ns paradise.shared.client.config
   (:require [cljs.reader :refer [read-string]]
             [taoensso.timbre :as log]
             [re-frame.core :as re-frame]
-            [utils.net :as net]
+            [net :as net]
             [promesa.core :as p]))
 
 (defn load-config []
@@ -19,7 +19,7 @@
 Only intended to be used for testing translation changes
 We may wish to fetch translations remotely against the server
 eventually though, so this may be the path forward anyway.
-#+begin_src clojurescript :tangle ../../src/client/config.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/config.cljs
 (defn load-i18n []
   (-> (net/fetch "./i18n.edn" #js {:cache "no-store"})
       (p/then #(.text %))
@@ -33,7 +33,7 @@ eventually though, so this may be the path forward anyway.
 
 This is to ensure that we never cache this fetch... so we
 can always update the version if needed.
-#+begin_src clojurescript :tangle ../../src/client/config.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/config.cljs
 (defn check-remote-version []
   (let [url (str "./config.edn?t=" (.getTime (js/Date.)))]
     (-> (net/fetch url #js {:cache "no-store"})
@@ -52,7 +52,7 @@ Additionally, Android Webview doesn't support SharedArrayBuffer.
 In concept, Eve is amazing. However, this may need to remain
 shut-off for the foreseeable future.
 
-#+begin_src clojurescript :tangle ../../src/client/config.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/config.cljs
 (defonce eve-enabled?
   false
   #_(and (exists? js/SharedArrayBuffer)
