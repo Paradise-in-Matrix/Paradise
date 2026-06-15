@@ -20,7 +20,7 @@ most web applications, not just web-based Matrix clients.
 Now workbox-precaching is set up through Vite (but is its own npm package mind you).
 This is an elegant way to ensure our caching mechanism is working well.
 We do not want the user to download the WASM ever again unless we change it.
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (ns service-worker
   (:require [clojure.string :as str]
             [promesa.core :as p]
@@ -29,7 +29,7 @@ We do not want the user to download the WASM ever again unless we change it.
             ["workbox-strategies" :refer [CacheFirst]]
             ["workbox-range-requests" :refer [RangeRequestsPlugin]]
             ["workbox-expiration" :refer [ExpirationPlugin]])
-  (:require-macros [utils.macros :refer [load-static-config]]))
+  (:require-macros [paradise.shared.utils.macros :refer [load-static-config]]))
 
 #+end_src
 
@@ -51,7 +51,7 @@ later we wish to provide multi-session functionality more implicitly.
 This also provides a level of security ensuring we don't accidentally
 send data to the wrong client instance. By having the full session on
 hand we have the home-server and the token used too.
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (defonce active-sessions (atom {}))
 (defonce session-resolvers (atom []))
 (def MAX_CACHE_ITEMS 300)
@@ -83,7 +83,7 @@ hand we have the home-server and the token used too.
 
 ****** Event
 
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (.addEventListener js/self "message"
                    (fn [event]
                      (let [data      (.-data event)
@@ -113,7 +113,7 @@ hand we have the home-server and the token used too.
 We need to wait until a session is available to start performing fetches.
 Without this, the user could end up seeing broken images purely from their
 client loading too fast and trying to fetch.
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (defn wait-for-session! []
   (if (not-empty @active-sessions)
     (p/resolved true)
@@ -134,7 +134,7 @@ rest we'd need some way to actually unlock it. So the second part of this
 is to create a small entry in our IndexedDB in which we create entries
 with the access token.
 
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (defn- get-token-from-vault [user-id]
   (p/create
    (fn [resolve-fn _]
@@ -177,7 +177,7 @@ they also have access to the key to decrypt it.
 For mobile users can take solace we can rely on the fact their operating system
 encrypt the disk at rest (Full Disk Encryption).
 
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (defn prune-cache! [name max-items]
   (p/let [cache (js/caches.open name)
           keys  (.keys cache)]
@@ -204,7 +204,7 @@ https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/fetch_
 We also want to utilize a cache so that users don't bother endlessly re-fetching assets on reloads.
 We make sure that we split the logic into two branches. Non-authenticated media and authenticated media.
 For any other browser fetch we want to simply return it back to the browser to handle.
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (js/self.addEventListener "fetch"
                           (fn [event]
                             (let [request      (.-request event)
@@ -262,7 +262,7 @@ For any other browser fetch we want to simply return it back to the browser to h
 
 The install event is the first event in the lifecycle of a service worker.
 Once this goes off the service worker starts to come alive.
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (js/self.addEventListener "install"
   (fn [event]
     (.skipWaiting js/self)))
@@ -275,7 +275,7 @@ So the service worker needs to be 'activated' and then once activated we want to
 immediately claim all clients so we can start fetching for them.
 This also happens to be the best time to check the cache to ensure we don't allow it
 to grow too large.
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (js/self.addEventListener "activate"
   (fn [event]
     (.waitUntil event
@@ -311,7 +311,7 @@ method for messages yet.
 It does seem unfortunately that we have no way to determine the recipient of a push...
 Perhaps I'll spend more time on the problem another time, but it is best we get
 this functional first.
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (def default-icon "/public/res/apple/apple-touch-icon-180x180.png")
 (def default-badge "/public/res/apple/apple-touch-icon-72x72.png")
 
@@ -423,7 +423,7 @@ this functional first.
 
 ***** Push Event
 
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (js/self.addEventListener "push"
   (fn [event]
     (let [data (try (.. event -data json) (catch :default _ nil))]
@@ -439,7 +439,7 @@ this functional first.
 
 ***** Notification Click Event
 
-#+begin_src clojurescript :tangle ../src/service_worker.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker.cljs
 (js/self.addEventListener "notificationclick"
   (fn [event]
     (let [notification (.-notification event)
@@ -479,23 +479,23 @@ logic that is to be used from the main application itself.
 
 ***** Imports
 
-#+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker_handler.cljs
 (ns service-worker-handler
   (:require
    [taoensso.timbre :as log]
-   [client.config :refer [check-remote-version]]
+   [paradise.shared.client.config :refer [check-remote-version]]
    [re-frame.db :as db]
    [promesa.core :as p]
    [re-frame.core :as re-frame]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]))
 #+end_src
 
 
 ***** Deleting Old Caches
 
-#+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker_handler.cljs
 (re-frame/reg-event-fx
  :app/apply-update
  (fn [_ _]
@@ -532,7 +532,7 @@ logic that is to be used from the main application itself.
 The major functionality we need is to register the service worker itself.
 We do so while passing off the session token so that the service worker
 may immediately begin to render our images.
-#+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker_handler.cljs
 (defn register-sw! []
   (when (exists? js/navigator.serviceWorker)
     (let [sw-container js/navigator.serviceWorker
@@ -577,7 +577,7 @@ may immediately begin to render our images.
 Now, since we're using reframe we want to ensure we're providing our rendering
 implementation an easy way to inform updates to the service worker.
 We may wish to break this apart a bit for re-usability, but for now this will do.
-#+begin_src clojurescript :tangle ../src/service_worker_handler.cljs
+#+begin_src clojurescript :tangle ../../src/service_worker_handler.cljs
 (re-frame/reg-event-fx
  :auth/sync-sw-with-worker
  (fn [{:keys [db]} _]
