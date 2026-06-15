@@ -9,18 +9,18 @@ Realistically, we should have a rather generic modal in which we just offer prop
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/reactions.cljs
-(ns overlays.reactions
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/reactions.cljs
+(ns paradise.ui.overlays.reactions
 (:require
- [utils.svg :as icons]
- [utils.global-ui :refer [avatar]]
- [utils.macros :refer [defui]]
- [utils.images :refer [mxc-image]]
+ [paradise.shared.utils.svg :as icons]
+ [paradise.ui.global :refer [avatar]]
+ [paradise.shared.utils.macros :refer [defui]]
+ [paradise.media.component :refer [media]]
  [re-frame.core :as re-frame]
  [clojure.string :as str]
  [taoensso.timbre :as log]
- [input.emotes :refer [emoji-sticker-board]]
- [overlays.base :refer [modal-component popover-component]]))
+ [paradise.ui.input.emotes :refer [emoji-sticker-board]]
+ [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 #+end_src
 
 
@@ -29,7 +29,7 @@ Realistically, we should have a rather generic modal in which we just offer prop
 ***** Component
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/reactions.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/reactions.cljs
 (defmethod popover-component :inline-emoji [_] nil)
 #+end_src
 
@@ -39,7 +39,7 @@ Realistically, we should have a rather generic modal in which we just offer prop
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/overlays/reactions.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/reactions.cljs
 (defui reaction-details-content [{:keys [room-id reactions]}]
   (let [tr          @(re-frame/subscribe [:i18n/tr])
         members-map @(re-frame/subscribe [:room/members-map room-id])
@@ -57,7 +57,7 @@ Realistically, we should have a rather generic modal in which we just offer prop
        [:div.reaction-detail-row
         [:div.reaction-detail-icon
          (if (str/starts-with? emoji "mxc://")
-           [mxc-image {:mxc   emoji
+           [media {:mxc   emoji
                        :class "reaction-detail-img"
                        :style {:width "40px"
                                :height "40px"
@@ -83,7 +83,7 @@ Realistically, we should have a rather generic modal in which we just offer prop
 ***** CSS
 
 
-#+begin_src css :tangle ../../css/reaction-modal.css
+#+begin_src css :tangle ../../../../css/reaction-modal.css
 
   .reaction-details-close-btn {
       z-index: 10;
@@ -144,7 +144,7 @@ Realistically, we should have a rather generic modal in which we just offer prop
 **** Reaction Picker
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/reactions.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/reactions.cljs
 (defn reaction-picker-content [{:keys [room-id msg-id close-fn]}]
   [emoji-sticker-board
    {:on-close close-fn
