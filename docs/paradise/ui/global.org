@@ -8,17 +8,19 @@ them collected together
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
-(ns utils.global-ui
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
+(ns paradise.ui.global
   (:require
+   [cljs.core.async :refer [go <!]]
    [re-frame.core :as re-frame]
+   [cljs-workers.mesh :as mesh]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [reagent.core :as r]
-   [utils.macros :refer [defui]]
-   [overlays.base :refer [modal-component popover-component context-menu-component]]
-   [utils.svg :as icons]
-   [utils.images :refer [mxc-image]]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.overlays.base :refer [modal-component popover-component context-menu-component]]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.media.component :refer [media]]
    ))
 #+end_src
 
@@ -27,7 +29,7 @@ them collected together
 **** Click Away Wrapper
 
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn click-away-wrapper
   "A reusable invisible backdrop for 'light dismiss' popovers.
    It catches clicks and prevents them from bleeding through to the app."
@@ -52,7 +54,7 @@ them collected together
 
 ***** Reframe events and subscriptions
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (re-frame/reg-event-db
  :ui/open-context-menu
  (fn [db [_ id props]]
@@ -72,7 +74,7 @@ them collected together
 
 ***** Function
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn ^:ui context-menu-root []
   (r/with-let [!drag-y (r/atom 0)
                !start-y (r/atom 0)
@@ -152,7 +154,7 @@ them collected together
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/global.css
+#+begin_src css :tangle ../../../css/global.css
 .universal-context-menu {
     position: fixed;
     background: #111214;
@@ -242,7 +244,7 @@ simply inform the component of when to render and what to render.
 It makes allowing potential support for dynamic behavior later
 much simpler.
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (re-frame/reg-event-db
  :ui/open-modal
  (fn [db [_ modal-id props]]
@@ -261,7 +263,7 @@ much simpler.
 
 
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn- modal-inner
   [{:keys [on-close backdrop-props window-props]} children]
   (r/with-let [handle-keyup (fn [e] (when (= (.-key e) "Escape") (on-close)))
@@ -296,11 +298,9 @@ much simpler.
          [TargetComponent props]]))))
 #+end_src
 
-**** Global Reaction Picker
+**** Global Popover Root
 
-
-
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (re-frame/reg-event-db
  :ui/open-popover
  (fn [db [_ id props]]
@@ -318,7 +318,7 @@ much simpler.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn popover-root []
   (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
     (when active-popover
@@ -338,7 +338,7 @@ much simpler.
                [:div.popover-backdrop
                 {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
                  :on-click close-fn
-                 :on-context-menu (fn [e] (.preventDefault e) (close-fn))}])
+                 :on-context-menu (fn [e] #_(.preventDefault e) (close-fn))}])
              [:div.popover-container
               {:style {:left (str render-x "px")
                        :top  (str render-y "px")
@@ -352,7 +352,7 @@ much simpler.
 ***** Component
 
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 
 
 (defn satellite-overlay [child-component]
@@ -388,7 +388,7 @@ much simpler.
 
 
 
-#+begin_src css :tangle ../../css/global.css
+#+begin_src css :tangle ../../../css/global.css
 .satellite-overlay {
     position: fixed;
     z-index: 11000;
@@ -471,12 +471,26 @@ much simpler.
 **** Long Press Properties
 
 500ms is the standard
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
-(defonce !long-press-state
-  (atom {:timer nil
-         :fired? false
-         :start-pos nil
-         :scroll-handler nil}))
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
+
+
+(defn start-long-press! [handler !long-press-state action-fn mx my]
+  (js/setTimeout
+   (fn []
+     (try
+       (swap! !long-press-state assoc
+              :fired? true
+              :scroll-handler handler)
+       (.addEventListener js/window "touchmove" handler #js {:passive false :capture true})
+       (if action-fn
+         (action-fn mx my)
+         (js/console.error "[LongPress Debug] Timer fired but action-fn is nil!"))
+       (catch :default err
+         (js/console.error "[LongPress Debug] Crash inside timeout! !long-press-state:" !long-press-state)
+         (throw err))))
+   500))
+
+(defonce !long-press-state (atom {}))
 
 (defn clear-long-press! []
   (let [{:keys [timer scroll-handler]} @!long-press-state]
@@ -487,46 +501,79 @@ much simpler.
 
 (defn long-press-props [action-fn]
   {:on-context-menu (fn [e]
-                      (.stopPropagation e)
-                      (.preventDefault e)
-                      (when-not (:fired? @!long-press-state)
-                        (action-fn (.-clientX e) (.-clientY e)))
-                      (clear-long-press!))
-   :on-touch-start  (fn [e]
-                      (clear-long-press!)
-                      (let [touch (aget (.-touches e) 0)
-                            mx (.-clientX touch)
-                            my (.-clientY touch)]
-                        (swap! !long-press-state assoc
-                               :start-pos {:x mx :y my}
-                               :timer (js/setTimeout
-                                        (fn []
-                                          (let [handler (fn [ev] (.preventDefault ev))]
-                                            (swap! !long-press-state assoc
-                                                   :fired? true
-                                                   :scroll-handler handler)
-                                            (.addEventListener js/window "touchmove" handler #js {:passive false :capture true})
-                                            (action-fn mx my)))
-                                        500))))
-   :on-touch-move   (fn [e]
-                      (let [{:keys [timer start-pos fired?]} @!long-press-state]
-                        (when (and timer (not fired?))
-                          (let [touch (aget (.-touches e) 0)
-                                mx (.-clientX touch)
-                                my (.-clientY touch)
-                                {:keys [x y]} start-pos
-                                dx (- mx x)
-                                dy (- my y)
-                                dist-sq (+ (* dx dx) (* dy dy))]
-                            (when (> dist-sq 100)
-                              (clear-long-press!))))))
-   :on-touch-end    (fn [e]
-                      (let [{:keys [fired?]} @!long-press-state]
+                      (try
+                        (.stopPropagation e)
+                        (.preventDefault e)
+                        (when (and action-fn (not (:fired? @!long-press-state)))
+                          (action-fn (.-clientX e) (.-clientY e)))
                         (clear-long-press!)
-                        (when fired?
-                          (.stopPropagation e)
-                          (.preventDefault e))))
+                        (catch :default err
+                          (js/console.error "[LongPress Debug] Crash in on-context-menu. action-fn:" action-fn)
+                          (throw err))))
+
+   :on-touch-start  (fn [e]
+                      (try
+                        (clear-long-press!)
+                        (let [touch (aget (.-touches e) 0)
+                              mx    (.-clientX touch)
+                              my    (.-clientY touch)
+                              handler (fn [ev] (.preventDefault ev))
+                              timer  (start-long-press! handler !long-press-state action-fn mx my)]
+                          (swap! !long-press-state assoc
+                                 :start-pos {:x mx :y my}
+                                 :timer timer))
+                        (catch :default err
+                          (js/console.error "[LongPress Debug] Crash in on-touch-start. !long-press-state:" !long-press-state)
+                          (throw err))))
+
+   :on-touch-move   (fn [e]
+                      (try
+                        (let [{:keys [timer start-pos fired?]} @!long-press-state]
+                          (when (and timer (not fired?))
+                            (let [touch (aget (.-touches e) 0)
+                                  mx    (.-clientX touch)
+                                  my    (.-clientY touch)
+                                  {:keys [x y]} start-pos
+                                  dx    (- mx x)
+                                  dy    (- my y)
+                                  dist-sq (+ (* dx dx) (* dy dy))]
+                              (when (> dist-sq 100)
+                                (clear-long-press!)))))
+                        (catch :default err
+                          (js/console.error "[LongPress Debug] Crash in on-touch-move. !long-press-state:" !long-press-state)
+                          (throw err))))
+
+   :on-touch-end    (fn [e]
+                      (try
+                        (let [{:keys [fired?]} @!long-press-state]
+                          (clear-long-press!)
+                          (when fired?
+                            (.stopPropagation e)
+                            (.preventDefault e)))
+                        (catch :default err
+                          (js/console.error "[LongPress Debug] Crash in on-touch-end. !long-press-state:" !long-press-state)
+                          (throw err))))
+
    :on-touch-cancel (fn [_] (clear-long-press!))})
+#+end_src
+
+
+**** Redraw Trigger
+
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
+(defonce !redraw-timer (atom nil))
+
+(defn request-batched-redraw! [room-id]
+  (go
+    (when-let [timer @!redraw-timer]
+      (js/clearTimeout timer))
+    (reset! !redraw-timer
+            (js/setTimeout
+             #(do
+                (mesh/do-with-thread! :virtualizer-pool
+                                      {:handler :recalculate-timeline
+                                       :arguments {:room-id room-id}}))
+             50))))
 #+end_src
 
 
@@ -539,7 +586,7 @@ much simpler.
 We want to ensure we have a re-usable component for filler avatars.
 Nothing complex, just a quick function to somewhat predictably
 provide an avatar color.
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (def avatar-colors
   ["#5865f2" "#3ba55c" "#faa61a" "#ed4245" "#eb459e" "#9b59b6"])
 
@@ -552,7 +599,7 @@ provide an avatar color.
 
 ****** Avatar function
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 ;; Hacky fix, but I need to clean the 'shape' up anyway haha
 (defn kname [arg]
   (name arg))
@@ -586,7 +633,7 @@ provide an avatar color.
 
                (when show-image?
                  (if is-mxc?
-                   [mxc-image {:mxc url :class "avatar-img-layer" :alt "" :on-error #(reset! !broken? true)}]
+                   [media {:mxc url :class "avatar-img-layer" :alt "" :on-error #(reset! !broken? true)}]
                    [:img.avatar-img-layer {:src url :alt "" :on-error #(reset! !broken? true)}]))
 
                (when status
@@ -600,7 +647,7 @@ We should now detail the CSS that will protect its behavior.
 We don't want it to be able to be shrunk, but
 we do want it to just gel with wherever we place them. They should
 also likely not be selectable (as the fallback will be literal text).
-#+begin_src css :tangle ../../css/avatar.css
+#+begin_src css :tangle ../../../css/avatar.css
 .avatar-wrapper {
     display: flex;
     align-items: center;
@@ -676,9 +723,14 @@ also likely not be selectable (as the fallback will be literal text).
 
 
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
+
+(defonce !swipe-drag-data (atom {:start-x nil :action nil :fg-node nil :bg-node nil :reply-node nil :edit-node nil}))
+
+
 (defn make-swipe-handlers
   "Abstracts pointer event tracking for horizontal swipes.
+   Safe for main-thread Reagent components.
    !drag-state should be an atom containing {:start-x nil :dx 0}."
   [!drag-state {:keys [on-start on-move on-end]}]
   (let [handle-ptr-down
@@ -687,7 +739,7 @@ also likely not be selectable (as the fallback will be literal text).
             (.setPointerCapture (.-target e) (.-pointerId e))
             (let [x (.-clientX e)]
               (reset! !drag-state {:start-x x :dx 0})
-              (when on-start (on-start x)))))
+              (when (fn? on-start) (on-start x)))))
 
         handle-ptr-move
         (fn [e]
@@ -695,74 +747,105 @@ also likely not be selectable (as the fallback will be literal text).
             (when start-x
               (let [dx (- (.-clientX e) start-x)]
                 (swap! !drag-state assoc :dx dx)
-                (when on-move (on-move dx))))))
+                (when (fn? on-move) (on-move dx))))))
 
         handle-ptr-up
         (fn [e]
           (let [{:keys [start-x dx]} @!drag-state]
             (when start-x
               (.releasePointerCapture (.-target e) (.-pointerId e))
-              (when on-end (on-end dx))
-              (swap! !drag-state assoc :start-x nil :dx 0))))]
+              (when (fn? on-end) (on-end dx))
+              (reset! !drag-state {:start-x nil :dx 0}))))]
 
     {:on-pointer-down   handle-ptr-down
      :on-pointer-move   handle-ptr-move
      :on-pointer-up     handle-ptr-up
      :on-pointer-cancel handle-ptr-up}))
+
+(defn handle-swipe-down! [e]
+  (when (= (.-button e) 0)
+    (let [fg         (.-currentTarget e)
+          wrapper    (.-parentNode fg)
+          bg         (.querySelector wrapper ".swipe-action-bg")
+          reply-el   (.querySelector bg ".reply-action")
+          edit-el    (.querySelector bg ".edit-action")]
+      (.setPointerCapture fg (.-pointerId e))
+      (set! (.-transition (.-style fg)) "none")
+      (set! (.-userSelect (.-style fg)) "none")
+      (when bg (set! (.-opacity (.-style bg)) "1"))
+      (reset! !swipe-drag-data {:start-x (.-clientX e)
+                                :action nil
+                                :fg-node fg
+                                :bg-node bg
+                                :reply-node reply-el
+                                :edit-node edit-el}))))
+
+(defn handle-swipe-move! [e can-edit? edit-threshold reply-threshold]
+  (let [{:keys [start-x fg-node bg-node reply-node edit-node]} @!swipe-drag-data]
+    (when start-x
+      (let [dx         (- (.-clientX e) start-x)
+            pull-dist  (- dx)
+            bounded-dx (max 0 (min pull-dist 180))
+            new-action (cond
+                         (and can-edit? (> bounded-dx edit-threshold)) :edit
+                         (> bounded-dx reply-threshold)                :reply
+                         :else                                         nil)]
+        (swap! !swipe-drag-data assoc :action new-action)
+        (when fg-node
+          (set! (.-transform (.-style fg-node)) (str "translateX(-" bounded-dx "px)")))
+        (when reply-node
+          (set! (.-display (.-style reply-node)) (if (= new-action :reply) "flex" "none")))
+        (when edit-node
+          (set! (.-display (.-style edit-node)) (if (= new-action :edit) "flex" "none")))))))
+
+(defn handle-swipe-up! [e on-action]
+  (let [{:keys [start-x action fg-node bg-node]} @!swipe-drag-data]
+    (when start-x
+      (.releasePointerCapture (.-target e) (.-pointerId e))
+      (when (and action (fn? on-action))
+        (on-action action))
+      (reset! !swipe-drag-data {:start-x nil :action nil :fg-node nil :bg-node nil :reply-node nil :edit-node nil})
+      (when fg-node
+        (set! (.-transform (.-style fg-node)) "translateX(0px)")
+        (set! (.-transition (.-style fg-node)) "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)")
+        (set! (.-userSelect (.-style fg-node)) "auto"))
+      (when bg-node
+        (set! (.-opacity (.-style bg-node)) "0")))))
 #+end_src
 
 
 This is more targeted to Slide to Reply and Long Slide to Edit, but I'll likely come back
 and pull this apart more.
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn swipe-to-action-wrapper [{:keys [can-edit? on-action wrapper-props enabled?]} & children]
   (if-not enabled?
     (into [:div.swipe-foreground wrapper-props] children)
-    (r/with-let [!drag-state     (r/atom {:start-x nil :dx 0 :action nil :current-x 0})
-                 reply-threshold 50
-                 edit-threshold  140
-                 swipe-props (make-swipe-handlers
-                              !drag-state
-                              {:on-move (fn [dx]
-                                          (let [pull-dist  (- dx)
-                                                bounded-dx (max 0 (min pull-dist 180))
-                                                new-action (cond
-                                                             (and can-edit? (> bounded-dx edit-threshold)) :edit
-                                                             (> bounded-dx reply-threshold)                :reply
-                                                             :else                                         nil)]
-                                            (swap! !drag-state assoc :current-x bounded-dx :action new-action)))
-                               :on-end (fn [_]
-                                         (when-let [action (:action @!drag-state)]
-                                           (on-action action))
-                                         (swap! !drag-state assoc :action nil :current-x 0))})]
-
-      (let [{:keys [start-x current-x action]} @!drag-state
-            is-dragging? (some? start-x)]
-
-        [:div.timeline-swipe-wrapper
-         {:style {:position "relative" :overflow "hidden"}}
-         [:div.swipe-action-bg
-          {:style {:position "absolute" :right 0 :top 0 :bottom 0 :width "100%"
-                   :display "flex" :align-items "center" :justify-content "flex-end" :padding-right "16px"
-                   :opacity (if (> current-x 20) 1 0)
-                   :transition "opacity 0.2s"
-                   :color (if (= action :edit) "var(--brand-experiment, #5865f2)" "var(--text-muted, #888)")
-                   :font-weight "bold" :font-size "0.85rem" :z-index 0}}
-          (cond
-            (= action :edit)  [:span [icons/edit] " Edit"]
-            (= action :reply) [:span "Reply " [icons/reply]]
-            :else             [:span [icons/reply]])]
-         (into [:div.swipe-foreground
-                (merge wrapper-props
-                       swipe-props
-                       {:style {:transform    (str "translateX(-" current-x "px)")
-                                :transition   (if is-dragging? "none" "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)")
-                                :touch-action "pan-y"
-                                :position     "relative"
-                                :z-index      1
-                                :background   "var(--background-primary, #313338)"
-                                :user-select  (if is-dragging? "none" "auto")}})]
-               children)]))))
+    (let [reply-threshold 50
+          edit-threshold  140]
+      [:div.timeline-swipe-wrapper
+       {:style {:position "relative" :overflow "hidden"}}
+       [:div.swipe-action-bg
+        {:style {:position "absolute" :right 0 :top 0 :bottom 0 :width "100%"
+                 :display "flex" :align-items "center" :justify-content "flex-end" :padding-right "16px"
+                 :opacity 0
+                 :z-index 0}}
+        [:div.reply-action
+         {:style {:display "none" :align-items "center" :color "var(--text-muted, #888)" :font-weight "bold" :font-size "0.85rem"}}
+         [:span "Reply "] [icons/reply]]
+        [:div.edit-action
+         {:style {:display "none" :align-items "center" :color "var(--brand-experiment, #5865f2)" :font-weight "bold" :font-size "0.85rem"}}
+         [:span [icons/edit] " Edit"]]]
+       (into [:div.swipe-foreground
+              (merge wrapper-props
+                     {:on-pointer-down   #(handle-swipe-down! %)
+                      :on-pointer-move   #(handle-swipe-move! % can-edit? edit-threshold reply-threshold)
+                      :on-pointer-up     #(handle-swipe-up! % on-action)
+                      :on-pointer-cancel #(handle-swipe-up! % on-action)
+                      :style             {:position "relative"
+                                          :z-index 1
+                                          :background "var(--background-primary, #313338)"
+                                          :touch-action "pan-y"}})]
+             children)])))
 #+end_src
 
 
@@ -770,7 +853,7 @@ and pull this apart more.
 **** List Navigation
 
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn handle-list-navigation
   [^js e items current-index set-index-fn on-select-fn]
   (let [key   (.-key e)
@@ -793,7 +876,7 @@ Now this should allow the parent to determine the look of the object
 and just more or less create a pretty list for us to have a navigation
 bound to.
 
-#+begin_src clojurescript :tangle ../../src/utils/global_ui.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn selectable-list
   [{:keys [items selected-index on-select on-highlight key-fn render-item item-class empty-text]}]
   (if (empty? items)
@@ -826,7 +909,7 @@ bound to.
 
 Perhaps these can be better placed elsewhere, but for now I'll just place the miscellaneous CSS we moved out here
 
-#+begin_src css :tangle ../../css/keyframes.css
+#+begin_src css :tangle ../../../css/keyframes.css
   @keyframes slideUp {
       from { transform: translateY(100%); }
       to { transform: translateY(0); }
