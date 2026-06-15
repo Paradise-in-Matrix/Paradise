@@ -1,0 +1,129 @@
+
+** Media Core
+
+**** Preface
+
+This allows us to create a wrapper for Hiccup components that intend to use media.
+It will handle making them deferred as well as handle the MXC processing
+So elsewhere in the library the developer need not do anything extra to handle
+media.
+By doing this we also ensure that the code inside the client UI can try to stay
+as ignorant as possible to the concept of Matrix. Instead ideally we want to
+move it towards existing as a more pure UI and the Matrix implications are
+merely 'transposed' into it.
+Admittedly, we've not been doing a good job at this.
+
+**** Imports
+
+
+#+begin_src clojurescript :tangle ../../../src/paradise/media/core.cljs
+(ns paradise.media.core
+  (:require  [clojure.string :as str]
+             [cljs-workers.worker :as worker]
+             [net :as net]
+             [taoensso.timbre :as log]
+             [cljs.core.async.interop :refer-macros [<p!]]
+             [cljs.core.async :refer [go <!]]))
+#+end_src
+
+
+
+**** Helper Function (b64->uint8)
+
+#+begin_src clojurescript :tangle ../../../src/paradise/media/core.cljs
+(defn b64->uint8 [b64]
+  (let [b1     (str/replace b64 "-" "+")
+        b2     (str/replace b1 "_" "/")
+        pad    (mod (- 4 (mod (count b2) 4)) 4)
+        padded (str b2 (apply str (repeat pad "=")))
+        raw    (js/atob padded)
+        len    (.-length raw)
+        arr    (js/Uint8Array. len)]
+    (dotimes [i len]
+      (aset arr i (.charCodeAt raw i)))
+    arr))
+
+
+#+end_Src
+
+
+**** Process Media Fetch
+
+
+#+begin_src clojurescript :tangle ../../../src/paradise/media/core.cljs
+(defn process-media-fetch [{:keys [source-map source hs-url token]}]
+  (go
+    (if-not (or source-map source)
+      {:status "ignored" :msg "No source provided"}
+      (try
+        (let [server     (str/replace (str hs-url) #"/+$" "")
+              fetch-opts #js {:headers #js {"Authorization" (str "Bearer " token)}}]
+          (cond
+              source-map
+              (let [sm-clj    (js->clj source-map :keywordize-keys true)
+                    file-info (:file sm-clj)]
+                (if-not file-info
+                  (let [mxc       (or source (:url sm-clj) (get-in sm-clj [:plain :url]) "")
+                        resource  (str/replace (str mxc) #"^mxc://" "")
+                        fetch-url (str server "/_matrix/client/v1/media/download/" resource)
+                        resp      (<p! (net/fetch fetch-url fetch-opts))]
+                    (if-not (.-ok resp)
+                      (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                      (let [buf (<p! (.arrayBuffer resp))]
+                        {:status "success" :bytes buf :transfer [:bytes]})))
+                  (let [jwk        (clj->js (:key file-info))
+                        iv-b64     (:iv file-info)
+                        mxc-url    (:url file-info)
+                        resource   (str/replace (str mxc-url) #"^mxc://" "")
+                        fetch-url  (str server "/_matrix/client/v1/media/download/" resource)
+                        resp       (<p! (net/fetch fetch-url fetch-opts))]
+                    (if-not (.-ok resp)
+                      (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                      (let [enc-buf    (<p! (.arrayBuffer resp))
+                            iv-arr     (b64->uint8 iv-b64)
+                            algo       #js {:name "AES-CTR"}
+                            crypto-key (<p! (js/crypto.subtle.importKey "jwk" jwk algo false #js ["decrypt"]))
+                            dec-buf    (<p! (js/crypto.subtle.decrypt
+                                             #js {:name "AES-CTR" :counter iv-arr :length 64}
+                                             crypto-key
+                                             enc-buf))]
+                        {:status "success" :bytes dec-buf :transfer [:bytes]})))))
+             source
+              (let [is-http?  (or (str/starts-with? source "http://")
+                                  (str/starts-with? source "https://"))
+                    fetch-url (if is-http?
+                                source
+                                (let [resource (str/replace (str source) #"^mxc://" "")]
+                                  (str server "/_matrix/client/v1/media/download/" resource)))
+                    resp      (<p! (net/fetch fetch-url fetch-opts))]
+                (if-not (.-ok resp)
+                  (throw (ex-info "Fetch failed" {:status (.-status resp)}))
+                  (let [buf (<p! (.arrayBuffer resp))]
+                    {:status "success" :bytes buf :transfer [:bytes]})))
+
+              :else
+              {:status "error" :msg "Neither source-map nor source MXC provided."})
+
+          )
+        (catch :default e
+          (js/console.warn "Media worker trapped fetch error:" e)
+          {:status "error" :msg (str e)})))))
+#+end_src
+
+**** Get Media
+
+#+begin_src clojurescript :tangle ../../../src/paradise/media/core.cljs
+(worker/register :get-media
+                 (fn [args]
+                   (process-media-fetch args)))
+#+end_src
+
+
+**** Bootstrap Thread
+
+#+begin_src clojurescript :tangle ../../../src/paradise/media/core.cljs
+(worker/bootstrap)
+#+end_src
+
+
+
