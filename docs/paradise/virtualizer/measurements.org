@@ -12,17 +12,17 @@ so they can be accurate, but it's pretty likely there are some flaws here.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/measurements.cljs
-(ns virtualizer.measurements
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/measurements.cljs
+(ns paradise.virtualizer.measurements
   (:require ["@chenglou/pretext" :refer [layoutWithLines]]
             [clojure.string :as str]
-            [utils.helpers :refer [format-divider-date]]))
+            [paradise.shared.utils.helpers :refer [format-divider-date]]))
 #+end_src
 
 
 **** Cache
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/measurements.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/measurements.cljs
 (def !pretext-cache (atom {}))
 #+end_src
 
@@ -30,7 +30,7 @@ so they can be accurate, but it's pretty likely there are some flaws here.
 
 Really just ensuring the items pour to the correct shape here.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/measurements.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/measurements.cljs
 (defn get-event-id [e]
   (cond
     (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Date"))
@@ -94,7 +94,7 @@ Really just ensuring the items pour to the correct shape here.
 
 This is what we use to measure the contents.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/measurements.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/measurements.cljs
 (defn calc-reply-height [content theme-metrics]
   (if (:in-reply-to content) (:reply-banner-h theme-metrics 32.4) 0))
 
@@ -192,7 +192,7 @@ This is what we use to measure the contents.
 
 This is more or less how we transmit the results of our measuring back to be used.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/measurements.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/measurements.cljs
 (defn apply-layout [events width theme measured]
   (let [events-seq (rseq (vec events))]
     (loop [evs    events-seq
