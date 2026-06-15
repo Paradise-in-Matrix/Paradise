@@ -11,16 +11,16 @@ This is where we do much of that magic.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
-(ns virtualizer.parsing
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
+(ns paradise.virtualizer.parsing
   (:require ["@xmldom/xmldom" :as xmldom]
             ["@chenglou/pretext" :refer [prepareWithSegments]]
             [goog.object]
             [clojure.string :as str]
             [taoensso.timbre :as log]
-            [container.timeline.item :refer [event-tile-render]]
-            [virtualizer.state :as state]
-            [utils.helpers :refer [process-raw-event sanitize-custom-html linkify-text]]))
+            [paradise.ui.container.timeline.item :refer [event-tile-render]]
+            [paradise.virtualizer.state :as state]
+            [paradise.shared.utils.helpers :refer [process-raw-event sanitize-custom-html linkify-text]]))
 #+end_src
 
 
@@ -32,7 +32,7 @@ trick Hickory into using one we set (and I believe their docs mentioned this).
 So we use xmldom so that we can evaluate HTML off the main thread and without
 the real DOM.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (set! js/globalThis.DOMParser
       (fn []
         (this-as this
@@ -61,7 +61,7 @@ the real DOM.
 **** Sanitizing Custom HTML
 
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn extract-first-url [text]
   (when text
     (when-let [match (re-find #"https?://[^\s\"'<>]+" text)]
@@ -95,9 +95,25 @@ the real DOM.
 This recursively walks the vectors and builds them out for us to use
 later.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn expand-hiccup [node]
   (cond
+    (and (vector? node) (fn? (first node)))
+    (let [comp-fn (first node)
+          react-boundary (or (.-$react_boundary comp-fn) (goog.object/get comp-fn "$react_boundary"))]
+      (if react-boundary
+        (let [has-attrs? (map? (second node))
+              attrs      (if has-attrs? (second node) nil)
+              children   (if has-attrs? (drop 2 node) (drop 1 node))]
+          (if attrs
+            (into [react-boundary attrs] (map expand-hiccup children))
+            (into [react-boundary] (map expand-hiccup children))))
+        (let [args   (rest node)
+              result (apply comp-fn args)]
+          (if (fn? result)
+            (expand-hiccup (apply result args))
+            (expand-hiccup result)))))
+
     (and (vector? node) (fn? (first node)))
     (let [comp-fn (first node)
           args    (rest node)
@@ -129,7 +145,7 @@ Some hacky implementations like our is-handler that we should
 clean up at some point.
 A big key facet is that we absolutely can not allow functions
 to survive the conversion. Closures will poison it.
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn process-props [attrs]
   (let [js-props #js {}
         process-kv (fn [k-name v]
@@ -203,7 +219,7 @@ to survive the conversion. Closures will poison it.
 
 Our magic function to convert a Hiccup component into a POJO. More
 particularly a thread-traversal compliant POJO.
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn hiccup->pojo [node]
   (cond
     (nil? node) nil
@@ -220,7 +236,9 @@ particularly a thread-traversal compliant POJO.
                        (keyword? tag-kw) (name tag-kw)
                        (string? tag-kw) tag-kw
                        (object? tag-kw) (or (.-displayName tag-kw) (.-name tag-kw) "unknown-object")
-                       (fn? tag-kw) (or (.-displayName tag-kw) (.-name tag-kw) "unknown-fn")
+                       (fn? tag-kw) (if-let [ptr (or (.-$fn_ptr tag-kw) (goog.object/get tag-kw "$fn_ptr"))]
+                                      (str "comp:" (if (keyword? ptr) (subs (str ptr) 1) (str ptr)))
+                                      (or (.-displayName tag-kw) (.-name tag-kw) "unknown-fn"))
                        :else "div")
 
             is-comp? (or (and (keyword? tag-kw) (= (namespace tag-kw) "comp"))
@@ -280,7 +298,7 @@ For context if I didn't mention it anywhere, but closures can't traverse
 the thread boundary as they refer to a location in the heap of the thread
 the exist on.
 Doing this extract makes the rehydration algorithmically rather efficient.
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn extract-lambda-paths [js-ast]
   (let [paths #js []]
     (letfn [(crawl [obj current-path]
@@ -320,7 +338,7 @@ Doing this extract makes the rehydration algorithmically rather efficient.
 The caching should also be short-circuit-able so that we can
 intentionally re-render something.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn build-ast-tree [laid-out]
   (let [render-fn (or (get @state/!worker-overrides :event-tile-render)
                       (get @state/!worker-components :event-tile-render)
@@ -345,7 +363,7 @@ intentionally re-render something.
 
 More or less gathering the ingredients for usage elsewhere.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/parsing.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn precompile-event-data [e source]
   (let [processed (process-raw-event e source)
         id (:id processed)
