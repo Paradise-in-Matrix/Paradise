@@ -1,5 +1,5 @@
 
-** Media Previews
+** Engine Media Previews
 
 **** Preface
 
@@ -14,14 +14,14 @@ a plugin and a proxy a proper solution.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/worker/media_previews.cljs
-(ns worker.media-previews
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/media_previews.cljs
+(ns paradise.engine.media-previews
   (:require [cljs-workers.worker :as worker]
             [clojure.string :as str]
-            [utils.net :as net]
+            [net :as net]
             [taoensso.timbre :as log]
             ["ffi-bindings" :as sdk]
-            [worker.state :as state])
+            [paradise.engine.state :as state])
   (:require-macros [cljs.core.async.macros :refer [go]]
                    [cljs.core.async.interop :refer [<p!]]))
 #+end_src
@@ -34,7 +34,7 @@ a plugin and a proxy a proper solution.
 The Rust SDK actually gives a rather clean mechanism to ensure the user
 has consented to media previews globally, so we'll just lean on that.
 
-#+begin_src clojurescript :tangle ../../src/worker/media_previews.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/media_previews.cljs
 (defonce !media-preview-listener (atom nil))
 
 (defn attach-media-preview-listener! [client]
@@ -59,7 +59,7 @@ has consented to media previews globally, so we'll just lean on that.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/worker/media_previews.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/media_previews.cljs
 (worker/register :get-url-preview
   (fn [{:keys [url]}]
     (go
