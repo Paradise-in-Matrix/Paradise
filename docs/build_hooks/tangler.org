@@ -93,8 +93,8 @@ tangled blocks out.
 
 ***** Imports
 
-#+begin_src clojurescript :tangle ../../src/utils/tangler.cljs
-(ns utils.tangler
+#+begin_src clojurescript :tangle ../../tangler.cljs
+(ns tangler
   (:require ["fs" :as fs]
             ["path" :as path]
             [clojure.string :as str]))
@@ -109,7 +109,7 @@ Using those it'll know where to place the output file.
 Since this is a simple tangler in one language it obviously doesn't have the capacity
 to do more than 'clojurescript' however since the method of determination is simple this
 could easily be extended later to support more.
-#+begin_src clojurescript :tangle ../../src/utils/tangler.cljs
+#+begin_src clojurescript :tangle ../../tangler.cljs
 (defn tangle-file [f-path]
   (let [content (fs/readFileSync f-path "utf8")
         blocks (re-seq #"(?is)#\+begin_src\s+(?:clojurescript|css)\s+:tangle\s+([^\s\n]+).*?\n(.*?)\n#\+end_src" content)
@@ -136,7 +136,7 @@ It then calls the tangle-file method on matching files within there.
 It avoids picking up Emacs lock files, so there shouldn't be any worry
 for Emacs users to just allow the tangling to be performed by the client's
 tangler function.
-#+begin_src clojurescript :tangle ../../src/utils/tangler.cljs
+#+begin_src clojurescript :tangle ../../tangler.cljs
 (defn run-tangle-all []
   (let [docs-dir "docs"]
     (when (fs/existsSync docs-dir)
@@ -157,7 +157,7 @@ tangler function.
 This sets the tangler to be watched and long lived. It also sets
 the interval to scan the file system for changes. That way it can
 neatly fit in the ClojureScript web development process.
-#+begin_src clojurescript :tangle ../../src/utils/tangler.cljs
+#+begin_src clojurescript :tangle ../../tangler.cljs
 (defn watch []
   (println "--- nbb Org-Tangle Watcher Active ---")
   (run-tangle-all)
