@@ -50,8 +50,8 @@ One regret is that I didn't write more on this topic.
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/utils/build.clj
-(ns utils.build
+#+begin_src clojurescript :tangle ../../src/plugin_build.clj
+(ns plugin-build
   (:require
    [utils.macros]
    [clojure.java.io :as io]
@@ -69,7 +69,7 @@ One regret is that I didn't write more on this topic.
 We need to ensure we don't leak any Java specific namespaces into the code
 as well as ensuring no invalid CLJS pieces are evaluated
 
-#+begin_src clojurescript :tangle ../../src/utils/build.clj
+#+begin_src clojurescript :tangle ../../src/plugin_build.clj
 (defn sanitize-ast [form]
   (walk/prewalk
     (fn [x]
@@ -150,7 +150,7 @@ This is our rather brittle and hard-coded macro expansion statement.
 For now, adding custom macros on the plugin devs end isn't exactly
 easily done. It'll be something that needs to be revisited.
 
-#+begin_src clojurescript :tangle ../../src/utils/build.clj
+#+begin_src clojurescript :tangle ../../src/plugin_build.clj
 
 (defn custom-macro? [sym]
   (when (symbol? sym)
@@ -198,7 +198,7 @@ easily done. It'll be something that needs to be revisited.
 
 
 
-#+begin_src clojurescript :tangle ../../src/utils/build.clj
+#+begin_src clojurescript :tangle ../../src/plugin_build.clj
 (defn read-cljs [s]
   (binding [*data-readers* tags/*cljs-data-readers*]
     (read-string s)))
@@ -213,7 +213,7 @@ easily done. It'll be something that needs to be revisited.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/build.clj
+#+begin_src clojurescript :tangle ../../src/plugin_build.clj
 (defn -main [& args]
   (let [metadata        (edn/read-string (slurp "manifest.edn"))
         ui-form-str     (process-and-expand-file "src/ui.cljs")
@@ -245,7 +245,5 @@ All that is needed in the template repo deps.edn is:
 #+end_src
 
 Which, of course, is provided for them.
-
-
 
 
