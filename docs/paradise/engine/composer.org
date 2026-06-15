@@ -1,22 +1,25 @@
 
-** Worker Composer
+** Engine Composer
 
 **** Preface
 
+Handling functionality related to the composer.
+May need some love and attention as... File uploads
+occur in more places than just the composer haha.
 
-
+***** TODO Move File upload and non-specific to composer parts out
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/worker/composer.cljs
-(ns worker.composer
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/composer.cljs
+(ns paradise.engine.composer
   (:require [cljs.core.async :refer [go]]
             [cljs-workers.worker :as worker]
             [promesa.core :as p]
             [clojure.string :as str]
-            [utils.net :as net]
-            [worker.state :as state]
-            [worker.timeline :refer [!active-timelines]]
+            [net :as net]
+            [paradise.engine.state :as state]
+            [paradise.engine.timeline :refer [!active-timelines]]
             ["ffi-bindings" :as sdk :refer [MessageFormat UploadSource UploadParameters]]
             [cljs.core.async.interop :refer-macros [<p!]]))
 #+end_src
@@ -42,8 +45,7 @@ https://matrix-org.github.io/matrix-rust-sdk/
 
 
 
-
-#+begin_src clojurescript :tangle ../../src/worker/composer.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/composer.cljs
 (worker/register :upload-media
   (fn [{:keys [mime buffer]}]
     (go
