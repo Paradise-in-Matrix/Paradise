@@ -20,8 +20,8 @@ org file using it. The scope creep has really started to set in there.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
-(ns utils.svg
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
+(ns paradise.shared.utils.svg
   (:require
    )
   )
@@ -35,7 +35,7 @@ So we should establish a nice icon base that we intend to use throughout.
 Since we have intent to provide animated SVGs for our icons... we'll
 go ahead and plan for that by providing a class we can hook to for
 the CSS.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (defn- build-icon-hiccup [{:keys [animate viewBox size] :as props} shapes]
   (let [final-view-box (or viewBox "0 0 24 24")
         final-size (or size "16px")]
@@ -58,7 +58,7 @@ the CSS.
 Occasionally we want some more dynamic icons, particularly when we want
 to indicate the variety of state involving rooms. So we need a base for
 these complex icons.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (defn composite-icon [{:keys [main top-left top-right bottom-left bottom-right] :as props}]
   (let [badge (fn [x y b]
                 (when b
@@ -68,7 +68,7 @@ these complex icons.
                      shape])))]
     (build-icon-hiccup
      (dissoc props :main :top-left :top-right :bottom-left :bottom-right)
-     [:<>
+     [:g
       [:svg {:x "4" :y "2" :width "16" :height "16" :viewBox "0 0 24 24"}
        main]
 
@@ -83,7 +83,7 @@ these complex icons.
 We had a wonderful artist create these icons for use around the app and more.
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def sun-shapes
   [:path {:d "m 550.92238,108.45841 -92.91577,4.89014 35.31877,270.59588 78.24484,1.63039 58.68324,-272.22627 z m -303.62591,72.21419 -41.53958,27.91458 a 120.31687,120.31687 0 0 0 -43.6485,52.8624 l -18.86965,44.46551 231.16677,140.50667 48.90296,-48.90296 z m 574.567,3.57705 -192.69677,224.68964 48.90296,48.90296 231.47373,-136.92808 -13.32425,-40.59649 A 142.557,142.557 0 0 0 861.58663,223.98262 Z M 524.26975,399.07839 A 143.19254,127.25317 0 0 0 381.07745,526.33161 143.19254,127.25317 0 0 0 524.26975,653.58482 143.19254,127.25317 0 0 0 667.46256,526.33161 143.19254,127.25317 0 0 0 524.26975,399.07839 Z m 450.81176,45.55278 -280.91981,48.90244 0.54312,73.3547 282.00656,29.34136 3.28507,-32.14429 a 366.14382,366.14382 0 0 0 -0.27492,-77.04336 z m -892.500565,1.99523 -3.893303,37.85918 a 428.39608,428.39608 0 0 0 -0.582393,81.56298 l 2.845821,32.17685 282.00656,-29.34188 0.54312,-73.35418 z m 587.964115,153.75598 -48.90296,48.90296 196.15495,229.30022 24.32358,-24.49463 a 255.44602,255.44602 0 0 0 51.51985,-74.7975 l 16.13959,-35.71462 z m -283.099,6.87555 -252.66468,148.33875 48.90296,76.61445 68.46403,47.27256 184.20065,-223.32331 z m 185.29308,58.87186 -75.52769,5.9769 -51.07647,265.16263 80.17289,10.98795 a 174.6582,174.6582 0 0 0 53.59207,-0.95653 l 51.52296,-8.94467 z"}])
 
@@ -126,7 +126,7 @@ We had a wonderful artist create these icons for use around the app and more.
 
 
 And then some basic 'animations' defined in CSS
-#+begin_src css :tangle ../../css/icons.css
+#+begin_src css :tangle ../../../../css/icons.css
 
 @keyframes sun-breathe {
       0%, 100% { transform: scale(1); }
@@ -158,7 +158,7 @@ application I noticed the Microphone wiggles when you hover over it.
 So let us start there.
 
 I think a simple bounce can just be done in CSS, so we'll write that out using keyframe transforms
-#+begin_src css :tangle ../../css/icons.css
+#+begin_src css :tangle ../../../../css/icons.css
 @keyframes mic-talk {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-2px); }
@@ -183,7 +183,7 @@ I think a simple bounce can just be done in CSS, so we'll write that out using k
 A nice ease out on them doesn't hurt either.
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 
 
 #+end_src
@@ -195,7 +195,7 @@ Now calling has a set of icons easily attributable to it, so
 we'll try to keep those all nicely grouped here
 
 For hanging up we just want to use the CSS we wrote for simplicity.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def phone-hangup-shapes
   [:path {:d "M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.58.9-.98.45-1.89.86-2.73 1.34-.14.07-.31.11-.49.11-.28 0-.53-.11-.7-.3l-2.6-2.6c-.18-.17-.3-.43-.3-.71 0-.28.11-.53.3-.7C3.12 7.32 7.32 4 12 4s8.88 3.32 11.7 6.96c.19.17.3.43.3.71 0 .28-.11.53-.3.71l-2.6 2.6c-.17.19-.42.3-.7.3-.18 0-.35-.04-.49-.11-.84-.48-1.75-.89-2.73-1.34-.35-.16-.58-.51-.58-.9v-3.1C15.15 9.25 13.6 9 12 9z"}])
 
@@ -206,7 +206,7 @@ For hanging up we just want to use the CSS we wrote for simplicity.
 For the mic, we once against just use our CSS animation written above.
 Now we want to future plan for this one, so perhaps we enable merging
 a passed prop in so that it can also glow when we speak.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def mic-shapes
   [:path {:d "M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"}])
 
@@ -215,9 +215,9 @@ a passed prop in so that it can also glow when we speak.
 #+end_src
 
 Now this will be our first truly animated SVG...
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def screen-share-shapes
-  [:<>
+  [:g
    [:rect {:x "2" :y "3" :width "20" :height "14" :rx "2" :ry "2"}]
    [:path {:d "M8 21h8M12 17v4"}]
    [:path {:d "M17 8l-5-5-5 5M12 3v9" :stroke "var(--accent-color)"}
@@ -230,7 +230,7 @@ Now this will be our first truly animated SVG...
   (build-icon-hiccup props screen-share-shapes))
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def video-shapes
   [:path {:d "M23 7l-7 5 7 5V7zM1 5h15v14H1z"}])
 
@@ -239,7 +239,7 @@ Now this will be our first truly animated SVG...
 #+end_src
 
 Now for muting we just want the strike to animate its way in. Nothing too fancy.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def mic-off-shapes
   [:g
    [:path {:d "M9 9a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"}]
@@ -258,7 +258,7 @@ Now for muting we just want the strike to animate its way in. Nothing too fancy.
 
 Now for the headphones icon... we want to give some sort of visual effect on hover...
 So a nice little bit of CSS animating each ear should do fine.
-#+begin_src css :tangle ../../css/icons.css
+#+begin_src css :tangle ../../../../css/icons.css
 @keyframes ear-wiggle {
       0%, 100% { transform: scaleX(1); }
       50% { transform: scaleX(1.1); }
@@ -272,7 +272,7 @@ So a nice little bit of CSS animating each ear should do fine.
 #+end_src
 
 Now using that CSS is easy!
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def headphones-shapes
   [:path {:d "M3 18v-6a9 9 0 0 1 18 0v6M4 15h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2zM18 15h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z"}])
 
@@ -281,7 +281,7 @@ Now using that CSS is easy!
 #+end_src
 
 Using the same technique from mic-off we can easily drive a stroke across the headphones icon too.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def headphones-off-shapes
   [:g [:path {:d "M3 11a9 9 0 0 1 13.52-7.78M20.42 15h.58a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 .58-1.42M2 17v3a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"}]
    [:line {:x1 "1" :y1 "1" :x2 "23" :y2 "23"
@@ -293,7 +293,7 @@ Using the same technique from mic-off we can easily drive a stroke across the he
 #+end_src
 
 Same for video off as well.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def video-off-shapes
   [:g [:path {:d "M16 16v3H1V5h2m4 0h9v9l7 5V7l-7 5V7.94"}]
    [:line {:x1 "1" :y1 "1" :x2 "23" :y2 "23"
@@ -304,9 +304,9 @@ Same for video off as well.
   (build-icon-hiccup props video-off-shapes))
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def screen-share-off-shapes
-  [:<>
+  [:g
    [:rect {:x "2" :y "3" :width "20" :height "14" :rx "2" :ry "2"}
     [:animate {:attributeName "opacity" :from "1" :to "0.3" :dur "0.4s" :fill "freeze"}]]
    [:path {:d "M8 21h8M12 17v4"}]])
@@ -317,7 +317,7 @@ Same for video off as well.
 
 
 Now what about something with some external logic? Still extremely straight-forward.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def speaker-base-shape
   [:path {:d "M11 5L6 9H2v6h4l5 4V5z"}])
 
@@ -328,7 +328,7 @@ Now what about something with some external logic? Still extremely straight-forw
   (build-icon-hiccup (merge {:stroke-width "2.5"
                              :animate (when has-call? :waves)}
                             (dissoc props :has-call?))
-                     [:<>
+                     [:g
                       speaker-base-shape
                       (when has-call? speaker-waves-shape)]))
 #+end_src
@@ -341,7 +341,7 @@ Not super sure how I want to do the sections here, but this will group up ones t
 So let us start with the classic settings gear.
 Since it is a gear, let's write some CSS to facilitate spinning the icon.
 
-#+begin_src css :tangle ../../css/icons.css
+#+begin_src css :tangle ../../../../css/icons.css
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
@@ -354,9 +354,9 @@ Since it is a gear, let's write some CSS to facilitate spinning the icon.
 #+end_src
 
 Now... the gear is a very complex geometric shape, so it has one of the more amusing SVG data values.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def settings-shapes
-  [:<>
+  [:g
    [:circle {:cx "12" :cy "12" :r "3"}]
    [:path {:d "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"}]])
 
@@ -366,7 +366,7 @@ Now... the gear is a very complex geometric shape, so it has one of the more amu
 
 
 Where as chat bubble? Simple.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def chat-bubble-shapes
   [:path {:d "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"}])
 
@@ -375,7 +375,7 @@ Where as chat bubble? Simple.
 #+end_src
 
 Now a little bit of a pan motion for the icon to give it a nice little feel.
-#+begin_src css :tangle ../../css/icons.css
+#+begin_src css :tangle ../../../../css/icons.css
 @keyframes search-drift {
     0%   { transform: translate(0, 0); }
     25%  { transform: translate(1.5px, -1px); }
@@ -396,9 +396,9 @@ Room Headers need some identifiable icons to inform users of their functionality
 at a glance.
 
 We'll need a nice search icon, so let's plant that here too.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def search-shapes
-  [:<>
+  [:g
    [:circle {:cx "11" :cy "11" :r "8"}]
    [:line {:x1 "21" :y1 "21" :x2 "16.65" :y2 "16.65"}]])
 
@@ -407,9 +407,9 @@ We'll need a nice search icon, so let's plant that here too.
 #+end_src
 
 Now for a simple hash icon
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def hash-shapes
-  [:<>
+  [:g
    [:line {:x1 "4" :y1 "9" :x2 "20" :y2 "9"}]
    [:line {:x1 "4" :y1 "15" :x2 "20" :y2 "15"}]
    [:line {:x1 "10" :y1 "3" :x2 "8" :y2 "21"}]
@@ -423,26 +423,26 @@ As we expanded scope we found that we needed some shapes
 for the composite SVGs... Rooms can be rather diverse.
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def shield-shapes
-  [:<>
+  [:g
    [:path {:d "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"}]])
 
 (def globe-shapes
-  [:<>
+  [:g
    [:circle {:cx "12" :cy "12" :r "10"}]
    [:line {:x1 "2" :y1 "12" :x2 "22" :y2 "12"}]
    [:path {:d "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"}]])
 
 (def lock-shapes
-  [:<>
+  [:g
    [:rect {:x "3" :y "11" :width "18" :height "11" :rx "2" :ry "2"}]
    [:path {:d "M7 11V7a5 5 0 0 1 10 0v4"}]])
 #+end_src
 
 
 Next up, phone icon
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def phone-shapes
   [:path {:d "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"}])
 
@@ -456,7 +456,7 @@ Pins!
 
 We can make it "press down" on hover without too much effort either.
 
-#+begin_src css :tangle ../../css/icons.css
+#+begin_src css :tangle ../../../../css/icons.css
 @keyframes pin-sink {
       0%   { transform: translateY(0) scale(1); }
       100% { transform: translateY(1.5px) scale(0.92); }
@@ -471,9 +471,9 @@ We can make it "press down" on hover without too much effort either.
 }
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def pins-shapes
-  [:<>
+  [:g
    [:path {:d "M12 17v5"}]
    [:path {:d "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"}]])
 
@@ -484,9 +484,9 @@ We can make it "press down" on hover without too much effort either.
 
 
 An icon for the member list
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def members-shapes
-  [:<>
+  [:g
    [:path {:d "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"}]
    [:circle {:cx "9" :cy "7" :r "4"}]
    [:path {:d "M23 21v-2a4 4 0 0 0-3-3.87"}]
@@ -497,9 +497,9 @@ An icon for the member list
 #+end_src
 
 And a 'more options' icon
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def more-vertical-shapes
-  [:<>
+  [:g
    [:circle {:cx "12" :cy "12" :r "1"}]
    [:circle {:cx "12" :cy "5" :r "1"}]
    [:circle {:cx "12" :cy "19" :r "1"}]])
@@ -509,9 +509,9 @@ And a 'more options' icon
 #+end_src
 
 and a menu button
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def menu-shapes
-  [:<>
+  [:g
    [:line {:x1 "4" :y1 "12" :x2 "20" :y2 "12"}]
    [:line {:x1 "4" :y1 "6" :x2 "20" :y2 "6"}]
    [:line {:x1 "4" :y1 "18" :x2 "20" :y2 "18"}]])
@@ -522,9 +522,9 @@ and a menu button
 
 
 I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow instead.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def arrow-left-shapes
-  [:<>
+  [:g
    [:line {:x1 "19" :y1 "12" :x2 "5" :y2 "12"}]
    [:polyline {:points "12 19 5 12 12 5"}]])
 
@@ -533,7 +533,7 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def check-circle-green-shapes
   [:polyline {:points "20 6 9 17 4 12"}])
 
@@ -542,7 +542,7 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def chevron-down-shapes
   [:polyline {:points "6 9 12 15 18 9"}])
 
@@ -552,9 +552,9 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def home-shapes
-  [:<>
+  [:g
    [:path {:d "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"}]
    [:polyline {:points "9 22 9 12 15 12 15 22"}]])
 
@@ -563,9 +563,9 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def user-shapes
-  [:<>
+  [:g
    [:path {:d "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"}]
    [:circle {:cx "12" :cy "7" :r "4"}]])
 
@@ -574,7 +574,7 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def check-shapes
   [:polyline {:points "20 6 9 17 4 12"}])
 
@@ -583,9 +583,9 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def leave-shapes
-  [:<>
+  [:g
    [:path {:d "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"}]
    [:polyline {:points "16 17 21 12 16 7"}]
    [:line {:x1 "21" :y1 "12" :x2 "9" :y2 "12"}]])
@@ -600,9 +600,9 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 **** Lightbox icons
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def download-shapes
-  [:<>
+  [:g
    [:path {:d "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"}]
    [:polyline {:points "7 10 12 15 17 10"}]
    [:line {:x1 "12" :y1 "15" :x2 "12" :y2 "3"}]])
@@ -612,9 +612,9 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def external-link-shapes
-  [:<>
+  [:g
    [:path {:d "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"}]
    [:polyline {:points "15 3 21 3 21 9"}]
    [:line {:x1 "10" :y1 "14" :x2 "21" :y2 "3"}]])
@@ -628,9 +628,9 @@ I feel like on mobile that icon isn't as nice as it could be. Let's do an arrow 
 
 
 A plus icon for indicating file upload is helpful
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def plus-shapes
-  [:<>
+  [:g
    [:line {:x1 "12" :y1 "5" :x2 "12" :y2 "19"}]
    [:line {:x1 "5" :y1 "12" :x2 "19" :y2 "12"}]])
 
@@ -640,9 +640,9 @@ A plus icon for indicating file upload is helpful
 
 
 A simple smiley icon is nice to indicate emoji functionality
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def smiley-shapes
-  [:<>
+  [:g
    [:circle {:cx "12" :cy "12" :r "9"}]
    [:circle {:cx "9" :cy "9" :r "1" :fill "currentColor"}]
    [:circle {:cx "15" :cy "9" :r "1" :fill "currentColor"}]
@@ -656,9 +656,9 @@ A simple smiley icon is nice to indicate emoji functionality
 
 
 And maybe a send button for later use in the style of a paper plane.
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def send-shapes
-  [:<>
+  [:g
    [:path {:d "M22 2L11 13"}]
    [:path {:d "M22 2L15 22L11 13L2 9L22 2Z"}]])
 
@@ -667,9 +667,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def file-shapes
-  [:<>
+  [:g
    [:path {:d "M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"}]
    [:polyline {:points "13 2 13 9 20 9"}]])
 
@@ -681,9 +681,9 @@ And maybe a send button for later use in the style of a paper plane.
 **** Message Items
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def reply-shapes
-  [:<>
+  [:g
    [:polyline {:points "9 17 4 12 9 7"}]
    [:path {:d "M20 18v-2a4 4 0 0 0-4-4H4"}]])
 
@@ -693,9 +693,9 @@ And maybe a send button for later use in the style of a paper plane.
 
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def edit-shapes
-  [:<>
+  [:g
    [:path {:d "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"}]
    [:path {:d "M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"}]])
 
@@ -704,9 +704,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def exit-shapes
-  [:<>
+  [:g
    [:line {:x1 "18" :y1 "6" :x2 "6" :y2 "18"}]
    [:line {:x1 "6" :y1 "6" :x2 "18" :y2 "18"}]])
 
@@ -715,9 +715,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def thread-shapes
-  [:<>
+  [:g
    [:circle {:cx "7" :cy "7" :r "3"}]
    [:circle {:cx "17" :cy "17" :r "3"}]
    [:path {:d "M7 10v4a2 2 0 0 0 2 2h4"}]
@@ -728,9 +728,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def copy-shapes
-  [:<>
+  [:g
    [:rect {:x "9" :y "9" :width "13" :height "13" :rx "2" :ry "2"}]
    [:path {:d "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"}]])
 
@@ -740,9 +740,9 @@ And maybe a send button for later use in the style of a paper plane.
 
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def link-shapes
-  [:<>
+  [:g
    [:path {:d "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}]
    [:path {:d "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]])
 
@@ -751,9 +751,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def trash-shapes
-  [:<>
+  [:g
    [:polyline {:points "3 6 5 6 21 6"}]
    [:path {:d "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}]
    [:line {:x1 "10" :y1 "11" :x2 "10" :y2 "17"}]
@@ -764,9 +764,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def more-shapes
-  [:<>
+  [:g
    [:circle {:cx "12" :cy "12" :r "1"}]
    [:circle {:cx "19" :cy "12" :r "1"}]
    [:circle {:cx "5" :cy "12" :r "1"}]])
@@ -776,9 +776,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def double-check-shapes
-  [:<>
+  [:g
    [:path {:d "M7 12l5 5L22 7"}]
    [:path {:d "M2 12l5 5L9 15"}]])
 
@@ -787,9 +787,9 @@ And maybe a send button for later use in the style of a paper plane.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def typing-dots-shapes
-  [:<>
+  [:g
    [:circle {:cx "5" :cy "12" :r "1.5"}
     [:animate {:attributeName "opacity" :values "0.3;1;0.3" :dur "1.2s" :repeatCount "indefinite"}]]
    [:circle {:cx "12" :cy "12" :r "1.5"}
@@ -804,9 +804,9 @@ And maybe a send button for later use in the style of a paper plane.
 
 Some more room icons
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def door-open-shapes
-  [:<>
+  [:g
    [:path {:d "M13 4h3a2 2 0 0 1 2 2v14"}]
    [:path {:d "M2 20h3"}]
    [:path {:d "M13 20h9"}]
@@ -818,9 +818,9 @@ Some more room icons
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def doorbell-shapes
-  [:<>
+  [:g
    [:rect {:x "7" :y "3" :width "10" :height "18" :rx "2"}]
    [:circle {:cx "12" :cy "15" :r "2"}]
    [:line {:x1 "10" :y1 "7" :x2 "14" :y2 "7"}]
@@ -831,9 +831,9 @@ Some more room icons
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def compass-shapes
-  [:<>
+  [:g
    [:circle {:cx "12" :cy "12" :r "10"}]
    [:line {:x1 "12" :y1 "2" :x2 "12" :y2 "22"}]
    [:line {:x1 "2" :y1 "12" :x2 "22" :y2 "12"}]
@@ -844,12 +844,12 @@ Some more room icons
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (defn members-plus [{:keys [size] :as props}]
   (let [final-size (or size "20px")]
     (build-icon-hiccup
      (assoc props :size final-size)
-     [:<>
+     [:g
       [:svg {:x "2" :y "2" :width "18" :height "18" :viewBox "0 0 24 24"}
        members-shapes]
 
@@ -858,9 +858,9 @@ Some more room icons
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def plus-circle-shapes
-  [:<>
+  [:g
    [:circle {:cx "12" :cy "12" :r "10"}]
    [:line {:x1 "12" :y1 "8" :x2 "12" :y2 "16"}]
    [:line {:x1 "8" :y1 "12" :x2 "16" :y2 "12"}]])
@@ -870,9 +870,9 @@ Some more room icons
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (def bell-shapes
-  [:<>
+  [:g
    [:path {:d "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"}]
    [:path {:d "M10.3 21a1.94 1.94 0 0 0 3.4 0"}]])
 
@@ -882,7 +882,7 @@ Some more room icons
 
 
 
-#+begin_src clojurescript :tangle ../../src/utils/svg.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/svg.cljs
 (defn dynamic-room-hash [{:keys [is-public? is-encrypted? is-joinable?] :as props}]
   (let [clean-props (dissoc props :is-public? :is-encrypted? :is-joinable?)]
     (composite-icon
