@@ -6,18 +6,20 @@ A short file to store the web workers state. Everything else is in reframe
 This may be move-able there too, but will let it remain for now.
 
 
-#+begin_src clojurescript :tangle ../../src/client/state.cljs
-(ns client.state
-  (:require [reagent.core :as r]
-            [eve.atom :as ea]))
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/state.cljs
+(ns paradise.shared.client.state
+  (:require [reagent.core :as r]))
 
-(defonce !shared-app-db (ea/atom {}))
+(defonce !shared-app-db (atom {}))
 (defonce !eve-app-db-payload (atom nil))
 
 (defonce !engine-pool (atom nil))
 (defonce !media-pool (atom nil))
 (defonce !virtualizer-pool (atom nil))
 (defonce !config (atom nil))
+
+(defonce !ast-handoff (atom {}))
+(defonce !attachments-cache (atom {}))
 
 (defonce !components (r/atom {}))
 (defonce !pure-fns (atom {}))
