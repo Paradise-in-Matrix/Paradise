@@ -23,45 +23,45 @@ actual UI components themselves.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../src/app.cljs
-(ns app
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
+(ns paradise.ui.app
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [clojure.string :as str]
    [re-frame.db :as db]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [reagent.core :as r]
    [eve.alpha :as eve]
    [eve.atom :as ea]
    [eve.mem :as mem]
    [eve.deftype-proto.alloc :as alloc]
    [reagent.dom.client :as rdom]
-   [navigation.spaces.bar :refer [spaces-sidebar]]
-   [client.key-handler :refer [global-key-listener]]
-   [overlays.notifications :as notifications]
-   [overlays.messages]
-   [overlays.settings]
-   [overlays.invites]
-   [overlays.creation]
-   [overlays.quick-switcher]
-   [overlays.lightbox]
-   [overlays.profiles]
-   [overlays.reactions]
-   [plugin-storage]
-   [auth.events :refer [login-screen]]
-   [container.call.call-container :refer [persistent-call-container]]
-   [client.config :refer [load-config check-remote-version load-i18n eve-enabled?]]
-   [client.state :refer [!config]]
-   [client.session-store :as store]
+   [paradise.ui.navigation.spaces.bar :refer [spaces-sidebar]]
+   [paradise.shared.client.key-handler :refer [global-key-listener]]
+   [paradise.ui.overlays.notifications :as notifications]
+   [paradise.ui.overlays.messages]
+   [paradise.ui.overlays.settings]
+   [paradise.ui.overlays.invites]
+   [paradise.ui.overlays.creation]
+   [paradise.ui.overlays.quick-switcher]
+   [paradise.ui.overlays.lightbox]
+   [paradise.ui.overlays.profiles]
+   [paradise.ui.overlays.reactions]
+   [paradise.shared.plugin-storage]
+   [paradise.ui.auth.events :refer [login-screen]]
+   [paradise.ui.container.call.call-container :refer [persistent-call-container]]
+   [paradise.shared.client.config :refer [load-config check-remote-version load-i18n eve-enabled?]]
+   [paradise.shared.client.state :refer [!config]]
+   [paradise.shared.client.session-store :as store]
    [taoensso.tempura :as tempura :refer [tr]]
-   [utils.global-ui :refer [modal-root popover-root context-menu-root satellite-overlay make-swipe-handlers]]
+   [paradise.ui.global :refer [modal-root popover-root context-menu-root satellite-overlay make-swipe-handlers]]
    ["@capacitor/app" :refer [App]]
-   [utils.macros :refer [i18n-data defui]]
-   [utils.svg :as icons]
-   [navigation.rooms.room-list :refer [room-list]]
-   [container.base :refer [container]]))
+   [paradise.shared.utils.macros :refer [i18n-data defui]]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.navigation.rooms.room-list :refer [room-list]]
+   [paradise.ui.container.base :refer [container]]))
 #+end_src
 
 
@@ -69,7 +69,7 @@ actual UI components themselves.
 
 For testing purposes we'd want to stage a general UI to template against.
 This also serves as a good example of where to start with modifying the UI
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 #_(def default-db
   {:spaces {"!space1:example.com" {:id "!space1:example.com" :name "Main Space" :parent-id nil}
             "!space2:example.com" {:id "!space2:example.com" :name "Sub Space" :parent-id "!space1:example.com"}
@@ -99,7 +99,7 @@ This also serves as a good example of where to start with modifying the UI
 This is the initializer for the global reframe object
 For some more info you can look here:
 https://day8.github.io/re-frame/application-state/
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (re-frame/reg-event-db
  :initialize-db
  (fn [_ _]
@@ -111,7 +111,7 @@ https://day8.github.io/re-frame/application-state/
 **** UI Reframe Events and Subscriptions
 
 
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 
 (re-frame/reg-fx
  :ui/blur-active
@@ -214,7 +214,7 @@ and easy use around the repository to utilize them.
 We want to be sure with the reframe components that we don't call unnecessarily. So segmenting
 locale and dictionary allows us to only ever update strings if we explicitly change the
 displayed language.
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (re-frame/reg-sub
  :i18n/locale
  (fn [db _] (:locale db)))
@@ -274,7 +274,7 @@ displayed language.
 We want to provide style switching (and even layout behavior later)
 This at least begins starting that off by providing some useful enough defaults.
 
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (re-frame/reg-event-fx
  :ui/hydrate-theme
  (fn [{:keys [db]} [_ theme-val]]
@@ -328,7 +328,7 @@ This at least begins starting that off by providing some useful enough defaults.
 
 We need a boot up screen for those moments where we're not quite ready.
 Making sure this is dynamic, but abstract is important for now.
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (defui booting-screen []
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.boot-container
@@ -342,7 +342,7 @@ Making sure this is dynamic, but abstract is important for now.
 
 **** Base CSS
 
-#+begin_src css :tangle ../css/app.css
+#+begin_src css :tangle ../../../css/app.css
 
 @import "icons.css";
 @import "room-list-entry.css";
@@ -504,7 +504,7 @@ html, body {
 
 
 
-#+begin_src css :tangle ../css/update-banner.css
+#+begin_src css :tangle ../../../css/update-banner.css
 .global-update-banner {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 16px);
@@ -556,7 +556,7 @@ This just provides some basic behavior to the back button on Android.
 
 ****** TODO Add history to the DB so the back button can navigate around?
 
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (re-frame/reg-event-fx
  :native/hardware-back
  (fn [{:keys [db]} _]
@@ -593,7 +593,7 @@ just focus on the part we actually care about. The benefits of Clojure
 providing the encapsulation and parsing for us.
 
 
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 
 (defui main-layout []
   (r/with-let [!drag-state (r/atom {:start-x nil :dx 0})]
@@ -650,7 +650,7 @@ providing the encapsulation and parsing for us.
 **** Resizing the Application
 
 
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (defn init-window-size-listener! []
   (re-frame/dispatch [:ui/window-resized (.-innerWidth js/window)])
 
@@ -670,7 +670,7 @@ onto.
 Also inside is th init function which informs reframe to start up
 as well as a method that instructs shadow-cljs how to handle the re-render
 when we detatch and reload (basically when you hit control + s to save).
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (defonce root (atom nil))
 
 (defn mount-root []
@@ -687,7 +687,7 @@ when we detatch and reload (basically when you hit control + s to save).
 
 ***** Eve Instantiation
 
-#+begin_src clojurescript :tangle ../src/app.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/app.cljs
 (defn get-eve-worker-payload [eve-atom]
       (let [ds       (.-domain-state ^js eve-atom)
             transfer (eve/sab-transfer-data eve-atom)]
