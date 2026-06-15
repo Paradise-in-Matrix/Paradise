@@ -41,8 +41,8 @@ by hand means we can just pass everything to our logger and expect it to handle 
 **** Imports
 
 So now we can move on to set up the logger for our project usage
-#+begin_src clojurescript :tangle ../../src/utils/logger.cljs
-(ns utils.logger
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/logger.cljs
+  (ns paradise.shared.utils.logger
   (:require
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
@@ -53,7 +53,7 @@ So now we can move on to set up the logger for our project usage
 **** JSON Appender
 
 We should likely set up an appender that makes our logs clean and easily queried.
-#+begin_src clojurescript :tangle ../../src/utils/logger.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/logger.cljs
 (def json-appender
   {:enabled? true
    :async? false
@@ -77,7 +77,7 @@ By tying in js/goog.DEBUG we can make it so that timbre is disabled for release
 versions, but enabled in dev mode.
 This setting is from the shadow-cljs optimizations, so in advanced builds it is
 effectively 'release' and anything else is 'dev'
-#+begin_src clojurescript :tangle ../../src/utils/logger.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/logger.cljs
 (defn init! []
   (timbre/merge-config!
    {:level :info
@@ -94,7 +94,7 @@ effectively 'release' and anything else is 'dev'
 **** Macro wrappers for internal usage ease
 
 Now we need to re-expose these back out for the rest of our project to utilize
-#+begin_src clojurescript :tangle ../../src/utils/logger.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/logger.cljs
 (def trace  timbre/trace)
 (def debug  timbre/debug)
 (def info   timbre/info)
