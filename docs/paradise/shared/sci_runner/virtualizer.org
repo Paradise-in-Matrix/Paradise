@@ -1,0 +1,96 @@
+
+** SCI Runner Virtualizer
+
+**** Preface
+
+A select few components aren't evaluated on the main thread.
+They're offloaded to a secondary thread (or threads) to
+avoid the computational load ever being placed on the
+main thread.
+So those components also need their own SCI runner
+but for many of the namespaces they can be blanked out.
+The naming scheme for this might shift in time.
+
+
+**** Imports
+
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/virtualizer.cljs
+(ns paradise.shared.sci-runner.virtualizer
+  (:require
+   [sci.core :as sci]
+   [cljs-workers.worker :as worker]
+   [paradise.virtualizer.state :as state]
+   [paradise.shared.sci-runner.factory :as factory]
+   [paradise.shared.sci-runner.shared]
+   [clojure.string]
+   [sci.configs.reagent.reagent :as sci-reagent]
+   [sci.configs.re-frame.re-frame :as sci-re-frame]))
+#+end_src
+
+
+**** SCI Sauce
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/virtualizer.cljs
+(defonce !current-eval-plugin (atom nil))
+
+(def ghost-ns {})
+
+(def virtualizer-namespaces
+  {'cljs-workers.worker {'register worker/register}
+   'paradise.shared.client.registry {'reg-slot-item ghost-ns
+                     'remove-plugin-overrides! ghost-ns
+                     'get-slot ghost-ns}
+   'paradise.shared.client.state    {'!config ghost-ns
+                     '!engine-pool ghost-ns}
+
+   'capacitor.browser ghost-ns
+   'capacitor.core    ghost-ns
+   'taoensso.timbre   ghost-ns
+   'paradise.ui.auth.events ghost-ns
+   'paradise.ui.container.base ghost-ns
+   'paradise.ui.container.call.core ghost-ns
+   'paradise.ui.container.call.call-view ghost-ns
+   'paradise.ui.container.call.call-container ghost-ns
+   'paradise.ui.container.call.events ghost-ns
+   'paradise.ui.container.members ghost-ns
+   'paradise.ui.container.pins ghost-ns
+   'paradise.ui.container.reusable ghost-ns
+   'paradise.ui.container.search ghost-ns
+   'paradise.ui.container.timeline.base ghost-ns
+   'paradise.ui.container.timeline.components ghost-ns
+   'paradise.ui.container.timeline.item ghost-ns
+   'paradise.ui.input.autocomplete ghost-ns
+   'paradise.ui.input.base ghost-ns
+   'paradise.ui.input.composer ghost-ns
+   'paradise.ui.input.drafts ghost-ns
+   'paradise.ui.input.emotes ghost-ns
+   'paradise.ui.navigation.rooms.entry ghost-ns
+   'paradise.ui.navigation.rooms.room-list ghost-ns
+   'paradise.ui.navigation.rooms.room-summary ghost-ns
+   'paradise.ui.navigation.spaces.bar ghost-ns
+   'paradise.ui.overlays.invites ghost-ns
+   'paradise.ui.overlays.lightbox ghost-ns
+   'paradise.ui.overlays.notifications ghost-ns
+   'paradise.ui.overlays.profiles ghost-ns
+   'paradise.ui.overlays.quick-switcher ghost-ns
+   'paradise.ui.overlays.reactions ghost-ns
+   'paradise.ui.overlays.settings ghost-ns
+   'paradise.ui.global ghost-ns
+   'paradise.shared.utils.helpers ghost-ns
+   'paradise.media.component ghost-ns
+   'paradise.shared.utils.svg ghost-ns
+   'cljs-workers.core ghost-ns})
+
+(def virtualizer-context
+  (factory/build-context
+   :virtualizer
+   {:!current-plugin         !current-eval-plugin
+    :!overrides              state/!worker-overrides
+    :!components             state/!worker-components
+    :!slots                  nil
+    :!virtualizer-pool       nil}
+   virtualizer-namespaces))
+
+
+#+end_src
