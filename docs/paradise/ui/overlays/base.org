@@ -6,8 +6,8 @@ This is where we define our global reusables. They're using multi-methods for ne
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/overlays/base.cljs
-(ns overlays.base
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/base.cljs
+(ns paradise.ui.overlays.base
 (:require))
 #+end_src
 
@@ -17,7 +17,7 @@ This is where we define our global reusables. They're using multi-methods for ne
 
 To avoid a nasty set of circular dependencies we actually want to centrally register all the components in one space.
 This allows us to neatly create states and provide a single component to the main application to render.
-#+begin_src clojurescript :tangle ../../src/overlays/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/base.cljs
 (defmulti modal-component identity)
 
 (defmethod modal-component :default [modal-id]
@@ -36,7 +36,7 @@ This allows us to neatly create states and provide a single component to the mai
 **** Multi-method Popover
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/base.cljs
 (defmulti popover-component identity)
 
 (defmethod popover-component :default [popover-id]
@@ -54,7 +54,7 @@ This allows us to neatly create states and provide a single component to the mai
 **** Multi-method Context Menu
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/base.cljs
 (defmulti context-menu-component identity)
 
 (defmethod context-menu-component :default [menu-id]
