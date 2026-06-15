@@ -1,23 +1,28 @@
 
-** Worker Timeline
+** Engine Timeline
 
 **** Preface
 
+Handling Timelines and stuff from the Rust SDK
+(If the files have simple bits like here... they've likely
+been shuffled around a bunch and this portion existed after
+most of it was written).
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
-(ns worker.timeline
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
+(ns paradise.engine.timeline
   (:require
    [cljs-workers.worker :as worker]
+   [cljs-workers.mesh :as mesh]
    [promesa.core :as p]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    ["ffi-bindings" :as sdk :refer [TimelineConfiguration MessageType ReceiptType]]
    [cljs.core.async.interop :refer-macros [<p!]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [utils.net :as net]
-   [worker.state :as state])
+   [paradise.shared.client.diff-handler :refer [apply-matrix-diffs]]
+   [net :as net]
+   [paradise.engine.state :as state])
   (:require-macros
    [cljs.core.async.macros :refer [go]]))
 #+end_src
@@ -28,7 +33,7 @@
 
 **** Atoms
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defonce !active-timelines (atom {}))
 (defonce !timeline-arrays (atom {}))
 (defonce !timeline-mutexes (atom {}))
@@ -44,7 +49,7 @@ help anyone later who wants to make changes to aspects of the timeline.
 
 ****** TODO We should segment content and describe it better
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defn- extract-mxc-url [ffi-source]
   (when ffi-source
     (try
@@ -209,7 +214,7 @@ main thread even more and just make a 'rendering' pool, but for now
 we'll be sticking with just doing the virtualizer this way.
 
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defn push-timeline-diff! [room-id source events]
   (log/debug "Sending timeline diff via Mesh to virtualizer...")
   (mesh/do-with-thread! :virtualizer-pool
@@ -225,7 +230,7 @@ It then takes the diff and tells reframe what to update the timeline
 to now display. This could be just *adding* a single message or swapping
 rooms.
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defn apply-timeline-diffs-async! [room-id source updates]
   (let [q-key [room-id source]]
     (swap! !timeline-mutexes update q-key #(or % (p/resolved [])))
@@ -285,7 +290,7 @@ export enum TimelineEventFocusThreadMode_Tags {
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defmulti focus (fn [{:keys [type]}] type))
 (defmethod focus :event [{:keys [id count]}]
   (let [auto-factory (.. sdk -TimelineEventFocusThreadMode -Automatic)
@@ -371,7 +376,7 @@ export enum TimelineEventFocusThreadMode_Tags {
 #+end_src
 
 got tired of guessing which one it was... last sdk version it was .cancel haha
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defn safe-cancel! [handle]
   (when handle
     (cond
@@ -397,7 +402,7 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
 
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (worker/register :paginate-timeline
                  (fn [{:keys [room-id direction amount]}]
                    (go
@@ -417,7 +422,7 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
 
 **** Reactions
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 
 
 ;; we should probably check why event-id is coming as a clojure map...
@@ -487,7 +492,7 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
 
 **** Media Fetching
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defn b64->uint8 [b64]
   (let [b1     (str/replace b64 "-" "+")
         b2     (str/replace b1 "_" "/")
@@ -570,7 +575,7 @@ However, it does expect three methods within that won't exist usually in
 generic items. So we need to neatly wrap our item to match the shape expected.
 
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defn make-timeline-item-shim [item event-id]
   #js {:uniqueId (fn [] #js {:id event-id})
        :asEvent  (fn [] item)
@@ -632,7 +637,7 @@ content directly from the server would be silly.
 From what I can tell we can't fetch arbitrary events from the server
 so we can manipulate what we are dealt by sync.
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (defn boot-live-pin! [room room-id event-id]
   (go
     (try
@@ -680,7 +685,7 @@ Instead, we'll fetch the event IDs directly. The thought
 here is that the actual request is rather small
 usually; so this shouldn't be too taxing.
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (worker/register :get-pinned-events
   (fn [{:keys [room-id]}]
     (go
@@ -725,7 +730,7 @@ and on success we'll use our shaping helper methods to
 get it ready for rendering using the event tile.
 
 
-#+begin_src clojurescript :tangle ../../src/worker/timeline.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 (worker/register :search-room
   (fn [{:keys [room-id query]}]
     (go
