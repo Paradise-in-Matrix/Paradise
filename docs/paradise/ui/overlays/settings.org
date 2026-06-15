@@ -18,26 +18,25 @@ Not entirely important to read, but certainly interesting.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
-(ns overlays.settings
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
+(ns paradise.ui.overlays.settings
   (:require
    [promesa.core :as p]
    [re-frame.core :as re-frame]
    [reagent.core :as r]
-   [utils.svg :as icons]
-   [utils.macros :refer [defui]]
-   [overlays.base :refer [modal-component]]
-   [utils.global-ui :refer [avatar]]
-   [client.session-store :as store]
-   [plugins :as plugins]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.overlays.base :refer [context-menu-component modal-component]]
+   [paradise.ui.global :refer [avatar]]
+
+   [paradise.shared.client.session-store :as store]
+   [paradise.shared.plugins :as plugins]
    [taoensso.timbre :as log]
-   [utils.macros :refer [config]]
+   [paradise.shared.utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    ))
-
-
 #+end_src
 
 
@@ -48,7 +47,7 @@ scaffolding.
 
 ***** sdk prefix
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (re-frame/reg-sub
  :sdk/profile
  (fn [db _]
@@ -76,7 +75,7 @@ scaffolding.
 ***** settings prefix
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 
 (re-frame/reg-event-fx
  :settings/open
@@ -173,7 +172,7 @@ scaffolding.
 
 **** Advanced (Plugins/Themes/Soup)
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui advanced-preferences-view []
   (let [tr @(re-frame/subscribe [:i18n/tr])
         policy       @(re-frame/subscribe [:settings/media-preview-policy])
@@ -223,7 +222,7 @@ scaffolding.
 #+end_src
 
 
-#+begin_src css :tangle ../../css/settings.css
+#+begin_src css :tangle ../../../../css/settings.css
 .sub-tabs-container {
   display: flex;
   gap: 8px;
@@ -266,7 +265,7 @@ events.
 
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 
 (def settings-registry
   {;; DB Key                  Hydration Event                       Default Value
@@ -315,7 +314,7 @@ events.
 
 Moving the CSS to here
 
-#+begin_src css :tangle ../../css/settings.css
+#+begin_src css :tangle ../../../../css/settings.css
 
 .sidebar-profile-mini {
   padding: 12px 0;
@@ -434,15 +433,48 @@ Moving the CSS to here
 This should likely be moved out to live with the rest of the
 navigational components.
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
-(defui sidebar-profile-mini []
+**** TODO Actually add status picker and behavior for copy-to-clipboard
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
+(defn build-profile-actions [tr user-id]
+  (->> [{:id "status"
+         :label (tr [:settings.context-menu/set-status])
+         :dispatch [:ui/open-modal :status-picker]}
+        {:id "copy"
+         :label (tr [:settings.context-menu/copy-id])
+         :dispatch [:ui/copy-to-clipboard user-id]}
+        {:id "logout"
+         :label (tr [:settings.context-menu/logout])
+         :class-name "danger"
+         :dispatch [:sdk/logout]}]
+       (remove nil?)
+       (vec)))
+
+(defn ^:ui profile-context-menu-content [{:keys [user-id x y close-fn]}]
+  (let [tr    @(re-frame/subscribe [:i18n/tr])
+        items (build-profile-actions tr user-id)]
+    [:<>
+     (for [{:keys [id label dispatch class-name icon]} items]
+       ^{:key (or id label)}
+       [:div.context-menu-item
+        {:class class-name
+         :on-click (fn [e]
+                     (.stopPropagation e)
+                     (when dispatch
+                       (re-frame/dispatch dispatch))
+                     (re-frame/dispatch [:ui/close-context-menu]))}
+        (when icon [:span.item-icon icon])
+        [:span.item-label label]])]))
+
+(defmethod context-menu-component :profile-actions [_]
+  profile-context-menu-content)
+
+(defn ^:ui sidebar-profile-mini []
   (let [tr      @(re-frame/subscribe [:i18n/tr])
         profile @(re-frame/subscribe [:sdk/profile])]
     [:div.sidebar-profile-mini
-     {:style {
-              :bottom "env(safe-area-inset-bottom, 16px)"
-              :position "absolute"
-              }}
+     {:style {:bottom "env(safe-area-inset-bottom, 16px)"
+              :position "absolute"}}
      [:div.profile-trigger
       {:style {:user-select "none"}
        :on-click (fn [e]
@@ -451,19 +483,11 @@ navigational components.
        :on-context-menu (fn [e]
                           (.preventDefault e)
                           (re-frame/dispatch
-                           [:context-menu/open
+                           [:ui/open-context-menu
+                            :profile-actions
                             {:x (.-clientX e)
                              :y (.-clientY e)
-                             :items [{:id "status"
-                                      :label (tr [:settings.context-menu/set-status])
-                                      :action #(log/info "Status")}
-                                     {:id "copy"
-                                      :label (tr [:settings.context-menu/copy-id])
-                                      :action #(log/info "Copied")}
-                                     {:id "logout"
-                                      :label (tr [:settings.context-menu/logout])
-                                      :action #(re-frame/dispatch [:sdk/logout])
-                                      :class-name "danger"}]}]))}
+                             :user-id (:user-id profile)}]))}
       [avatar {:id   (:user-id profile)
                :name (or (:display-name profile) "?")
                :url  (:avatar-url profile)
@@ -477,8 +501,8 @@ navigational components.
 
 Simple verification tab for now
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
-(defui verification-tab []
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
+(defn ^:ui verification-tab []
   (r/with-let [!passphrase (r/atom "")]
     (let [tr              @(re-frame/subscribe [:i18n/tr])
           status          @(re-frame/subscribe [:verification/status])
@@ -533,7 +557,7 @@ Simple verification tab for now
 **** Current Account tab
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui my-account-tab [profile]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:<>
@@ -555,7 +579,7 @@ Simple verification tab for now
 
 **** Notification tab component
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui notifications-tab []
   (let [tr              @(re-frame/subscribe [:i18n/tr])
         status          @(re-frame/subscribe [:push/status])
@@ -616,7 +640,7 @@ Simple verification tab for now
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/settings.css
+#+begin_src css :tangle ../../../../css/settings.css
 
 .warning-banner {
     margin-bottom: 16px;
@@ -652,7 +676,7 @@ Simple verification tab for now
 
 ***** Reframe event, effects, and subscriptions
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 
 
 
@@ -708,7 +732,7 @@ Simple verification tab for now
 
 ***** Account items
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui account-item [{:keys [acc is-active?]}]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.account-item {:class (when is-active? "active")}
@@ -724,7 +748,7 @@ Simple verification tab for now
          (tr [:settings.account-item/switch-button])])]]))
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui accounts-tab []
   (let [tr           @(re-frame/subscribe [:i18n/tr])
         accounts     @(re-frame/subscribe [:settings/available-accounts])
@@ -756,7 +780,7 @@ Simple verification tab for now
 You want to ensure the language options are easy to find for the user.
 
 
-#+begin_src css :tangle ../../css/settings.css
+#+begin_src css :tangle ../../../../css/settings.css
 .language-list {
   display: flex;
   flex-direction: column;
@@ -842,7 +866,7 @@ You want to ensure the language options are easy to find for the user.
 
 ***** TODO Need to add time format implementation
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 
 
 (defui language-time-tab []
@@ -875,7 +899,7 @@ You want to ensure the language options are easy to find for the user.
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/settings.css
+#+begin_src css :tangle ../../../../css/settings.css
 .about-header {
     display: flex;
     align-items: center;
@@ -922,7 +946,7 @@ You want to ensure the language options are easy to find for the user.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui about-tab []
   (let [tr       @(re-frame/subscribe [:i18n/tr])
         locale   @(re-frame/subscribe [:i18n/locale])
@@ -958,7 +982,7 @@ You want to ensure the language options are easy to find for the user.
 
 Inside the modal this is our sidebar options.
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui settings-sidebar [active-tab]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.settings-sidebar
@@ -989,7 +1013,7 @@ Inside the modal this is our sidebar options.
 
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defui settings-content [_props]
   (let [tr         @(re-frame/subscribe [:i18n/tr])
         active-tab @(re-frame/subscribe [:settings/active-tab])
@@ -1018,7 +1042,7 @@ Inside the modal this is our sidebar options.
 
 
 Now we just register the modal to our modal registry so it is usable globally.
-#+begin_src clojurescript :tangle ../../src/overlays/settings.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/settings.cljs
 (defmethod modal-component :settings [_]
   settings-content)
 #+end_src
@@ -1029,7 +1053,7 @@ Now we just register the modal to our modal registry so it is usable globally.
 
 I should clean this up, but at least it is grouped with the code for now
 
-#+begin_src css :tangle ../../css/settings.css
+#+begin_src css :tangle ../../../../css/settings.css
 
 
 
