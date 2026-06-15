@@ -12,29 +12,35 @@ if applicable.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
-(ns worker.core
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(ns paradise.engine.core
   (:require
    [cljs-workers.worker :as worker]
    [promesa.core :as p]
    [taoensso.timbre :as log]
-   [clojure.string :as str]
-   [client.session-store :as session-store :refer [SessionStore]]
+   [paradise.shared.client.session-store :as session-store :refer [SessionStore]]
    ["ffi-bindings" :as sdk]
    [cljs.core.async.interop :refer-macros [<p!]]
    [cljs.core.async :refer [go]]
-   [utils.net :refer [set-auth-context!] :as net]
-   [worker.state :as state]
-   [worker.spaces :as spaces]
-   [worker.settings :as settings :refer [setup-encryption-listeners!]]
-   [worker.timeline]
-   [worker.members]
-   [worker.composer]
-   [worker.media-previews :as previews]
-   [worker.call]
-   [worker.rooms :as rooms]
-   [worker-sci-runner :as sci]
-   ))
+   [net :refer [set-auth-context!] :as net]
+#_   [eve.alpha :as eve]
+   #_ [eve.atom :as ea]
+   #_ [eve.mem :as mem]
+   #_ [re-frame.db :as db]
+   #_ [eve.wasm-mem :as wasm-mem]
+ #_  [eve.deftype-proto.alloc :as alloc]
+   [paradise.engine.state :as state]
+   [paradise.engine.spaces :as spaces]
+   [paradise.engine.settings :as settings :refer [setup-encryption-listeners!]]
+   [paradise.engine.timeline]
+#_   [worker.media]
+   [paradise.engine.members]
+   [paradise.engine.composer]
+   [paradise.engine.media-previews :as previews]
+   [paradise.engine.call]
+   [paradise.engine.rooms :as rooms]
+   [paradise.shared.sci-runner.engine :as sci]))
+
 #+end_src
 
 
@@ -66,8 +72,33 @@ So we'll likely need to expand on our cljs-worker library for that.
 
 #+end_src
 
+We did, in fact, begin expanding on this.
 
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+#_(worker/register :bind-app-db
+  (fn [{:keys [eve-payload]}]
+    (let [root-sab      (:root-sab eve-payload)
+          rmap-sab      (:rmap-sab eve-payload)
+          slab-sabs     (:slab-sabs eve-payload)
+          atom-slot-idx (:atom-slot-idx eve-payload)]
+      (alloc/init-worker-slabs! slab-sabs root-sab nil)
 
+      (let [root-r       (mem/js-sab-region root-sab)
+            rmap-r       (mem/js-sab-region rmap-sab)
+            slot-idx     (ea/register-worker! {:root-r root-r} 2)
+            domain-state {:root-r root-r :rmap-r rmap-r :base-path nil
+                          :slot-idx slot-idx :retire-q (atom [])
+                          :flush-ts (doto (make-array 1) (aset 0 0))}
+            eve-atom     (ea/->MmapAtom domain-state atom-slot-idx)]
+
+        (db/set-eve-atom! eve-atom)
+        (js/setInterval
+          #(js/console.log "Worker Interval DB Keys:" (pr-str (keys @eve-atom)))
+          3000)
+        (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
+        {:status :db-bound}))))
+
+#+end_src
 
 
 **** Initialize the Wasm
@@ -77,7 +108,7 @@ So the first thing we need to do is actually initialize the
 WASM.
 
 
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (worker/register :init-wasm
                  (fn [_]
                    (go
@@ -126,7 +157,7 @@ login or restoreSession method depending on what is passed through to restore-or
 Now later we need some helper functions to determine which session we are currently in.
 This is a functionality useful to supporting multiple accounts at once.
 
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (defn maybe-local-session []
   (p/let [store (SessionStore.)
           sessions (.loadSessions store)
@@ -146,7 +177,7 @@ Some important little notes I can add here, but the sliding sync
 version really just determines whether it is enabled or not.
 If the version is anything but 0 then it'll use Sliding Sync.
 
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (defn build-client [hs passphrase? store-id? restore-or-login!]
   (p/let [sdk-root (if (.-ClientBuilder sdk) sdk (.-default sdk))
           ClientBuilder (.-ClientBuilder sdk-root)
@@ -175,7 +206,7 @@ If the version is anything but 0 then it'll use Sliding Sync.
 
 Now we can provide our application initialization and attempt to restore the previous login session.
 If the previous login session is found, then we start-syncing and kick off the client's run.
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (worker/register :bootstrap
   (fn [{:keys [target-user-id]}]
     (go
@@ -245,7 +276,7 @@ spaces and their rooms.
 
 The sync service is the actual service that tries to sync with the home server.
 
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (worker/register :start-sync
                  (fn [_]
                    (go
@@ -277,7 +308,7 @@ The sync service is the actual service that tries to sync with the home server.
 Fetching the profile is a promise, so it is reasonable for now
 to separate it into its own sort of call instead of just
 bundling in the client context. I may revisit though.
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (worker/register :fetch-profile
                  (fn [_]
                    (go
@@ -296,7 +327,7 @@ bundling in the client context. I may revisit though.
 This is more or less the same info we store in a session object, so we just neatly
 want to provide the UI a way to request this info. It'll use it in a great number
 of locations.
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (worker/register :get-client-context
                  (fn [_]
                    (go
@@ -321,7 +352,7 @@ we need to look for the proper method to unmount them so to speak.
 
 ****** TODO Look for proper method to unmount IDBs from WASM in FFI bindings
 
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (worker/register :logout-client
   (fn [{:keys [user-id]}]
     (go
@@ -345,28 +376,13 @@ we need to look for the proper method to unmount them so to speak.
           {:status "error" :msg (str e)})))))
 
 
-
-
 #+end_src
 
-**** SCI Runner (not walker)
-
-This just exposes the method to SCI so we can register
-functions in the web worker from a plugin context.
-
-
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
-
-(worker/register :evaluate-worker-form
-  (fn [{:keys [form-str]}]
-    (sci/evaluate-worker-form form-str)))
-
-#+end_src
 
 **** Kickoff
 
 Now we need to kick off the bootstrapping immediately, so we do so here.
-#+begin_src clojurescript :tangle ../../src/worker/core.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (worker/bootstrap)
 #+end_src
 
