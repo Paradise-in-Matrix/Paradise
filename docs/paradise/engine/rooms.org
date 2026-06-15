@@ -1,14 +1,15 @@
 
-** Worker Rooms
+** Engine Rooms
 
 **** Preface
 
+This is where we handle effectively everything for Matrix rooms.
 
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
-(ns worker.rooms
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
+(ns paradise.engine.rooms
   (:require
    [cljs-workers.worker :as worker]
    [clojure.string :as str]
@@ -16,11 +17,11 @@
    [taoensso.timbre :as log]
    ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory]]
    [cljs.core.async.interop :refer-macros [<p!]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [navigation.rooms.room-summary :refer [build-room-summary]]
-   [utils.net :as net]
-   [worker.state :as state])
+   [paradise.shared.client.diff-handler :refer [apply-matrix-diffs]]
+   [net :as net]
+   [paradise.engine.state :as state])
   (:require-macros
+   [paradise.shared.utils.macros :refer [ocall oget]]
    [cljs.core.async.macros :refer [go]]))
 #+end_src
 
@@ -30,7 +31,7 @@
 
 **** Atoms
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defonce !ui-controller (atom nil))
 (defonce !bg-controller (atom nil))
 
@@ -47,6 +48,60 @@
 (defonce !parent-cache (atom {}))
 
 (defonce !preview-promises (atom {}))
+#+end_src
+
+**** Room Summary
+
+This defines the internals we expect from a Room
+If a room gains some new feature or functionality it would be added here
+and since we're trying to upstream the handling... it may just work after
+adding it here.
+
+Note, that this is not all values bound inside the room item, so
+it may be worthwhile to check.
+
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
+
+
+(defn build-room-summary [room room-info latest-event]
+  (let [
+        num-notifications (js/Number (oget room-info :numUnreadNotifications))
+        num-mentions      (js/Number (oget room-info :numUnreadMentions))
+        num-unread        (js/Number (oget room-info :numUnreadMessages))
+        membership        (oget room-info :membership)
+        invited           (= membership "Invited")
+        is-marked-unread  (oget room-info :isMarkedUnread)
+        notification-state
+        #js {:isMention                    (> num-mentions 0)
+             :isNotification               (or (> num-notifications 0) is-marked-unread)
+             :isActivityNotification       (and (> num-unread 0) (<= num-notifications 0))
+             :hasAnyNotificationOrActivity (or (> num-unread 0) (> num-notifications 0) invited is-marked-unread)
+             :invited                      invited}
+        display-name (or (some-> (oget room-info :displayName) str/trim)
+                         (oget room-info :id))
+        avatar-url (oget room-info :avatarUrl)]
+    #js {:room                       room
+         :id                         (oget room-info :id)
+         :name                       display-name
+         :avatar                     avatar-url
+         ;; TODO Add message preview handling here
+         :messagePreview             nil
+         :pinnedEventIds               (oget room-info :pinnedEventIds)
+         :activeRoomCallParticipants (oget room-info :activeRoomCallParticipants)
+         :showNotificationDecoration (oget notification-state :hasAnyNotificationOrActivity)
+         :notificationState          notification-state
+         :hasRoomCall       (boolean (oget room-info :hasRoomCall))
+         :isBold                     (oget notification-state :hasAnyNotificationOrActivity)
+         :unreadMessagesCount        num-unread
+         :unreadMentionsCount        num-mentions
+         :unreadNotificationsCount   num-notifications
+         :membership                 membership
+         :isDirect                   (oget room-info :isDirect)
+         :isSpace                    (oget room-info :isSpace)
+         :isFavourite                (oget room-info :isFavourite)
+         :isMarkedUnread             is-marked-unread
+         }))
 #+end_src
 
 
@@ -71,7 +126,7 @@ queue here which periodically retries to populate the parentage for the given ro
 After a number of fails we just simply determine that the room is an orphan and
 remove it from the queue as well.
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defn enqueue-parent-check! [room-id]
   (swap! !parent-queue update room-id #(if % % 0)))
 
@@ -127,7 +182,7 @@ remove it from the queue as well.
 
 **** Loading Previews (Calls for now)
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defn- extract-preview [preview-ffi]
   (when preview-ffi
     (let [is-call? (try
@@ -175,7 +230,7 @@ significant delay that the user doesn't really care about. Instead
 we can resolve that promise whenever we actually want to interact with
 data associated with the RoomPreview. Otherwise it shouldn't matter.
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defn parse-room [client space-service room-interface]
   (p/let [room-info     (if (fn? (.-roomInfo room-interface)) (.roomInfo room-interface) nil)
           latest-event  (.latestEvent room-interface)
@@ -219,7 +274,7 @@ As a result on space swapping we ALWAYS want to ensure we set back to "All" as
 we rely on the list for our room list view behaviors (even if the space loads a
 'dumb' version).
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defn get-rust-filter [filter-id]
   (case filter-id
     "unread"
@@ -252,7 +307,7 @@ we rely on the list for our room list view behaviors (even if the space loads a
 
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (worker/register :set-room-filter
   (fn [{:keys [filter-id]}]
     (if-let [ctrl @!ui-controller]
@@ -283,7 +338,7 @@ available to refresh our window. We don't slow the rust-sdk down,
 but instead establish a queue for our code to process them
 and notify reframe properly.
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defn apply-home-diffs-async! [client space-service updates]
   (swap! !home-mutex
          (fn [prev-promise]
@@ -322,7 +377,7 @@ and revised a good bit it is now easily done here and we generate a nice
 mapped structure for use everywhere. So we can easily look up rooms at O(1)
 as well.
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defn apply-bg-rooms-diffs! [client space-service updates]
   (swap! !bg-room-mutex
          (fn [prev-promise]
@@ -354,7 +409,7 @@ then attaching an onUpdate to easily refresh those entries without much effort.
 We apply a filter to ensure we don't end up with any duplication on the resulting room list and
 apply it. Then we prompt the app to give us the first page for the controller.
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (defn start-room-list-sync! [client room-list space-service]
   (p/let [ui-result (.entriesWithDynamicAdapters room-list 200
                                                      #js {:onUpdate #(apply-home-diffs-async! client space-service %)})
@@ -375,7 +430,7 @@ apply it. Then we prompt the app to give us the first page for the controller.
     (.addOnePage bg-controller)))
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 
 
 (worker/register :paginate-room-list
@@ -401,7 +456,7 @@ end point itself which will easily allow us to sort Spaces.
 We do eventually need to clean up the filter as this will cause
 repeat fetches for the space rooms for now.
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (worker/register :fetch-space-hierarchy
                  (fn [{:keys [space-id]}]
                    (go
@@ -469,7 +524,7 @@ repeat fetches for the space rooms for now.
 For room creation we may need to take a peek at the FFI bindings to expose room
 type as a parameter. For now this at least provides the core functionality.
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (worker/register :create-room
   (fn [{:keys [name topic visibility is-encrypted history-visibility is-space]}]
     (go
@@ -507,7 +562,7 @@ type as a parameter. For now this at least provides the core functionality.
 
 ***** Other Functions
 
-#+begin_src clojurescript :tangle ../../src/worker/rooms.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/rooms.cljs
 (worker/register :join-room
                 (fn [{:keys [room-id]}]
                    (go
