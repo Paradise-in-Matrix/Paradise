@@ -6,10 +6,22 @@
 We need a convenient way to pass functionality around between native and web. We can easily do this by
 making wrapper functions to catch the specific calls needed.
 
+Now, because we want this to more or less be as easy to use as js/fetch we are going to make the
+namespace exist at the top-level.
+
+***** TODO Remove Matrix specific logic
+
+The rationale for removing the Matrix specific logic is that we should instead make this generic
+and allow for the functions needed to be used for validation and such be set by an initialization
+function instead.
+It also may be practical for it to exist in cljs-workers and expand that library even further.
+
+
+
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/utils/net.cljs
-(ns utils.net
+#+begin_src clojurescript :tangle ../src/net.cljs
+(ns net
   (:require [promesa.core :as p]
             [clojure.string :as str]
             ))
@@ -24,7 +36,7 @@ that we can easily update the fetches to use the correct client.
 
 We may need to check to ensure we're disposing of the previous
 client when the account is swapped (among other reset operations).
-#+begin_src clojurescript :tangle ../../src/utils/net.cljs
+#+begin_src clojurescript :tangle ../src/net.cljs
 (defonce !auth-context (atom {:token nil :hs-url nil}))
 
 (defn set-auth-context! [token hs-url]
@@ -35,7 +47,7 @@ client when the account is swapped (among other reset operations).
 Similar to how we do in the service worker, we want to be certain we never send
 the token to an endpoint that doesn't need it.
 
-#+begin_src clojurescript :tangle ../../src/utils/net.cljs
+#+begin_src clojurescript :tangle ../src/net.cljs
 (defn- safe-auth-path? [request-url hs-url]
   (try
     (let [req-obj  (js/URL. request-url)
@@ -71,7 +83,10 @@ I considered just monkey patching the global JS item, but since
 we do some level of URL validation in the service worker this may be
 more sensible.
 I can later revise the SW to use this mechanism instead to remove the duplication.
-#+begin_src clojurescript :tangle ../../src/utils/net.cljs
+
+
+
+#+begin_src clojurescript :tangle ../src/net.cljs
 (defn- wait-for-auth []
   (p/create
    (fn [resolve]
