@@ -1,0 +1,193 @@
+
+** Re-frame DB
+
+**** Preface
+
+This may need changing the parent directory name or
+figuring out a better spot for these. Library
+mods aren't something I plan to make commonplace.
+
+We actually need to replace the core behavior of the app-db
+to enable Eve to actually create a SharedArrayBuffer version
+of it.
+
+A very cool pattern enabled by Clojure is that namespaces
+are loaded and treated as last in. Library namespaces
+are evaluated before program namespaces and so we can
+define the same exact namespace and overwrite how it behaves
+globally, even within the library that originally
+defined it.
+
+
+App-DB is a core part of Re-frame. Luckily for us it is also a very simple
+namespace. It just contains an atom. So this means overwriting the namespace
+doesn't have huge risks as long as we ensure the atom we expose back out
+behaves more or less the same.
+This enables us to create a cross-thread (mostly safe) app-db. With Eve we're
+restricted from placing JS objects or functions inside anyway and in Re-frame
+these are generally considered anti-patterns. So Eve goes with Re-frame quite
+well.
+
+As I'll likely mention many times where Eve is used, we can't use it on all devices
+due to limitations in Safari, Firefox, and Android Webview.
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
+(ns re-frame.db
+  (:require [re-frame.interop :refer [ratom]]
+            [cognitect.transit :as t]
+            [editscript.core :as e]
+            [editscript.edit :as edit]))
+#+end_src
+
+
+**** Definitions
+
+Just define our holders for what we'll need.
+
+#+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
+(defonce !reactive-state (ratom {}))
+(defonce !eve-ref (atom nil))
+
+(defonce !async-broadcaster (atom nil))
+(def writer (t/writer :json))
+(def reader (t/reader :json))
+#+end_src
+
+
+
+**** Transit and Editscript
+
+If Eve isn't enabled we wrote this as a back-up to sync the DB
+across thread boundaries still. This does mean that the memory allocated
+is doubled, but we don't store any objects of substantial size inside the
+app-db anyway, so the overhead shouldn't be too bad.
+
+As an extra precaution of this limitation we also more or less don't use
+the app-db anywhere that we don't plan to actually do some rendering work.
+
+
+#+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
+(defn set-async-broadcaster! [send-fn]
+  (reset! !async-broadcaster send-fn))
+
+
+(defn get-encoded-state []
+  (t/write writer @!reactive-state))
+
+(defn apply-remote-patch!
+  [encoded-patch]
+  (let [edits (t/read reader encoded-patch)]
+    (cljs.core/swap! !reactive-state e/patch (edit/edits->script edits))))
+
+(defn broadcast-async!
+  "Calculates the exact mutations and sends them to the worker."
+  [old-state new-state]
+  (when-let [broadcast @!async-broadcaster]
+    (let [edits (e/get-edits (e/diff old-state new-state {:algo :quick}))]
+      (when (seq edits)
+        (broadcast (t/write writer edits))))))
+#+end_src
+
+
+This creates our re-frame DB syncing with whatever mechanism is used.
+#+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
+(defn start-sab-sync-loop! []
+  (let [sync-fn (fn []
+                  (when-let [ea @!eve-ref]
+                    (let [latest-state @ea]
+                      (when-not (identical? @!reactive-state latest-state)
+                        (cljs.core/reset! !reactive-state latest-state)))))]
+    (if (exists? js/window)
+      (let [tick (fn tick []
+                   (sync-fn)
+                   (js/requestAnimationFrame tick))]
+        (tick))
+      (js/setInterval sync-fn 16))))
+#+end_src
+
+
+Ideally, we could just use Eve and sync our app-db via the Shared Array Buffer.
+If Eve is enabled (which only Chromium browsers and desktop versions will use)
+then we do just that. This enables a real-time global sync across threads.
+
+iOS and Firefox do not support credentialless for bypassing COEP
+Android Webview does not support SharedArrayBuffers
+
+
+#+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
+(defn set-eve-atom! [eve-atom]
+  (cljs.core/swap! eve-atom
+                   (fn [sab-state]
+                     (reduce-kv assoc (or sab-state {}) @!reactive-state)))
+  (reset! !eve-ref eve-atom)
+  (cljs.core/reset! !reactive-state @eve-atom)
+  (start-sab-sync-loop!))
+#+end_src
+
+
+#+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
+(def app-db
+  (reify
+    cljs.core/IDeref
+    (-deref [_]
+      (cljs.core/deref !reactive-state))
+
+    cljs.core/IReset
+    (-reset! [_ new-val]
+      (if-let [ea @!eve-ref]
+        (let [res (cljs.core/reset! ea new-val)]
+          (cljs.core/reset! !reactive-state res)
+          res)
+        (let [old-state @!reactive-state
+              res       (cljs.core/reset! !reactive-state new-val)]
+          (broadcast-async! old-state res)
+          res)))
+
+    cljs.core/ISwap
+    (-swap! [_ f]
+      (if-let [ea @!eve-ref]
+        (let [res (cljs.core/swap! ea f)]
+          (cljs.core/reset! !reactive-state res)
+          res)
+        (let [old-state @!reactive-state
+              res       (cljs.core/swap! !reactive-state f)]
+          (broadcast-async! old-state res)
+          res)))
+
+    (-swap! [_ f a]
+      (if-let [ea @!eve-ref]
+        (let [res (cljs.core/swap! ea f a)]
+          (cljs.core/reset! !reactive-state res)
+          res)
+        (let [old-state @!reactive-state
+              res       (cljs.core/swap! !reactive-state f a)]
+          (broadcast-async! old-state res)
+          res)))
+
+    (-swap! [_ f a b]
+      (if-let [ea @!eve-ref]
+        (let [res (cljs.core/swap! ea f a b)]
+          (cljs.core/reset! !reactive-state res)
+          res)
+        (let [old-state @!reactive-state
+              res       (cljs.core/swap! !reactive-state f a b)]
+          (broadcast-async! old-state res)
+          res)))
+
+    (-swap! [_ f a b xs]
+      (if-let [ea @!eve-ref]
+        (let [res (apply cljs.core/swap! ea f a b xs)]
+          (cljs.core/reset! !reactive-state res)
+          res)
+        (let [old-state @!reactive-state
+              res       (apply cljs.core/swap! !reactive-state f a b xs)]
+          (broadcast-async! old-state res)
+          res)))
+
+    cljs.core/IWatchable
+    (-notify-watches [_ old new] (cljs.core/-notify-watches !reactive-state old new))
+    (-add-watch [_ key f] (cljs.core/-add-watch !reactive-state key f))
+    (-remove-watch [_ key] (cljs.core/-remove-watch !reactive-state key))))
+#+end_src
