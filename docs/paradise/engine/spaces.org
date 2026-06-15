@@ -1,20 +1,20 @@
 
-** Worker Spaces
+** Engine Spaces
 
 **** Preface
 
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
-(ns worker.spaces
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
+(ns paradise.engine.spaces
   (:require
    [cljs-workers.worker :as worker]
    [promesa.core :as p]
    [taoensso.timbre :as log]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [worker.state :as state]
-   [worker.rooms :refer [process-parent-queue!]]
+   [paradise.shared.client.diff-handler :refer [apply-matrix-diffs]]
+   [paradise.engine.state :as state]
+   [paradise.engine.rooms :refer [process-parent-queue!]]
    [cljs.core.async :refer [<! timeout]]
    [cljs.core.async.interop :refer-macros [<p!]])
   (:require-macros
@@ -24,7 +24,7 @@
 
 **** Atoms
 
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
 (defonce !space-service (atom nil))
 (defonce !global-space-sub (atom nil))
 (defonce !space-list-subs (atom {}))
@@ -44,7 +44,7 @@ It is interesting that they aren't just room objects, but they
 aren't particularly useful in the current sdk.
 
 
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
 (defn parse-space-child [obj]
   (let [id       (or (.-roomId obj) (.-id obj))
         name     (or (.-displayName obj) (.-name obj) "Unknown")
@@ -64,7 +64,7 @@ aren't particularly useful in the current sdk.
 We'll make this behavior global later. Room, timeline, and spaces can use it the same.
 We describe it in the method doc, but effectively it provides a buffer to the reframe
 without slowing don't the rust-sdk.
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
 
 (defn apply-space-rooms-diffs! [space-id updates]
   (swap! !space-rooms-mutexes update space-id #(or % (atom (p/resolved nil))))
@@ -94,7 +94,7 @@ as pagination will just make it render more rooms. Not entirely necessary at the
 is that we keep space loading at effectively O(1) since we're just asking the Rust SDK which already has built the dependency
 graph out for us what the Space contains.
 
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
 (defn boot-space-list! [space-id]
   (when-not (get @!space-list-subs space-id)
     (-> (.spaceRoomList @!space-service space-id)
@@ -136,7 +136,7 @@ This is just using the space-service to start subscribing to the
 top-level spaces for the user. We need these to start building
 out the parent-child relationships.
 
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
 (defn init-space-service! [client]
   (p/let [space-service (.spaceService client)
           _             (reset! !space-service space-service)
@@ -151,7 +151,7 @@ out the parent-child relationships.
 **** Paginate
 Now the UI component will need to know to load enough to fill its area, so there needs to be a method to actually
 paginate directly.
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
 (worker/register :paginate-space
   (fn [{:keys [space-id]}]
     (if-let [space-list (get-in @!space-list-subs [space-id :list])]
@@ -168,7 +168,7 @@ The add child could likely be cleaner by having a proper check, but it
 appears .getRoom returns true before we can actually perform the addChildtoSpace
 So for we just kind of need to buffer the action and repeat on a fail.
 
-#+begin_src clojurescript :tangle ../../src/worker/spaces.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/spaces.cljs
 (worker/register :space-add-child
   (fn [{:keys [space-id child-id]}]
     (go
