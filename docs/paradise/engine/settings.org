@@ -1,5 +1,5 @@
 
-** Worker Settings
+** Engine Settings
 
 **** Preface
 
@@ -9,13 +9,13 @@ device management, user management, notification status, and more.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/worker/settings.cljs
-(ns worker.settings
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/settings.cljs
+(ns paradise.engine.settings
   (:require
    [cljs-workers.worker :as worker]
-   [client.session-store :refer [SessionStore]]
-   [worker.state :as state]
-   [utils.net :refer [set-auth-context!] :as net]
+   [paradise.shared.client.session-store :refer [SessionStore]]
+   [paradise.engine.state :as state]
+   [net :refer [set-auth-context!] :as net]
    [promesa.core :as p]
    [taoensso.timbre :as log]
    [clojure.string :as str]
@@ -37,7 +37,7 @@ it expects and then the recovery key... and that actually is it. It'll handle
 Everything else from there.
 
 
-#+begin_src clojurescript :tangle ../../src/worker/settings.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/settings.cljs
 (worker/register :recover-session
                  (fn [{:keys [recovery-key]}]
                    (go
@@ -80,7 +80,7 @@ Everything else from there.
 For multi-account we need to neatly be able to aggregate the accounts we're signed
 into.
 
-#+begin_src clojurescript :tangle ../../src/worker/settings.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/settings.cljs
 (worker/register :get-available-accounts
                  (fn [_]
                    (go
@@ -99,7 +99,7 @@ into.
 
 
 And of course we need to be able to grab the account data for an account as well.
-#+begin_src clojurescript :tangle ../../src/worker/settings.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/settings.cljs
 (worker/register :get-account-data
                  (fn [{:keys [event-type]}]
                    (go
@@ -134,7 +134,7 @@ https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3pushers
 
 However, we could just hit this endpoint and delete them that way all the same.
 
-#+begin_src clojurescript :tangle ../../src/worker/settings.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/settings.cljs
 (worker/register :register-pusher
   (fn [{:keys [p256dh auth endpoint app-id push-url app-name lang pushkey is-native platform]}]
     (go
