@@ -9,8 +9,8 @@ function context to all threads as much as they need, at least.
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/client/registry.cljs
-(ns client.registry
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/registry.cljs
+(ns paradise.shared.client.registry
   (:require [reagent.core :as r]
             [cljs-workers.mesh]
             ))
@@ -21,7 +21,7 @@ function context to all threads as much as they need, at least.
 
 ***** Defs
 
-#+begin_src clojurescript :tangle ../../src/client/registry.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/registry.cljs
 (defonce !components (r/atom {}))
 (defonce !pure-fns (atom {}))
 (defonce !anon-fns (atom {}))
@@ -33,7 +33,7 @@ function context to all threads as much as they need, at least.
 
 ***** Functions
 
-#+begin_src clojurescript :tangle ../../src/client/registry.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/registry.cljs
 (defn stash-lambdas [x]
   (cond
     (fn? x) (let [id (keyword (str "cb-" (random-uuid)))]
@@ -45,7 +45,7 @@ function context to all threads as much as they need, at least.
     :else x))
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/client/registry.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/registry.cljs
 (defn hydrate-lambdas [x]
   (cond
     (and (map? x) (= (:__type x) :plugin-cb))
@@ -58,7 +58,7 @@ function context to all threads as much as they need, at least.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/client/registry.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/registry.cljs
 (defn dehydrate [x]
   (cond
     (and (fn? x) (some? (.-$fn_ptr x)))
