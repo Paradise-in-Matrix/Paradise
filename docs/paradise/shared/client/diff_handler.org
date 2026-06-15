@@ -8,8 +8,8 @@ the mechanism wishes to use
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/client/diff_handler.cljs
-(ns client.diff-handler
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/diff_handler.cljs
+(ns paradise.shared.client.diff-handler
   (:require
    [taoensso.timbre :as log]
    [promesa.core :as p]
@@ -24,7 +24,7 @@ The Rust SDK more or less only uses the following options for diffs, so it
 is sensible to handle all the potential diff options in one location in
 a generic manner.
 
-#+begin_src clojurescript :tangle ../../src/client/diff_handler.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/diff_handler.cljs
 (defn apply-matrix-diffs [current-items updates parse-fn]
   (let [initial-items (vec (or current-items []))]
     (p/loop [i 0
@@ -72,7 +72,7 @@ This is a useful bit we put together through trial and error. With a
 mutex we can ensure tha we don't end up with weird rendering issues
 and our source of truth (rust-sdk) isn't impeded in its operational
 speed.
-#+begin_src clojurescript :tangle ../../src/client/diff_handler.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/diff_handler.cljs
 (defn apply-generic-diffs!
   "A universal mutex-locked diff processor for the Matrix Rust SDK."
   [{:keys [!mutex db-path parse-fn sync-event async-event updates]}]
