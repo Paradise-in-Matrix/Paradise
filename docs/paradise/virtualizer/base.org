@@ -97,27 +97,29 @@ we can lean more on Eve.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
-(ns virtualizer.base
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
+(ns paradise.virtualizer.base
   (:require [cljs-workers.worker :as worker]
-            [sci-runner.virtualizer :as sci-runner]
+            [paradise.shared.sci-runner.virtualizer :as sci-runner]
             [taoensso.timbre :as log]
-            [virtualizer.state :as state]
+            [paradise.virtualizer.state :as state]
             [eve.alpha :as eve]
             [eve.atom :as ea]
             [eve.mem :as mem]
             [re-frame.db :as db]
             [eve.wasm-mem :as wasm-mem]
+            [cognitect.transit :as t]
+            [editscript.core :as e]
+            [editscript.edit :as edit]
             [eve.deftype-proto.alloc :as alloc]
             [goog.object]
-            [container.timeline.base]
-            [navigation.rooms.room-list]
-            [app]
-            [container.timeline.item :refer [event-tile-render]]
-            [container.members]
-            [virtualizer.parsing :as parsing]
-            [virtualizer.measurements :as measurements]))
-
+            [paradise.ui.container.timeline.base]
+            [paradise.ui.navigation.rooms.room-list]
+            [paradise.ui.app]
+            [paradise.ui.container.timeline.item :refer [event-tile-render]]
+            [paradise.ui.container.members]
+            [paradise.virtualizer.parsing :as parsing]
+            [paradise.virtualizer.measurements :as measurements]))
 #+end_src
 
 
@@ -127,7 +129,7 @@ Web worker threads have no DOM and so Re-frame will complaining
 
 **** TODO Maybe move to re-frame.db directly?
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
 
 
 (re-frame.loggers/set-loggers! {:warn (fn [& _])})
@@ -137,7 +139,7 @@ Web worker threads have no DOM and so Re-frame will complaining
 
 **** Cache and Constants
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
 (def !event-cache (atom {}))
 (def !layout-context (atom {}))
 (def !room-events (atom {}))
@@ -165,7 +167,7 @@ client isn't using COEP. It may be advisable to avoid COEP anyway
 for inline video players on all platforms.
 
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
 (worker/register :bind-app-db
   (fn [{:keys [eve-payload ports]}]
     (let [mode          (keyword (:mode eve-payload))
@@ -227,7 +229,7 @@ for inline video players on all platforms.
 This performs the measurements and the parsing to generate the prebuilt
 React object that will be hydrated on the other end.
 
-#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
 (defn recalculate-and-stream! [room-id source]
   (let [raw-events (get-in @!room-events [room-id source])
         ctx        (get @!layout-context room-id {:width 400 :theme {:font "16px sans-serif" :line-height 22.8} :measured {}})
@@ -303,6 +305,6 @@ React object that will be hydrated on the other end.
 **** Thread Initialization
 
 This just kicks off the thread.
-#+begin_src clojurescript :tangle ../../src/virtualizer/base.cljs
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
 (worker/bootstrap)
 #+end_src
