@@ -11,11 +11,11 @@ This may be worth revisiting also to see if we can streamline it further.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
-(ns sci-runner.factory
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/factory.cljs
+(ns paradise.shared.sci-runner.factory
   (:require [sci.core :as sci]
             [clojure.walk :as walk]
-            [sci-runner.shared :as sci-shared]
+            [paradise.shared.sci-runner.shared :as sci-shared]
             [sci.configs.reagent.reagent :as sci-reagent]
             [sci.configs.re-frame.re-frame :as sci-re-frame]))
 #+end_src
@@ -29,7 +29,7 @@ functions into their own 'named' function to avoid trying to send a function
 across the thread boundary.
 
 
-#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/factory.cljs
 (defn extract-and-hash-fns [body]
   (let [extracted-fns (atom {})
         walked-body
@@ -47,7 +47,7 @@ across the thread boundary.
 
 Ensures override is treated as valid code in the interpreted instance.
 
-#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/factory.cljs
 (defn create-defoverride-macro [env-type !overrides-atom !plugin-id-atom virtualizer-walk-ast-fn]
   (sci/new-macro-var
    'defoverride
@@ -78,7 +78,7 @@ Ensures override is treated as valid code in the interpreted instance.
 For now we'll keep the thread awareness simple. This should likely need to know 'less' about the overall context
 at a later point though.
 
-#+begin_src clojurescript :tangle ../../src/sci_runner/factory.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/sci_runner/factory.cljs
 (defn build-context [env-type thread-state extra-namespaces]
   (let [{:keys [!overrides !components !slots !current-plugin !virtualizer-pool virtualizer-walk-ast-fn re-frame-mock]} thread-state
         is-ui?     (= env-type :ui)
