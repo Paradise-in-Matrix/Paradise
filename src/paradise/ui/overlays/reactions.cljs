@@ -1,14 +1,14 @@
-(ns overlays.reactions
+(ns paradise.ui.overlays.reactions
 (:require
- [utils.svg :as icons]
- [utils.global-ui :refer [avatar]]
- [utils.macros :refer [defui]]
- [utils.images :refer [mxc-image]]
+ [paradise.shared.utils.svg :as icons]
+ [paradise.ui.global :refer [avatar]]
+ [paradise.shared.utils.macros :refer [defui]]
+ [paradise.media.component :refer [media]]
  [re-frame.core :as re-frame]
  [clojure.string :as str]
  [taoensso.timbre :as log]
- [input.emotes :refer [emoji-sticker-board]]
- [overlays.base :refer [modal-component popover-component]]))
+ [paradise.ui.input.emotes :refer [emoji-sticker-board]]
+ [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 
 (defmethod popover-component :inline-emoji [_] nil)
 
@@ -29,7 +29,7 @@
        [:div.reaction-detail-row
         [:div.reaction-detail-icon
          (if (str/starts-with? emoji "mxc://")
-           [mxc-image {:mxc   emoji
+           [media {:mxc   emoji
                        :class "reaction-detail-img"
                        :style {:width "40px"
                                :height "40px"
