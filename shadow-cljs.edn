@@ -14,23 +14,23 @@
         :modules {:base   {:entries []}
                   :eve-shared {:entries [eve.alpha]
                                :depends-on #{:base}}
-                  :main   {:entries [client.core]
+                  :main   {:entries [paradise.shared.client.core]
                            :depends-on #{:eve-shared}
-                           :exports {init client.core/init}}
+                           :exports {init paradise.shared.client.core/init}}
                   :sw     {:entries [service-worker]
                            :web-worker true
                            :depends-on #{:base}}
                   ;; exists solely for decryption
-                  :media {:entries [media.core]
+                  :media {:entries [paradise.media.core]
                           :web-worker true
                           :depends-on #{:base}}
-                  :engine {:entries [worker.core]
+                  :engine {:entries [paradise.engine.core]
                            :web-worker true
                            :depends-on #{:base}
                            #_#{:eve-shared}
 
                            }
-                  :virtualizer {:entries [virtualizer.base]
+                  :virtualizer {:entries [paradise.virtualizer.base]
                                 :web-worker true
                                 :depends-on #{:eve-shared}}}
 
@@ -45,7 +45,7 @@
          :warnings {:undeclared-ns false
                     :undeclared-var false
                     :infer-warning false}}
-        :devtools {:after-load client.core/after-load
+        :devtools {:after-load paradise.shared.client.core/after-load
                    :watch-dir "docs"
                    ;;:devtools-url "."
                    }}}}
