@@ -1,4 +1,4 @@
-(ns worker.rooms
+(ns paradise.engine.rooms
   (:require
    [cljs-workers.worker :as worker]
    [clojure.string :as str]
@@ -6,11 +6,11 @@
    [taoensso.timbre :as log]
    ["ffi-bindings" :as sdk :refer [RoomListEntriesDynamicFilterKind RoomListFilterCategory]]
    [cljs.core.async.interop :refer-macros [<p!]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [navigation.rooms.room-summary :refer [build-room-summary]]
-   [utils.net :as net]
-   [worker.state :as state])
+   [paradise.shared.client.diff-handler :refer [apply-matrix-diffs]]
+   [net :as net]
+   [paradise.engine.state :as state])
   (:require-macros
+   [paradise.shared.utils.macros :refer [ocall oget]]
    [cljs.core.async.macros :refer [go]]))
 
 (defonce !ui-controller (atom nil))
@@ -29,6 +29,47 @@
 (defonce !parent-cache (atom {}))
 
 (defonce !preview-promises (atom {}))
+
+
+
+(defn build-room-summary [room room-info latest-event]
+  (let [
+        num-notifications (js/Number (oget room-info :numUnreadNotifications))
+        num-mentions      (js/Number (oget room-info :numUnreadMentions))
+        num-unread        (js/Number (oget room-info :numUnreadMessages))
+        membership        (oget room-info :membership)
+        invited           (= membership "Invited")
+        is-marked-unread  (oget room-info :isMarkedUnread)
+        notification-state
+        #js {:isMention                    (> num-mentions 0)
+             :isNotification               (or (> num-notifications 0) is-marked-unread)
+             :isActivityNotification       (and (> num-unread 0) (<= num-notifications 0))
+             :hasAnyNotificationOrActivity (or (> num-unread 0) (> num-notifications 0) invited is-marked-unread)
+             :invited                      invited}
+        display-name (or (some-> (oget room-info :displayName) str/trim)
+                         (oget room-info :id))
+        avatar-url (oget room-info :avatarUrl)]
+    #js {:room                       room
+         :id                         (oget room-info :id)
+         :name                       display-name
+         :avatar                     avatar-url
+         ;; TODO Add message preview handling here
+         :messagePreview             nil
+         :pinnedEventIds               (oget room-info :pinnedEventIds)
+         :activeRoomCallParticipants (oget room-info :activeRoomCallParticipants)
+         :showNotificationDecoration (oget notification-state :hasAnyNotificationOrActivity)
+         :notificationState          notification-state
+         :hasRoomCall       (boolean (oget room-info :hasRoomCall))
+         :isBold                     (oget notification-state :hasAnyNotificationOrActivity)
+         :unreadMessagesCount        num-unread
+         :unreadMentionsCount        num-mentions
+         :unreadNotificationsCount   num-notifications
+         :membership                 membership
+         :isDirect                   (oget room-info :isDirect)
+         :isSpace                    (oget room-info :isSpace)
+         :isFavourite                (oget room-info :isFavourite)
+         :isMarkedUnread             is-marked-unread
+         }))
 
 (defn enqueue-parent-check! [room-id]
   (swap! !parent-queue update room-id #(if % % 0)))
@@ -151,15 +192,21 @@
     (RoomListEntriesDynamicFilterKind.All.
      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Favourite.)
                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
+
+    "invites"
+    (RoomListEntriesDynamicFilterKind.All.
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Invite.)
+                        (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
     "other"
     (RoomListEntriesDynamicFilterKind.All.
      #js {:filters #js [(RoomListEntriesDynamicFilterKind.Category. #js {:expect RoomListFilterCategory.Group})
-                        (RoomListEntriesDynamicFilterKind.NonLeft.)
+                        (RoomListEntriesDynamicFilterKind.Joined.)
                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})
 
     (RoomListEntriesDynamicFilterKind.All.
-     #js {:filters #js [(RoomListEntriesDynamicFilterKind.NonLeft.)
+     #js {:filters #js [(RoomListEntriesDynamicFilterKind.Joined.)
                         (RoomListEntriesDynamicFilterKind.DeduplicateVersions.)]})))
+
 
 (worker/register :set-room-filter
   (fn [{:keys [filter-id]}]
