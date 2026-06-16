@@ -1,12 +1,12 @@
 (ns service-worker-handler
   (:require
    [taoensso.timbre :as log]
-   [client.config :refer [check-remote-version]]
+   [paradise.shared.client.config :refer [check-remote-version]]
    [re-frame.db :as db]
    [promesa.core :as p]
    [re-frame.core :as re-frame]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]))
 
 (re-frame/reg-event-fx
