@@ -1,5 +1,4 @@
-
-(ns sci-shared
+(ns paradise.shared.sci-runner.shared
   (:require [sci.core :as sci]
             [cljs.core.async.impl.dispatch :as dispatch]
             [cljs.core.async.impl.ioc-helpers]
@@ -7,7 +6,7 @@
             [cljs.core.async]
             [promesa.core]
             [clojure.string]
-            [utils.macros :refer [expose-ns]]))
+            [paradise.shared.utils.macros :refer [expose-ns]]))
 
 (def async-namespaces
   {'cljs.core.async (expose-ns cljs.core.async)
@@ -35,4 +34,3 @@
 (def common-classes
   {'js   goog/global :allow :all
    'Date js/Date})
-
