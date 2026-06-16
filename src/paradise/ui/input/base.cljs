@@ -1,21 +1,22 @@
-(ns input.base
+(ns paradise.ui.input.base
   (:require [promesa.core :as p]
             [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [input.drafts :refer [attachment-preview]]
-            [input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
-            [input.emotes :refer [emoji-sticker-board]]
-            [input.autocomplete :refer [suggestion-menu]]
+            [paradise.ui.input.drafts :refer [attachment-preview]]
+            [paradise.ui.input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
+            [paradise.ui.input.emotes :refer [emoji-sticker-board]]
+            [paradise.ui.input.autocomplete :refer [suggestion-menu]]
+            [paradise.ui.global :refer [request-batched-redraw!]]
             [reagent.core :as r]
-            [utils.images :refer [mxc->url]]
-            [utils.helpers :refer [truncate-name]]
-            [utils.svg :as icons]
-            [utils.macros :refer [defui]]
+            [paradise.media.component :refer [mxc->url]]
+            [paradise.shared.utils.helpers :refer [truncate-name]]
+            [paradise.shared.utils.svg :as icons]
+            [paradise.shared.utils.macros :refer [defui]]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
-            [client.state :as state]
-            [plugins :as plugins]))
+            [paradise.shared.client.state :as state]
+            [paradise.shared.plugins :as plugins]))
 
 (re-frame/reg-event-fx
  :sdk/upload-media
@@ -39,14 +40,9 @@
          {:db (assoc (re-frame/db) :uploading-files? true)})
        (do (log/warn "Missing file for upload") {})))))
 
-
-
-
-
-
 (defn extract-metadata [raw-file]
   (p/create
-   (fn [resolve _]
+   (fn [resolve-fn _]
      (let [mime      (.-type raw-file)
            is-image? (str/starts-with? mime "image/")
            is-video? (str/starts-with? mime "video/")
@@ -66,14 +62,15 @@
                        (set! (.-onload el)
                              (fn []
                                (js/URL.revokeObjectURL url)
-                               (resolve (assoc base-att :width (.-width el) :height (.-height el)))))
+                               (resolve-fn (assoc base-att :width (.-width el) :height (.-height el)))))
                        (set! (.-onloadedmetadata el)
                              (fn []
                                (js/URL.revokeObjectURL url)
-                               (resolve (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
+                               (resolve-fn (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
                      (set! (.-src el) url))
-                   (resolve base-att)))))
+                   (resolve-fn base-att)))))
        (.readAsArrayBuffer reader raw-file)))))
+
 
 (re-frame/reg-event-fx
  :sdk/handle-file-drop
@@ -161,11 +158,15 @@
 (re-frame/reg-event-db
  :input/set-context
  (fn [db [_ room-id mode target-item]]
+   (when (= mode :edit)
+     (request-batched-redraw! room-id))
    (assoc-in db [:input-context room-id] {:mode mode :target target-item})))
 
 (re-frame/reg-event-db
  :input/clear-context
  (fn [db [_ room-id]]
+   (when (= (get-in db [:input-context room-id :mode]) :edit)
+     (request-batched-redraw! room-id))
    (update db :input-context dissoc room-id)))
 
 (re-frame/reg-sub
@@ -190,7 +191,7 @@
    (= (:id active-popover) :inline-emoji)))
 
 
-(defui inline-editor [item active-id]
+(defn ^:react inline-editor [item active-id]
   (r/with-let [!editor (r/atom nil)]
     (fn [item active-id]
       (let [m-content    (get-in item [:content :inner :content])
@@ -220,7 +221,7 @@
                                            (re-frame/dispatch [:input/clear-context active-id]))))} "save"]]]))))
 
 
-(defui timeline-send-button [{:keys [submit-message! editor attachments]}]
+(defn ^:ui timeline-send-button [{:keys [submit-message! editor attachments]}]
   [:button.timeline-send-btn
    {:on-click (fn [e]
                 (.preventDefault e)
@@ -229,7 +230,7 @@
    [plugins/plugin-slot :composer-send {:room-id active-id}]
    [icons/send]])
 
-(defui timeline-emoji-button [{:keys [on-click active? room-id]}]
+(defn ^:ui timeline-emoji-button [{:keys [on-click active? room-id]}]
   [:button.timeline-emoji-btn
    {:on-click (fn [e]
                 (.stopPropagation e)
@@ -237,7 +238,7 @@
    [icons/smiley]
    [plugins/plugin-slot :composer-emojis {:room-id room-id}]])
 
-(defui message-input []
+(defn ^:ui message-input []
   (r/with-let [!editor       (r/atom nil)
                !sug-command  (r/atom nil)]
     (fn []
