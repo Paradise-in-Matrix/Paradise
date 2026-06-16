@@ -1,13 +1,13 @@
-(ns auth.events
+(ns paradise.ui.auth.events
   (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
-            [client.state :as state]
+            [paradise.shared.client.state :as state]
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
-            [utils.macros :refer [defui]]
-            [client.session-store :as store]
-            [utils.svg :as icons]
-            [utils.net :refer [set-auth-context!]]
+            [paradise.shared.utils.macros :refer [defui]]
+            [paradise.shared.client.session-store :as store]
+            [paradise.shared.utils.svg :as icons]
+            [net :refer [set-auth-context!]]
             [service-worker-handler :refer [register-sw!]]
             [taoensso.timbre :as log]))
 
@@ -66,24 +66,28 @@
      (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data))
      (store/set-setting! "last_active_user" user-id))
    (log/info "Login successful for:" user-id)
-   {:db (cond-> (assoc db :auth-status :logged-in
-                          :active-user-id user-id
-                          :rooms/data {}
-                          :timeline/current-events [])
-          hs-url (assoc :homeserver-url hs-url))
-    :fx (cond-> [[:dispatch [:app/load-settings-by-stage :login]]
-                 [:dispatch [:app/restore-user-session user-id]]
-                 [:dispatch [:push/check-status]]]
-          (and credentials session-data)
-          (conj [:dispatch [:push/create-sleepy-shadow
-                            (assoc credentials :homeserver
-                                   (:homeserverUrl session-data)
-                                   :userId user-id)]]))}))
+   (let [actual-hs-url (or (:homeserverUrl session-data) hs-url)]
+     {:db (cond-> (assoc db
+                         :auth-status :logged-in
+                         :active-user-id user-id
+                         :rooms/data {}
+                         :timeline/events []
+                         :auth/token (:accessToken session-data)
+                         :auth/hs-url actual-hs-url)
+            actual-hs-url (assoc :homeserver-url actual-hs-url))
+      :fx (cond-> [[:dispatch [:app/load-settings-by-stage :login]]
+                   [:dispatch [:app/restore-user-session user-id]]
+                   [:dispatch [:push/check-status]]]
+            (and credentials session-data)
+            (conj [:dispatch [:push/create-sleepy-shadow
+                              (assoc credentials :homeserver actual-hs-url
+                                                 :userId user-id)]]))})))
 
 (re-frame/reg-sub
  :auth/active-user-id
  (fn [db _]
    (:active-user-id db)))
+
 
 (re-frame/reg-event-fx
  :auth/switch-account
@@ -93,14 +97,16 @@
                   :settings/open? false
                   :active-user-id nil
                   :rooms/data {}
-                  :timeline/current-events [])
+                  :timeline/events [])
     :fx [[:dispatch [:app/bootstrap target-user-id]]]}))
+
 
 (re-frame/reg-event-db
  :auth/login-failure
  (fn [db [_ error-msg]]
    (assoc db :auth-status :logged-out
              :login-error error-msg)))
+
 
 
 
@@ -128,7 +134,7 @@
         {:db (assoc db :auth-status :logged-out
                        :active-user-id nil
                        :rooms/data {}
-                       :timeline/current-events [])})))))
+                       :timeline/events [])})))))
 
 (re-frame/reg-fx
  :session/wipe-settings
@@ -172,12 +178,12 @@
          delete-promises
          (map (fn [db-name]
                 (js/Promise.
-                 (fn [resolve]
+                 (fn [resolve-fn]
                    (let [req (js/window.indexedDB.deleteDatabase db-name)]
-                     (set! (.-onsuccess req) #(resolve true))
-                     (set! (.-onerror req) #(resolve false))
+                     (set! (.-onsuccess req) #(resolve-fn true))
+                     (set! (.-onerror req) #(resolve-fn false))
                      (set! (.-onblocked req) #(do (log/warn db-name "is blocked!")
-                                                  (resolve false)))))))
+                                                  (resolve-fn false)))))))
               stores-to-delete)]
      (-> (js/Promise.all (clj->js delete-promises))
          (.then (fn []
