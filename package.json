@@ -10,8 +10,8 @@
     },
     "scripts": {
         "notangle": "concurrently \"npx shadow-cljs watch app\" \"npx vite\"",
-        "dev": "concurrently \"npx shadow-cljs watch app\" \"npx nbb src/utils/tangler.cljs\" \"npx vite\"",
-        "me": "concurrently \"npx shadow-cljs watch app\" \"npx nbb src/utils/tangler.cljs\" \"npx vite\"",
+        "dev": "concurrently \"npx shadow-cljs watch app\" \"npx nbb tangler.cljs\" \"npx vite\"",
+        "me": "concurrently \"npx shadow-cljs watch app\" \"npx nbb tangler.cljs\" \"npx vite\"",
         "release": "npx shadow-cljs release app && npx vite build",
         "serve": "npx serve -s dist -l 8000",
         "ubrn:web:build:release": "PATH=$HOME/.cargo/bin:/bin:$PATH && ubrn build web --config ubrn.config.yaml --release",
@@ -32,6 +32,7 @@
         "electron:make": "npm run electron:make --prefix electron",
         "guix:electron:make": "guix shell -FCN -m ./electron-manifest.scm -- npm run electron:make --prefix electron"
     },
+
     "dependencies": {
         "@capacitor-community/electron": "^5.0.1",
         "@capacitor/android": "^8.3.0",
