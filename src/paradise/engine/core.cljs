@@ -1,25 +1,55 @@
-(ns worker.core
+(ns paradise.engine.core
   (:require
    [cljs-workers.worker :as worker]
    [promesa.core :as p]
    [taoensso.timbre :as log]
-   [clojure.string :as str]
-   [client.session-store :as session-store :refer [SessionStore]]
+   [paradise.shared.client.session-store :as session-store :refer [SessionStore]]
    ["ffi-bindings" :as sdk]
    [cljs.core.async.interop :refer-macros [<p!]]
    [cljs.core.async :refer [go]]
-   [utils.net :refer [set-auth-context!] :as net]
-   [worker.state :as state]
-   [worker.spaces :as spaces]
-   [worker.settings :as settings :refer [setup-encryption-listeners!]]
-   [worker.timeline]
-   [worker.members]
-   [worker.composer]
-   [worker.media-previews :as previews]
-   [worker.call]
-   [worker.rooms :as rooms]
-   [worker-sci-runner :as sci]
-   ))
+   [net :refer [set-auth-context!] :as net]
+#_   [eve.alpha :as eve]
+   #_ [eve.atom :as ea]
+   #_ [eve.mem :as mem]
+   #_ [re-frame.db :as db]
+   #_ [eve.wasm-mem :as wasm-mem]
+ #_  [eve.deftype-proto.alloc :as alloc]
+   [paradise.engine.state :as state]
+   [paradise.engine.spaces :as spaces]
+   [paradise.engine.settings :as settings :refer [setup-encryption-listeners!]]
+   [paradise.engine.timeline]
+#_   [worker.media]
+   [paradise.engine.members]
+   [paradise.engine.composer]
+   [paradise.engine.media-previews :as previews]
+   [paradise.engine.call]
+   [paradise.engine.rooms :as rooms]
+   [paradise.shared.sci-runner.engine :as sci]))
+
+
+#_(worker/register :bind-app-db
+  (fn [{:keys [eve-payload]}]
+    (let [root-sab      (:root-sab eve-payload)
+          rmap-sab      (:rmap-sab eve-payload)
+          slab-sabs     (:slab-sabs eve-payload)
+          atom-slot-idx (:atom-slot-idx eve-payload)]
+      (alloc/init-worker-slabs! slab-sabs root-sab nil)
+
+      (let [root-r       (mem/js-sab-region root-sab)
+            rmap-r       (mem/js-sab-region rmap-sab)
+            slot-idx     (ea/register-worker! {:root-r root-r} 2)
+            domain-state {:root-r root-r :rmap-r rmap-r :base-path nil
+                          :slot-idx slot-idx :retire-q (atom [])
+                          :flush-ts (doto (make-array 1) (aset 0 0))}
+            eve-atom     (ea/->MmapAtom domain-state atom-slot-idx)]
+
+        (db/set-eve-atom! eve-atom)
+        (js/setInterval
+          #(js/console.log "Worker Interval DB Keys:" (pr-str (keys @eve-atom)))
+          3000)
+        (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
+        {:status :db-bound}))))
+
 
 (worker/register :init-wasm
                  (fn [_]
@@ -190,14 +220,6 @@
           (log/error "Worker Logout Panic:" e)
           {:status "error" :msg (str e)})))))
 
-
-
-
-
-
-(worker/register :evaluate-worker-form
-  (fn [{:keys [form-str]}]
-    (sci/evaluate-worker-form form-str)))
 
 
 (worker/bootstrap)
