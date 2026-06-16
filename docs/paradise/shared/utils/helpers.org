@@ -89,7 +89,7 @@ Just use Reagent.
 (defn- transform-img [attrs]
   (let [src (get attrs :src "")]
     (if (and (string? src) (str/starts-with? src "mxc://"))
-      {:tag "comp:media.component/media-native"
+      {:tag media
        :attrs {:mxc   src
                :class "timeline-emotes"
                :className "timeline-emotes"
