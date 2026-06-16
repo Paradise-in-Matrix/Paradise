@@ -1,7 +1,7 @@
-(ns worker.call
+(ns paradise.engine.call
   (:require [cljs-workers.worker :as worker]
             [taoensso.timbre :as log]
-            [worker.state :as state]
+            [paradise.engine.state :as state]
             ["ffi-bindings" :as sdk])
   (:require-macros [cljs.core.async.macros :refer [go]]
                    [cljs.core.async.interop :refer [<p!]]))
