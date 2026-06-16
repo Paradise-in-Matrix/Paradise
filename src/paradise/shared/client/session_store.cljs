@@ -1,4 +1,4 @@
-(ns client.session-store
+(ns paradise.shared.client.session-store
   (:require [promesa.core :as p]
             [cljs.reader :as reader]
             [taoensso.timbre :as log]
@@ -60,26 +60,26 @@
 
 (defn- open-settings-db []
   (p/create
-   (fn [resolve _]
+   (fn [resolve-fn _]
      (let [req (.open js/indexedDB "paradise-settings" 1)]
        (set! (.-onupgradeneeded req)
              #(let [db (.. % -target -result)]
                 (when-not (.contains (.-objectStoreNames db) "settings")
                   (.createObjectStore db "settings"))))
-       (set! (.-onsuccess req) #(resolve (.. % -target -result)))
-       (set! (.-onerror req) #(resolve nil))))))
+       (set! (.-onsuccess req) #(resolve-fn (.. % -target -result)))
+       (set! (.-onerror req) #(resolve-fn nil))))))
 
 (defn get-setting [key]
   (p/let [db (open-settings-db)]
     (if-not db (p/resolved nil)
       (p/create
-       (fn [resolve _]
+       (fn [resolve-fn _]
          (let [tx    (.transaction db #js ["settings"] "readonly")
                store (.objectStore tx "settings")
                req   (.get store key)]
            (set! (.-onsuccess req)
                  #(let [raw-val (.-result req)]
-                    (resolve
+                    (resolve-fn
                      (cond
                        (nil? raw-val) nil
                        (string? raw-val)
@@ -93,32 +93,32 @@
                            raw-val))
                        :else
                        (js->clj raw-val :keywordize-keys true)))))
-           (set! (.-onerror req) #(resolve nil))))))))
+           (set! (.-onerror req) #(resolve-fn nil))))))))
 
 (defn set-setting! [key value]
   (p/let [db (open-settings-db)]
     (if-not db false
       (p/create
-       (fn [resolve _]
+       (fn [resolve-fn _]
          (let [tx      (.transaction db #js ["settings"] "readwrite")
                store   (.objectStore tx "settings")
                put-req (if (some? value)
                          (.put store (pr-str value) key)
                          (.delete store key))]
-           (set! (.-onsuccess put-req) #(resolve true))
-           (set! (.-onerror put-req) #(resolve false))))))))
+           (set! (.-onsuccess put-req) #(resolve-fn true))
+           (set! (.-onerror put-req) #(resolve-fn false))))))))
 
 (defn- delete-db! [db-name]
   (js/Promise.
-   (fn [resolve _]
+   (fn [resolve-fn _]
      (try
        (let [request (.deleteDatabase js/indexedDB db-name)]
-         (set! (.-onsuccess request) #(do (log/info "Destroyed IDB:" db-name) (resolve true)))
-         (set! (.-onerror request) #(do (log/error "Error deleting IDB:" db-name) (resolve false)))
-         (set! (.-onblocked request) #(do (log/warn "BLOCKED deleting IDB:" db-name) (resolve false))))
+         (set! (.-onsuccess request) #(do (log/info "Destroyed IDB:" db-name) (resolve-fn true)))
+         (set! (.-onerror request) #(do (log/error "Error deleting IDB:" db-name) (resolve-fn false)))
+         (set! (.-onblocked request) #(do (log/warn "BLOCKED deleting IDB:" db-name) (resolve-fn false))))
        (catch :default e
          (log/error "Fatal crash attempting to delete IDB:" db-name "Error:" e)
-         (resolve false))))))
+         (resolve-fn false))))))
 
 (defn- delete-store-impl! [store-id]
   (let [base-name (str "paradise-store-" store-id)]
