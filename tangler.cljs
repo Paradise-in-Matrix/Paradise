@@ -1,4 +1,4 @@
-(ns utils.tangler
+(ns tangler
   (:require ["fs" :as fs]
             ["path" :as path]
             [clojure.string :as str]))
