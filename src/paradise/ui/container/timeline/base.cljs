@@ -1,4 +1,4 @@
-(ns container.timeline.base
+(ns paradise.ui.container.timeline.base
   (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
@@ -6,133 +6,52 @@
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
             [reagent.core :as r]
-            [client.state :as state]
+            [eve.atom :as ea]
+            [goog.object]
+            [paradise.shared.client.state :as state]
             [reagent.dom.client :as rdom]
-            [utils.images :refer [mxc->url]]
-            [utils.helpers :refer [sanitize-custom-html format-divider-date format-readers join-names get-status-string process-raw-event]]
-            [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
-            [utils.svg :as icons]
+            [paradise.media.component :refer [mxc->url]]
+            [paradise.shared.utils.helpers :refer [sanitize-custom-html format-divider-date format-readers join-names get-status-string process-raw-event]]
+            [paradise.ui.global :refer [avatar long-press-props swipe-to-action-wrapper]]
+            [paradise.shared.utils.svg :as icons]
             [virtualizer.core :refer [virtualized-list]]
-            [container.timeline.item :refer [calc-item-height event-tile connected-event-tile]]
-            [virtualizer.core :refer [virtualized-list]]
-            [container.timeline.components :refer [timeline-empty-state
+            [paradise.ui.container.timeline.hydrator :refer [!local-timeline-data]]
+            [paradise.ui.container.timeline.item :refer [event-tile]]
+            [paradise.ui.container.timeline.components :refer [timeline-empty-state
                                                    timeline-jump-button
                                                    timeline-loading-overlay
                                                    timeline-measuring-sticks
                                                    extract-timeline-metrics]]
-            [container.reusable :refer [room-header]]
-            [input.base :refer [message-input]]))
+            [paradise.ui.container.reusable :refer [room-header]]
+            [paradise.ui.input.base :refer [message-input]]))
 
-(defn get-event-id [e]
-  (cond
-    (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Date"))
-    (str "virtual-divider-" (format-divider-date (:ts e)) "-" (:ts e))
-
-    (and (= (:type e) :virtual) (str/includes? (str (:tag e)) "Read"))
-    "read-marker"
-
-    (= (:type e) :virtual)
-    (str "virtual-" (:tag e) "-" (:ts e))
-
-    (not-empty (:id e))
-    (:id e)
-
-    :else
-    (:internal-id e)))
-
-(defn enrich-timeline-items [items]
-  (loop [remaining items
-         processed (transient [])
-         last-msg  nil
-         unread?   false]
-    (if (empty? remaining)
-      (persistent! processed)
-      (let [curr             (first remaining)
-            is-marker?       (= (:tag curr) "ReadMarker")
-            next-unread?     (or unread? is-marker?)
-            curr-is-msg?     (= (:content-tag curr) "MsgLike")
-            stable-id        (get-event-id curr)
-            can-merge?       (boolean (and curr-is-msg?
-                                           last-msg
-                                           (= (:sender-id curr) (:sender-id last-msg))
-                                           (< (- (:ts curr) (:ts last-msg)) 300000)))
-            apply-unread?    (and next-unread? (not is-marker?))
-            already-correct? (and (= (:id curr) stable-id)
-                                  (= (boolean (:merge-with-prev? curr)) can-merge?)
-                                  (= (boolean (:unread? curr)) apply-unread?))
-            new-item         (if already-correct?
-                               curr
-                               (assoc curr
-                                      :id stable-id
-                                      :merge-with-prev? can-merge?
-                                      :unread? apply-unread?))]
-        (recur (rest remaining)
-               (conj! processed new-item)
-               (if curr-is-msg? new-item nil)
-               next-unread?)))))
-
-
-(re-frame/reg-sub
- :timeline/raw-events
- (fn [db [_ room-id]]
-   (let [focused-data (get-in db [:timeline-data room-id :focused] [])
-         live-data    (get-in db [:timeline-data room-id :live] [])]
-;;     live-data
-(if (and (vector? focused-data) (empty? focused-data))
-  live-data
-  focused-data
-
- ;;    (if (empty? focused-data) focused-data live-data)
-     ))))
 
 (re-frame/reg-event-db
- :sdk/update-timeline
- (fn [db [_ room-id source new-raw-events]]
-   (if (get-in db [:timeline-subs room-id source])
-     (let [path             [:timeline-data room-id source]
-           existing-events  (get-in db path [])
-           extract-id       (fn [e]
-                              (let [e-kw (if (map? e) (update e :type keyword) e)]
-                                (or (get-event-id e-kw)
-                                    (:event_id e)
-                                    (:event-id e)
-                                    (:internal-id e))))
-           existing-map     (into {} (map (juxt extract-id identity) existing-events))
-           processed-events (mapv
-                             (fn [e]
-                               (let [event-id     (extract-id e)
-                                     cached-event (get existing-map event-id)]
-                                 (if (and cached-event (= (:raw cached-event) e))
-                                   cached-event
-                                   (process-raw-event e source))))
-                             new-raw-events)]
-       (assoc-in db path processed-events))
-     (do
-       (log/warn "Ghost diff dropped: Timeline" source "is dead for room:" room-id)
-       db))))
+ :app/worker-redraw-ping
+ (fn [db _]
+   (assoc db :_last-worker-ping (js/Date.now))))
+
+(re-frame/reg-sub-raw
+ :timeline/worker-data
+ (fn [_ [_ room-id source]]
+   (reagent.ratom/make-reaction
+    (fn []
+      (get-in @!local-timeline-data [room-id (keyword source)] [])))))
 
 (re-frame/reg-sub
- :timeline/sorted-events
- (fn [[_ active-room]]
-   (re-frame/subscribe [:timeline/raw-events active-room]))
- (fn [raw-events _]
-   raw-events
-   ))
-
-(re-frame/reg-sub
- :timeline/current-events
- (fn [[_ active-room]]
-   (re-frame/subscribe [:timeline/sorted-events active-room]))
- (fn [sorted-events]
-   (enrich-timeline-items sorted-events)
-   ))
+ :timeline/events
+ (fn [[_ room-id]]
+   [(re-frame/subscribe [:timeline/worker-data room-id :focused])
+    (re-frame/subscribe [:timeline/worker-data room-id :live])])
+ (fn [[focused live] _]
+   (if (empty? focused) live focused)))
 
 (re-frame/reg-sub
  :timeline/events-map
  (fn [[_ room-id]]
-   (re-frame/subscribe [:timeline/current-events room-id]))
+   (re-frame/subscribe [:timeline/events room-id]))
  (fn [events _]
-   (into {} (map (juxt :id identity) events))))
+   (reduce (fn [acc ev] (assoc acc (:id ev) ev)) {} events)))
 
 (re-frame/reg-sub
  :timeline/event
@@ -140,6 +59,8 @@
    (re-frame/subscribe [:timeline/events-map room-id]))
  (fn [events-map [_ _room-id event-id]]
    (get events-map event-id)))
+
+
 
 (re-frame/reg-event-fx
  :sdk/boot-timeline
@@ -365,7 +286,7 @@
 (re-frame/reg-sub
  :timeline/latest-readers
  (fn [[_ room-id _]]
-   [(re-frame/subscribe [:timeline/current-events room-id])
+   [(re-frame/subscribe [:timeline/events room-id])
     (re-frame/subscribe [:sdk/profile])])
  (fn [[events profile] _]
    (let [my-id         (:user-id profile)
@@ -407,12 +328,16 @@
        :else
        [:span.text {:key "empty"} "\u00A0"])]))
 
-(defn timeline-estimate-fn [msg width !prepared-cache !measured-atom theme]
-  (if (= (:id msg) "read-marker")
-    (:virtual-divider-h theme 49)
-    (calc-item-height msg width !prepared-cache theme)))
+
+(re-frame/reg-event-fx :sdk/update-layout-context
+                       (fn [{:keys [db]} [_ room-id width theme measured]]
+                         (main/do-with-pool! @state/!virtualizer-pool
+                                             {:handler :update-layout-context
+                                              :arguments {:room-id room-id :width width :theme theme :measured measured}})
+                         {}))
 
 (def default-metrics {:font "16px sans-serif" :line-height 22.8})
+
 
 (defn pretext-timeline [room-id]
   (let [on-load-older   #(re-frame/dispatch [:sdk/back-paginate room-id])
@@ -423,42 +348,37 @@
         render-sticks   (fn [ruler-ref-fn] [timeline-measuring-sticks ruler-ref-fn])
         render-jump     (fn [do-jump! is-focused?] [timeline-jump-button do-jump! is-focused?])]
     (fn [room-id]
-      (let [events           @(re-frame/subscribe [:timeline/current-events room-id])
+      (let [events           @(re-frame/subscribe [:timeline/events room-id])
             events-map       @(re-frame/subscribe [:timeline/events-map room-id])
             loading?         @(re-frame/subscribe [:timeline/loading-more? room-id])
             loading-forward? @(re-frame/subscribe [:timeline/loading-forward? room-id])
             back-dead?       @(re-frame/subscribe [:timeline/back-dead? room-id])
             jump-target      @(re-frame/subscribe [:timeline/jump-target-id room-id])
-            focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])
-            hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
-            is-mobile?       @(re-frame/subscribe [:ui/mobile?])
-            my-profile       @(re-frame/subscribe [:sdk/profile])
-            my-id            (:user-id my-profile)
-            tr               @(re-frame/subscribe [:i18n/tr])
-            render-item      (fn [layout-node]
-                              ^{:key (:id layout-node)}
-                               [event-tile (:id layout-node) hs-url is-mobile? my-id tr])]
+            focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])]
         [virtualized-list
-         {:items                   events
-          :items-map               events-map
-          :loading-older?          loading?
-          :loading-newer?          loading-forward?
-          :older-dead?             back-dead?
-          :jump-target-id          jump-target
-          :focus-mode?             focus-mode?
-          :on-load-older           on-load-older
-          :on-load-newer           on-load-newer
-          :on-jump-live            on-jump-live
-          :estimate-fn             timeline-estimate-fn
-          :extract-metrics-fn      extract-timeline-metrics
-          :default-theme-metrics   default-metrics
-          :wrapper-class           "timeline-wrapper"
-          :scroll-container-class  "timeline-messages"
-          :render-item             render-item
-          :render-empty-state      render-empty
-          :render-jump-button      render-jump
-          :render-loading-overlay  render-loading
-          :render-measuring-sticks render-sticks}]))))
+         {:items                    events
+          :items-map                events-map
+          :loading-older?           loading?
+          :loading-newer?           loading-forward?
+          :older-dead?              back-dead?
+          :jump-target-id           jump-target
+          :focus-mode?              focus-mode?
+          :on-load-older            on-load-older
+          :on-load-newer            on-load-newer
+          :on-jump-live             on-jump-live
+          :on-layout-context-change (fn [w t m] (re-frame/dispatch [:sdk/update-layout-context room-id w t m]))
+          :extract-metrics-fn       extract-timeline-metrics
+          :default-theme-metrics    default-metrics
+          :wrapper-class            "timeline-wrapper"
+          :scroll-container-class   "timeline-messages"
+          :render-item              event-tile
+          :render-empty-state       render-empty
+          :render-jump-button       render-jump
+          :render-loading-overlay   render-loading
+          :render-measuring-sticks  render-sticks}]))))
+
+
+
 
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
