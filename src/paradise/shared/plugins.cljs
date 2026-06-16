@@ -1,9 +1,9 @@
-(ns plugins
+(ns paradise.shared.plugins
   (:require
    [re-frame.core :as re-frame]
    [reagent.core :as r]
-   [client.state :as state]
-   [utils.svg :as icons]
+   [paradise.shared.client.state :as state]
+   [paradise.shared.utils.svg :as icons]
    [clojure.string :as str]))
 
 (defn build-wrapped-component [base-comp wrappers]
