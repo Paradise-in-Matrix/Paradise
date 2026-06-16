@@ -12,26 +12,26 @@ So this is where we'll start allowing that logic to live.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
-(ns navigation.rooms.entry
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
+(ns paradise.ui.navigation.rooms.entry
   (:require
    [clojure.string :as str]
    [re-frame.core :as re-frame]
    [cljs-workers.core :as main]
    [reagent.core :as r]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]
    [taoensso.timbre :as log]
-   [utils.svg :as icons]
-   [utils.macros :refer [defui]]
-   [utils.global-ui :refer [avatar long-press-props]]))
+   [paradise.shared.utils.svg :as icons]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.global :refer [avatar long-press-props]]))
 #+end_src
 
 
 **** Room Actions
 
 Eventually I'd like to swap these out with SVGs too, but for now they can stay.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (defn build-room-actions [tr room-id parent-id room-name is-space? is-dm? context membership]
   (let [is-joined?  (= membership "joined")
         is-invited? (= membership "invited")
@@ -190,7 +190,7 @@ Now we need a container to 'hold' the room entry items as well as some nice
 behaviors on hover. Should also style the name to prevent any weird UI
 side-effects like too long of a name squishing the SVG (icon).
 
-#+begin_src css :tangle ../../../css/room-list-entry.css
+#+begin_src css :tangle ../../../../../css/room-list-entry.css
 .room-item {
   display: flex;
   align-items: center;
@@ -285,7 +285,7 @@ side-effects like too long of a name squishing the SVG (icon).
 
 ***** Mobile and Desktop Hiding!
 
-#+begin_src css :tangle ../../../css/room-list-entry.css
+#+begin_src css :tangle ../../../../../css/room-list-entry.css
 @media (min-width: 768px) { .hide-on-desktop { display: none !important; } }
 @media (max-width: 767px) { .hide-on-mobile { display: none !important; } }
 #+end_src
@@ -295,7 +295,7 @@ side-effects like too long of a name squishing the SVG (icon).
 
 So we want to ensure that we have a grouping to the right for notifs, room
 actions, and such. Generally they'll only be visible when hovered.
-#+begin_src css :tangle ../../../css/room-list-entry.css
+#+begin_src css :tangle ../../../../../css/room-list-entry.css
 .room-item-right {
       display: flex;
       align-items: center;
@@ -343,7 +343,7 @@ and ensure they are different across desktop and mobile.
 On desktop we have much more liberty with vertical space, but
 on mobile we should ensure we're compressing the participants into
 a nice little 'indicator' of sorts.
-#+begin_src css :tangle ../../../css/room-list-entry.css
+#+begin_src css :tangle ../../../../../css/room-list-entry.css
 
   .call-participants {
     display: flex;
@@ -376,7 +376,7 @@ a nice little 'indicator' of sorts.
 Now we want a smooth notification appearance
 Mentions should probably be a strong red,
 but regular counts should be much softer.
-#+begin_src css :tangle ../../../css/room-list-entry.css
+#+begin_src css :tangle ../../../../../css/room-list-entry.css
 .room-item.has-unread .room-name {
       font-weight: 600;
       color: #ffffff;
@@ -425,7 +425,7 @@ We mostly just need to enforce the behavior on the name
 (don't want names to appear too long) the grid for the
 call controls and some color styling.
 
-#+begin_src css :tangle ../../../css/room-list-entry.css
+#+begin_src css :tangle ../../../../../css/room-list-entry.css
 .active-call-panel {
   padding: 8px;
   width: 100%;
@@ -495,7 +495,7 @@ call controls and some color styling.
 
 Now before we define the panel we may want to define media buttons...
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (defui media-button [active? icon-on icon-off title on-click color-active color-inactive]
   [:button.media-btn
    {:style {:background "transparent"
@@ -514,7 +514,7 @@ Now before we define the panel we may want to define media buttons...
 ***** Active Panel Code
 
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (defui active-call-panel []
   (let [active-call-id  @(re-frame/subscribe [:call/active-room])
         audio-on?       @(re-frame/subscribe [:call/audio-enabled?])
@@ -568,7 +568,7 @@ Now before we define the panel we may want to define media buttons...
 **** Room Action Reframe Subscriptions and Events
 
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (re-frame/reg-event-fx
  :rooms/join
   (fn [{:keys [db]} [_ room-id opts]]
@@ -680,7 +680,7 @@ We need a clean way to check the room's encryption status and whether the
 room is public or not. We'll likely expand on this via room join rules...
 for now this will work though.
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (re-frame/reg-sub
  :room/membership
  (fn [db [_ room-id]]
@@ -781,7 +781,7 @@ better access to the room type on the Room object itself.
 However, as we don't have access to that currently we instead must
 resolve the preview promise here and memoize it. That way we only
 ever do this once per room.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (re-frame/reg-sub
  :room/is-call?
  (fn [db [_ room-id]]
@@ -822,7 +822,7 @@ Also likely important to note that we only bother loading the member list
 for DMs because of this issue. Otherwise that piece can be removed as well.
 
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (defn room-item [initial-props]
   (r/with-let [!attempted? (atom false)]
     (fn [{:keys [id name indent is-space? is-closed? is-dm? has-call?
@@ -955,7 +955,7 @@ for DMs because of this issue. Otherwise that piece can be removed as well.
 
 ***** CSS
 
-#+begin_src css :tangle ../../../css/room-list-entry.css
+#+begin_src css :tangle ../../../../../css/room-list-entry.css
 
 .participant-name {
   white-space: nowrap;
@@ -992,7 +992,7 @@ for DMs because of this issue. Otherwise that piece can be removed as well.
 Now this is actually what we provide to the Virtuoso list for rendering the
 individual elements. Effectively just a fancy destructure to grab the values we
 need out.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/entry.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/entry.cljs
 (defn render-room-item [tr client rooms active-space active-room closed-drawers active-filter]
   (fn [_ raw-room]
     (let [r           (if (map? raw-room) raw-room (js->clj raw-room :keywordize-keys true))
