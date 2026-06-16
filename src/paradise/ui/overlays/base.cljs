@@ -1,4 +1,4 @@
-(ns overlays.base
+(ns paradise.ui.overlays.base
 (:require))
 
 (defmulti modal-component identity)
@@ -21,5 +21,16 @@
       popover-id]))
 
 (defmethod popover-component :plugin-portal [_]
+  (fn [{:keys [render-fn] :as props}]
+    [render-fn props]))
+
+(defmulti context-menu-component identity)
+
+(defmethod context-menu-component :default [menu-id]
+  (fn [_props]
+    [:div {:style {:padding "10px" :color "red"}}
+     (str "Missing context menu: " menu-id)]))
+
+(defmethod context-menu-component :plugin-portal [_]
   (fn [{:keys [render-fn] :as props}]
     [render-fn props]))
