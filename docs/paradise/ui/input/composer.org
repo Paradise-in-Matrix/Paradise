@@ -10,13 +10,13 @@ just keep this to defining the look and feel itself.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
-(ns input.composer
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
+(ns paradise.ui.input.composer
     (:require
      [clojure.string :as str]
-     [utils.images :refer [mxc->url url->mxc mxc-image]]
-     [utils.macros :refer [defui]]
-     [input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
+     [paradise.media.component :refer [mxc->url url->mxc media]]
+     [paradise.shared.utils.macros :refer [defui]]
+     [paradise.ui.input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
      ["react" :as react]
      [reagent.core :as r]
      ["@tiptap/react" :refer [useEditor EditorContent ReactNodeViewRenderer NodeViewWrapper]]
@@ -35,7 +35,7 @@ just keep this to defining the look and feel itself.
 
 ***** Extension Definitions
 
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 (def emoji-trigger
   (-> Mention
       (.extend #js {:name "emojiTrigger"})
@@ -58,7 +58,7 @@ just keep this to defining the look and feel itself.
 
 ***** Helper Functions
 
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 (defn renderHtml [^js props]
   (let [attrs         (.-HTMLAttributes props)
         raw-shortcode (aget attrs "shortcode")
@@ -75,7 +75,7 @@ just keep this to defining the look and feel itself.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 (defn prepare-html-for-editor [raw-html]
   (if (string? raw-html)
     (str/replace raw-html
@@ -86,7 +86,7 @@ just keep this to defining the look and feel itself.
 
 Now Tiptap has the HTTPS URL inside of the message box, but we can't send that
 so below is a helper function that converts the node BACK to Mxc on send.
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 (defn get-matrix-formatted-body [editor]
   (let [json (.. editor getJSON -content)
         node->html (fn node->html [node]
@@ -132,7 +132,7 @@ so below is a helper function that converts the node BACK to Mxc on send.
 
 ***** Custom TipTap Node
 
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 
 (defn emote-node-view [props]
   (let [node  (:node props)
@@ -140,7 +140,7 @@ so below is a helper function that converts the node BACK to Mxc on send.
         mxc   (or (aget attrs "mxc") (aget attrs "src"))
         alt   (aget attrs "shortcode")]
     [:> NodeViewWrapper {:as "span" :style {:display "inline-block" :vertical-align "middle"}}
-     [mxc-image
+     [media
       {:mxc   mxc
        :class "chat-input-emote"
        :style {:height "1.5em" :width "auto"}
@@ -186,7 +186,7 @@ It makes it easy to add new ones though.
 
 https://tiptap.dev/docs/editor/core-concepts/extensions
 
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 (def file-drop-extension
   (.create Extension
     #js {:name "fileDropHandler"
@@ -225,7 +225,7 @@ https://tiptap.dev/docs/editor/core-concepts/extensions
 **** Submit Extension
 
 This determines the 'submit' behavior for the editor.
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 (def submit-extension
   (.create Extension
            #js {:name "submitExtension"
@@ -253,7 +253,7 @@ We build out the editor with the above extensions to 'include' that behavior.
 Then we build the react component as TipTap leans heavily on React hooks and
 re-frame tends to avoid them if possible. This is one of those if possible cases,
 so we stick with what the complex component expects.
-#+begin_src clojurescript :tangle ../../src/input/composer.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
 (defn tiptap-component [^js props]
   (let [active-id    (.. props -children -activeId)
         on-send      (.. props -children -onSend)
@@ -269,13 +269,13 @@ so we stick with what the complex component expects.
                 #js {:extensions #js [(.configure StarterKit #js {})
                                       (.configure Placeholder #js {:placeholder placeholder})
                                       (.configure submit-extension
-                                      #js {:onSend (fn [text html]
-                                                     (let [cb (.-onSend (.-current latest-cbs))]
-                                                       (when cb (cb text html))))})
+                                                  #js {:onSend (fn [text html]
+                                                                 (let [cb (.-onSend (.-current latest-cbs))]
+                                                                   (when cb (cb text html))))})
                                       (.configure file-drop-extension
-                                      #js {:onFiles (fn [files]
-                                                      (let [cb (.-onFiles (.-current latest-cbs))]
-                                                        (when cb (cb files))))})
+                                                  #js {:onFiles (fn [files]
+                                                                  (let [cb (.-onFiles (.-current latest-cbs))]
+                                                                    (when cb (cb files))))})
                                       (.configure custom-emote #js {})
                                       emoji-trigger
                                       user-trigger
@@ -296,7 +296,8 @@ so we stick with what the complex component expects.
 
     (react/useEffect
      (fn []
-       (when (and editor loaded-text)
+       (when (and editor loaded-text
+                  (.-schema editor))
          (let [current-html (.getHTML editor)]
            (when (not= current-html loaded-text)
              (.commands.setContent editor loaded-text))))
@@ -313,11 +314,12 @@ so we stick with what the complex component expects.
                                 :onClick (fn [] (.commands.focus editor))}
                            (react/createElement EditorContent #js {:editor editor})))))
 
+
 #+end_src
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/composer.css
+#+begin_src css :tangle ../../../../css/composer.css
 
 .tiptap-editor-container,
 .tiptap-editor-container > div {
