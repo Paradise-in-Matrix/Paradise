@@ -1,16 +1,16 @@
-(ns navigation.spaces.bar
+(ns paradise.ui.navigation.spaces.bar
   (:require
    [re-frame.core :as re-frame]
    [reagent.core :as r]
    ["react-virtuoso" :refer [Virtuoso]]
    [cljs-workers.core :as main]
-   [client.state :as state]
-   [client.session-store :as store]
+   [paradise.shared.client.state :as state]
+   [paradise.shared.client.session-store :as store]
    [cljs.core.async :refer [go <!]]
-   [overlays.settings :refer [sidebar-profile-mini]]
-   [utils.svg :as icons]
-   [utils.macros :refer [defui]]
-   [utils.global-ui :refer [avatar]]))
+   [paradise.ui.overlays.settings :refer [sidebar-profile-mini]]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.global :refer [avatar]]))
 
 (re-frame/reg-event-db
  :sdk/set-spaces-list-sync
