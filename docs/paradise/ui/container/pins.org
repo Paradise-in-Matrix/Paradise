@@ -29,22 +29,22 @@ Doesn't matter how, but we need one of those to render the actual entries.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/container/pins.cljs
-(ns container.pins
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/pins.cljs
+(ns paradise.ui.container.pins
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]
    [reagent.core :as r]
-   [utils.svg :as icons]
-   [container.reusable :refer [message-preview-item]]))
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.container.reusable :refer [message-preview-item]]))
 
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/pins.cljs
 
 
 #+end_src
@@ -55,7 +55,7 @@ Doesn't matter how, but we need one of those to render the actual entries.
 
 ***** Fetching
 
-#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/pins.cljs
 (re-frame/reg-event-fx
  :room/fetch-pinned-events
  (fn [{:keys [db]} [_ room-id]]
@@ -68,7 +68,7 @@ Doesn't matter how, but we need one of those to render the actual entries.
 
 ***** Saving and Getting
 
-#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/pins.cljs
 
 (re-frame/reg-event-db
  :room/sync-pinned-ids
@@ -93,7 +93,7 @@ Doesn't matter how, but we need one of those to render the actual entries.
 **** Component
 
 
-#+begin_src clojurescript :tangle ../../src/container/pins.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/pins.cljs
 
 (defn ^:ui pins []
   (let [active-room @(re-frame/subscribe [:rooms/active-id])
@@ -114,7 +114,7 @@ Doesn't matter how, but we need one of those to render the actual entries.
 #+end_src
 
 
-#+begin_src css :tangle ../../css/pins.css
+#+begin_src css :tangle ../../../../css/pins.css
 .sidebar-pins-container {
     display: flex;
     flex-direction: column;
