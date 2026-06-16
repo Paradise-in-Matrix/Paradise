@@ -1,4 +1,4 @@
-(ns input.emotes
+(ns paradise.ui.input.emotes
   (:require
    [promesa.core :as p]
    [re-frame.core :as re-frame]
@@ -6,12 +6,12 @@
    [clojure.string :as str]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [reagent.core :as r]
-   [utils.helpers :refer [fetch-state-event fetch-room-state]]
-   [utils.global-ui :refer [click-away-wrapper]]
-   [utils.macros :refer [defui]]
-   [utils.images :refer [mxc-image]]
+   [paradise.shared.utils.helpers :refer [fetch-state-event fetch-room-state]]
+   [paradise.ui.global :refer [click-away-wrapper]]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.media.component :refer [media]]
    ["emojibase-data/en/data.json" :as emoji-data]
    ["react" :as react]
    ))
@@ -164,7 +164,7 @@
                                          (:is-unicode? pack-data)
                                          [:span.pack-text-icon (:hero-icon pack-data)]
                                          avatar
-                                         [mxc-image {:mxc   avatar
+                                         [media {:mxc   avatar
                                                      :class "pack-icon"
                                                      :alt   pname}]
                                          :else
@@ -196,7 +196,7 @@
                                                        (on-insert-emoji shortcode (:url item))))}
                                         (if (:is-unicode? item)
                                           [:span.native-emoji {:title shortcode} (:unicode item)]
-                                          [mxc-image {:mxc   (:url item)
+                                          [media {:mxc   (:url item)
                                                       :class "emoji-img"
                                                       :title shortcode
                                                       :alt   shortcode}])]))]
@@ -228,7 +228,7 @@
 
                                        (if (:is-unicode? active-pack)
                                          [:span.native-emoji {:title shortcode} (:unicode item)]
-                                         [mxc-image {:mxc   (:url item)
+                                         [media {:mxc   (:url item)
                                                      :class "emoji-img"
                                                      :title shortcode
                                                      :alt   shortcode}])])]])]])]]
