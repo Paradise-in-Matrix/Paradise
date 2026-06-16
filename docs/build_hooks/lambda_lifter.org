@@ -102,7 +102,7 @@ Hiccup vectors.
                              bind-str  (if (empty? free-syms)
                                          "_"
                                          (str "{:keys [" (str/join " " free-syms) "]}"))]
-                         (str "(clojure.core/swap! client.registry/!anon-fns clojure.core/assoc " hash-kw "\n"
+                         (str "(clojure.core/swap! paradise.shared.client.registry/!anon-fns clojure.core/assoc " hash-kw "\n"
                               "  (fn [" bind-str "]\n"
                               "    " code "))")))
                      registry)]
