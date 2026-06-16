@@ -17,26 +17,26 @@ diffs like Timeline, Spaces, and Rooms.
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
-(ns container.members
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
+(ns paradise.ui.container.members
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    ["react-virtuoso" :refer [GroupedVirtuoso]]
    [reagent.core :as r]
-   [utils.images :refer [mxc-image]]
-   [utils.svg :as icons]
-   [utils.global-ui :refer [avatar]]
+   [paradise.media.component :refer [media]]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.global :refer [avatar]]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]))
+   [paradise.shared.client.state :as state]))
 #+end_src
 
 
 **** Reframe Events
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 (re-frame/reg-event-fx
  :room/fetch-members
  (fn [{:keys [db]} [_ room-id]]
@@ -52,7 +52,7 @@ diffs like Timeline, Spaces, and Rooms.
      (log/error "Cannot fetch members: No engine pool"))
    {:db (assoc-in db [:room-members room-id :loading?] true)}))
 
-(re-frame/reg-event-db
+ (re-frame/reg-event-db
  :room/fetch-members-success
  (fn [db [_ room-id raw-members]]
    (let [clean-members (mapv (fn [m]
@@ -77,7 +77,7 @@ diffs like Timeline, Spaces, and Rooms.
 
 **** Reframe Subscriptions
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 
 (re-frame/reg-sub
  :room/member-sort-type
@@ -203,7 +203,7 @@ room. We want to also reify the resulting objects so we can sort
 the entries by the local part of the user id or display name or by the
 power level.
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 
 
 #+end_src
@@ -216,7 +216,7 @@ So now we want to provide the user interface a method to actually filter
 and display different forms of data. Like the list of banned users or
 just everyone in the current room.
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 
 #+end_src
 
@@ -256,7 +256,7 @@ here then.
 
 ***** Fetcher
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 (re-frame/reg-event-fx
  :room/fetch-power-level-tags
  (fn [_ [_ room-id]]
@@ -285,7 +285,7 @@ here then.
 
 **** Global Member Reframe Subscriptions
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 
 
 #+end_src
@@ -299,7 +299,7 @@ and then provide easy swapping between the categories themselves.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 (defn filter-pill [room-id label type active-type count]
   [:button.filter-pill
    {:class (when (= type active-type) "active")
@@ -310,7 +310,7 @@ and then provide easy swapping between the categories themselves.
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/member-list.css
+#+begin_src css :tangle ../../../../css/member-list.css
 
   .filter-pill {
       padding: 4px 10px;
@@ -349,7 +349,7 @@ Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
 
 
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 (defn profile-popover-trigger [member custom-tags active-room pos child]
   (let [open-popover! (fn [current-target]
                         (let [rect (.getBoundingClientRect current-target)
@@ -357,6 +357,7 @@ Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
                                    (- (.-left rect) 265)
                                    (+ (.-right rect) 15))
                               py (.-top rect)]
+                          (log/error member)
                           (re-frame/dispatch
                            [:ui/open-popover :profile-preview
                             {:x         px
@@ -388,7 +389,7 @@ Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 (defn member-item [m custom-tags active-room]
   (let [pl         (:power-level m)
         tag-data   (get custom-tags (keyword (str pl)))
@@ -404,7 +405,7 @@ Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
         (when role-name
           [:div.member-item-role-badge {:style {:color role-color :border (str "1px solid " role-color)}}
            (when icon-mxc
-             [mxc-image {:mxc icon-mxc :class "member-item-role-icon"}])
+             [media {:mxc icon-mxc :class "member-item-role-icon"}])
            role-name])]
        [:span.member-item-user-id (:user-id m)]]]]))
 #+end_src
@@ -412,7 +413,7 @@ Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/member-list.css
+#+begin_src css :tangle ../../../../css/member-list.css
   .member-item {
       display: flex;
       align-items: center;
@@ -471,7 +472,7 @@ Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/container/members.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/members.cljs
 (defn member-list []
   (let [tr           @(re-frame/subscribe [:i18n/tr])
         active-room  @(re-frame/subscribe [:rooms/active-id])
@@ -543,7 +544,7 @@ Maybe we can link in org-mode? I forget if backlinks were just a Dendron thing.
 ***** CSS
 
 
-#+begin_src css :tangle ../../css/member-list.css
+#+begin_src css :tangle ../../../../css/member-list.css
 .member-list {
       display: flex;
       flex-direction: column;
