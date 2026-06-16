@@ -1,14 +1,14 @@
-(ns overlays.quick-switcher
+(ns paradise.ui.overlays.quick-switcher
 (:require
- [utils.svg :as icons]
- [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
- [utils.images :refer [mxc-image]]
- [utils.macros :refer [defui]]
+ [paradise.shared.utils.svg :as icons]
+ [paradise.ui.global :refer [avatar handle-list-navigation selectable-list]]
+ [paradise.media.component :refer [media]]
+ [paradise.shared.utils.macros :refer [defui]]
  [re-frame.core :as re-frame]
  [reagent.core :as r]
  [clojure.string :as str]
  [taoensso.timbre :as log]
- [overlays.base :refer [modal-component popover-component]]))
+ [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 
 (re-frame/reg-event-db
  :quick-switcher/toggle
