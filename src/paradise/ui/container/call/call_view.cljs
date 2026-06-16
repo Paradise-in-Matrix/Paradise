@@ -1,10 +1,10 @@
-(ns container.call.call-view
+(ns paradise.ui.container.call.call-view
   (:require [reagent.core :as r]
             [re-frame.core :as rf]
             [goog.functions :as gf]
-            [utils.macros :refer [defui]]
-            [container.reusable :refer [room-header]]
-            [container.call.call-container :refer [host-rect]]))
+            [paradise.shared.utils.macros :refer [defui]]
+            [paradise.ui.container.reusable :refer [room-header]]
+            [paradise.ui.container.call.call-container :refer [host-rect]]))
 
 (defui call-view [room-id]
   (let [host-ref    (r/atom nil)
