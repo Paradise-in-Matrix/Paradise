@@ -1,14 +1,14 @@
-(ns navigation.rooms.room-list
+(ns paradise.ui.navigation.rooms.room-list
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [cljs-workers.core :as main]
-   [client.state :as state]
-   [client.session-store :as store]
-   [utils.macros :refer [defui]]
-   [utils.svg :as icons]
+   [paradise.shared.client.state :as state]
+   [paradise.shared.client.session-store :as store]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.shared.utils.svg :as icons]
    ["react-virtuoso" :refer [Virtuoso]]
-   [navigation.rooms.entry :refer [render-room-item active-call-panel]]
+   [paradise.ui.navigation.rooms.entry :refer [render-room-item active-call-panel]]
    [cljs.core.async :refer [go <!]]))
 
 (re-frame/reg-event-db
@@ -49,7 +49,6 @@
       (if (undefined? v)
         (aget obj (name k-kw))
         v))))
-
 
 
 
@@ -95,6 +94,8 @@
                acc-with-item)))))
      []
      child-refs)))
+
+
 
 (re-frame/reg-sub :rooms/active-id (fn [db _] (:active-room-id db)))
 (re-frame/reg-sub :space-rooms (fn [db _] (vec (or (:space-rooms db) []))))
@@ -337,6 +338,7 @@
     [:div.filter-bar
      (for [[id label-key] [["people" :navigation.room-list.filters/people]
                            ["unread" :navigation.room-list.filters/unread]
+                           ["invites" :navigation.room-list.filters/invites]
                            ["other"    :navigation.room-list.filters/all] ]]
        ^{:key id}
        [:button.filter-btn
