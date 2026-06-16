@@ -3,21 +3,23 @@
 
 **** Preface
 
+Room Lists sauce here.
+(Likely added preface portions after writing this.)
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-(ns navigation.rooms.room-list
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
+(ns paradise.ui.navigation.rooms.room-list
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [cljs-workers.core :as main]
-   [client.state :as state]
-   [client.session-store :as store]
-   [utils.macros :refer [defui]]
-   [utils.svg :as icons]
+   [paradise.shared.client.state :as state]
+   [paradise.shared.client.session-store :as store]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.shared.utils.svg :as icons]
    ["react-virtuoso" :refer [Virtuoso]]
-   [navigation.rooms.entry :refer [render-room-item active-call-panel]]
+   [paradise.ui.navigation.rooms.entry :refer [render-room-item active-call-panel]]
    [cljs.core.async :refer [go <!]]))
 #+end_src
 
@@ -26,7 +28,7 @@
 **** Syncing
 
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (re-frame/reg-event-db
  :rooms/parent-resolved
  (fn [db _]
@@ -54,7 +56,7 @@
 **** Space Tree Flattening
 
 This is just a simple filter method to deduplicate
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (defn distinct-by [f coll]
   (let [!seen (atom #{})]
     (filterv (fn [x]
@@ -80,8 +82,7 @@ This is just a simple filter method to deduplicate
 This provides a method to take the room map and turn it into a usable structure
 to actually visualize our room lists. I'll come back and add more to this when
 I add the call room previewing.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
-
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 
 (defn flatten-tree [rooms-map children-map space-orders closed-drawers previews-map join-mode? parent-id depth]
   (let [sdk-children    (get children-map parent-id [])
@@ -124,6 +125,8 @@ I add the call room previewing.
                acc-with-item)))))
      []
      child-refs)))
+
+
 #+end_src
 
 
@@ -131,7 +134,7 @@ I add the call room previewing.
 
 There are our reframe pieces. I'll go into detail on each of them later on. For now this
 is effectively a functioning *stub*.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (re-frame/reg-sub :rooms/active-id (fn [db _] (:active-room-id db)))
 (re-frame/reg-sub :space-rooms (fn [db _] (vec (or (:space-rooms db) []))))
 (re-frame/reg-sub :rooms/all (fn [db _] (let [rooms (:rooms db)] (if (map? rooms) (vec (vals rooms)) (vec (or rooms []))))))
@@ -187,7 +190,7 @@ this valuable data. Instead we want to provide a simple 'parsed' map for
 the DMs list or All rooms list as these are best served fresh first.
 For the space rooms themselves we want to flatten as we have described
 above.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 
 (re-frame/reg-sub :rooms/unfiltered-indexed-map (fn [db _] (get db :rooms-unfiltered-cache {})))
 
@@ -247,7 +250,7 @@ above.
 
 ***** CSS
 
-#+begin_src css :tangle ../../../css/room-list.css
+#+begin_src css :tangle ../../../../../css/room-list.css
 .room-drawer-header {
     display: flex;
     align-items: center;
@@ -285,7 +288,7 @@ above.
 
 ***** Reframe components
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (re-frame/reg-event-db
  :rooms/toggle-drawer
  (fn [db [_ drawer-id]]
@@ -310,7 +313,7 @@ To a much easier degree, we need to also calculate the unread count for DMs.
 This is mostly useful for presenting that info on the space bar cleanly.
 Otherwise we would just re-use (and probably should see if we can)
 the method we have for all other rooms.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (re-frame/reg-sub
                                    :space/unread-stats
                                    :<- [:rooms/unfiltered-indexed-map]
@@ -368,7 +371,7 @@ view state.
 ****** TODO Fix the actual swap impl.
 Stopped and just stubbed it in for now while I go back and clean up the CSS
 and file structures.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (defn- is-call-room? [db room-id]
   (get-in db [:room-previews room-id :is-call?] false))
 
@@ -467,7 +470,7 @@ entire room list to reload. Hopefully not.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (defui filter-toggle-bar []
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         active-filter @(re-frame/subscribe [:room-list/active-filter])]
@@ -509,7 +512,7 @@ entire room list to reload. Hopefully not.
 ***** CSS
 
 Now the CSS for the filter is relatively simple
-#+begin_src css :tangle ../../../css/room-list.css
+#+begin_src css :tangle ../../../../../css/room-list.css
 .filter-bar {
     display: flex;
     gap: 8px;
@@ -559,7 +562,7 @@ We assign the data to be represented as the room array itself.
 Now, we can also add nifty behavior for the content itself by then
 checking for the "kind" of room. For now though, this is plenty sufficient.
 
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (defui virtualized-room-list [tr client room-array active-space active-room closed-drawers active-filter]
   (let [item-renderer (render-room-item tr client room-array active-space active-room closed-drawers active-filter)]
     [:> Virtuoso
@@ -579,7 +582,7 @@ checking for the "kind" of room. For now though, this is plenty sufficient.
 
 
 Now for the CSS
-#+begin_src css :tangle ../../../css/room-list.css
+#+begin_src css :tangle ../../../../../css/room-list.css
 .sidebar-rooms {
     width: 240px;
     flex-shrink: 1;
@@ -625,7 +628,7 @@ Now for our room list component itself, we have three subscriptions requested fr
 We want to make sure the component updates if our rooms change, our active space changes,
 or our active room changes. We then add some decorating Hiccup around it to round out the
 component.
-#+begin_src clojurescript :tangle ../../../src/navigation/rooms/room_list.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/navigation/rooms/room_list.cljs
 (defui room-list []
   (let [tr              @(re-frame/subscribe [:i18n/tr])
         rooms           @(re-frame/subscribe [:rooms/current-view])
@@ -669,7 +672,7 @@ component.
 **** CSS (Needs testing)
 
 
-#+begin_src css :tangle ../../../css/room-list.css
+#+begin_src css :tangle ../../../../../css/room-list.css
 .room-drawer-header {
     display: flex;
     align-items: center;
