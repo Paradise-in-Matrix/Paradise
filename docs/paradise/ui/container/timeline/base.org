@@ -12,8 +12,8 @@ we've made interop with the WASM bindings.
 
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
-(ns container.timeline.base
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
+(ns paradise.ui.container.timeline.base
   (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
@@ -23,22 +23,22 @@ we've made interop with the WASM bindings.
             [reagent.core :as r]
             [eve.atom :as ea]
             [goog.object]
-            [client.state :as state]
+            [paradise.shared.client.state :as state]
             [reagent.dom.client :as rdom]
-            [utils.images :refer [mxc->url]]
-            [utils.helpers :refer [sanitize-custom-html format-divider-date format-readers join-names get-status-string process-raw-event]]
-            [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper]]
-            [utils.svg :as icons]
+            [paradise.media.component :refer [mxc->url]]
+            [paradise.shared.utils.helpers :refer [sanitize-custom-html format-divider-date format-readers join-names get-status-string process-raw-event]]
+            [paradise.ui.global :refer [avatar long-press-props swipe-to-action-wrapper]]
+            [paradise.shared.utils.svg :as icons]
             [virtualizer.core :refer [virtualized-list]]
-            [container.timeline.hydrator :refer [!local-timeline-data]]
-            [container.timeline.item :refer [event-tile]]
-            [container.timeline.components :refer [timeline-empty-state
+            [paradise.ui.container.timeline.hydrator :refer [!local-timeline-data]]
+            [paradise.ui.container.timeline.item :refer [event-tile]]
+            [paradise.ui.container.timeline.components :refer [timeline-empty-state
                                                    timeline-jump-button
                                                    timeline-loading-overlay
                                                    timeline-measuring-sticks
                                                    extract-timeline-metrics]]
-            [container.reusable :refer [room-header]]
-            [input.base :refer [message-input]]))
+            [paradise.ui.container.reusable :refer [room-header]]
+            [paradise.ui.input.base :refer [message-input]]))
 
 #+end_src
 
@@ -48,7 +48,7 @@ we've made interop with the WASM bindings.
 **** Reframe event and subscriptions
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
 (re-frame/reg-event-db
  :app/worker-redraw-ping
  (fn [db _]
@@ -279,7 +279,7 @@ is an edit)
 When no readers are present we use a line break that won't get optimized
 away.
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
 (defn followers-indicator [active-room]
   (let [reader-ids  @(re-frame/subscribe [:timeline/latest-readers])
         members-map @(re-frame/subscribe [:room/members-map active-room])
@@ -303,7 +303,7 @@ It is important we reserve the space for this as if we don't
 the user may be typing and it'll bump the composer when it appears.
 
 
-#+begin_src css :tangle ../../../css/timeline.css
+#+begin_src css :tangle ../../../../../css/timeline.css
 
 .followers-indicator {
     font-size: 0.75rem;
@@ -337,7 +337,7 @@ uses the mini-buffer. A nice status indicator.
 
 ***** Reframe Subscriptions and Events
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
 (re-frame/reg-event-db
  :sdk/clear-stale-typing
  (fn [db [_ room-id]]
@@ -374,7 +374,7 @@ We want to subscribe to a single room's events to have the read indicators for i
 We then just want to filter out the event objects and get the read-by from inside.
 We also don't want to list our own name, so we remove that too.
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
 
 (re-frame/reg-sub
  :timeline/latest-readers
@@ -395,7 +395,7 @@ We also don't want to list our own name, so we remove that too.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
 (defn status-indicator [active-room]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         typing-info   @(re-frame/subscribe [:room/typing-users active-room])
@@ -433,7 +433,7 @@ We also don't want to list our own name, so we remove that too.
 **** Virtualized Timeline
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
 
 (re-frame/reg-event-fx :sdk/update-layout-context
                        (fn [{:keys [db]} [_ room-id width theme measured]]
@@ -496,7 +496,7 @@ update the timeline via reframe being told when the Rust SDK has
 received an update.
 ***** TODO dig into the display-name
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/base.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/base.cljs
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
         room-meta    @(re-frame/subscribe [:rooms/active-metadata])
@@ -523,7 +523,7 @@ received an update.
 
 I will segment these another time
 
-#+begin_src css :tangle ../../../css/timeline.css
+#+begin_src css :tangle ../../../../../css/timeline.css
 
 
 
