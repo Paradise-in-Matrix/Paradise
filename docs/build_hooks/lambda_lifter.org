@@ -126,36 +126,46 @@ This is more or less where we actually perform the body of work to walk the AST 
                (cond
                  (= (first x) 'ns)
                  (let [ns-name (second x)
-                       reqs (if (#{'client.registry 'client.state 're-frame.db 'client.core 'utils.macros} ns-name)
+                       reqs (if (#{'paradise.shared.client.registry 'paradie.shared.client.state 're-frame.db 'paradise.shared.client.core 'paradise.shared.utils.macros} ns-name)
                               (do (reset! skip-instrument? true) extra-requires)
-                              (do (reset! skip-instrument? false) (conj extra-requires '[client.registry])))]
+                              (do (reset! skip-instrument? false) (conj extra-requires '[paradise.shared.client.registry])))]
                    (reset! current-ns ns-name)
                    (inject-requires x reqs))
-
                  (and (= (first x) 'defn) (not @skip-instrument?))
                  (let [fn-name      (second x)
-                       is-ui?       (:ui (meta fn-name))
-                       fqn          (keyword (name @current-ns) (name fn-name))
+                       meta-map     (meta fn-name)
+                       is-ui?       (:ui meta-map)
+                       is-react?    (:react meta-map)
+                       fqn          (keyword (str @current-ns) (str fn-name))
+                       comp-str     (str "comp:" (str @current-ns) "/" (str fn-name))
                        default-name (symbol (str fn-name "-default"))
-                       registry     (if is-ui? 'client.registry/!components 'client.registry/!pure-fns)
+                       registry     (if (or is-ui? is-react?) 'paradise.shared.client.registry/!components 'paradise.shared.client.registry/!pure-fns)
                        default-defn (cons 'defn (cons default-name (drop 2 x)))
                        args-sym     (gensym "args")
                        override-sym (gensym "override")
                        live-fn-sym  (gensym "live-fn")]
                    `(do
                       ~default-defn
+                      (clojure.core/aset ~default-name "$fn_ptr" ~fqn)
+                      ~(when is-react?
+                         `(clojure.core/aset ~default-name "$react_boundary" ~comp-str))
+
                       (swap! ~registry #(if (contains? % ~fqn) % (assoc % ~fqn ~default-name)))
                       (defn ~fn-name [& ~args-sym]
-                        (let [~override-sym (get @client.registry/!active-overrides ~fqn)
+                        (let [~override-sym (get @paradise.shared.client.registry/!active-overrides ~fqn)
                               ~live-fn-sym  (if ~override-sym
                                               (:fn ~override-sym)
                                               (get @~registry ~fqn))]
-                          ~(if is-ui?
+                          ~(if (or is-ui? is-react?)
                              `(into [~live-fn-sym] ~args-sym)
-                             `(apply ~live-fn-sym ~args-sym))))))
+                             `(apply ~live-fn-sym ~args-sym))))
+                      (clojure.core/aset ~fn-name "$fn_ptr" ~fqn)
+                      ~(when is-react?
+                         `(clojure.core/aset ~fn-name "$react_boundary" ~comp-str))))
                  :else x)
                x))
            (rest ast-form)))))
+
 #+end_src
 
 
@@ -248,7 +258,7 @@ In fact, this was what necessitated building out this build hook.
                       (let [env-map (into {} (map (fn [s] [(keyword s) (symbol s)]) free-vars))
                             replacement-str (str "(clojure.core/let [f# " form-str "]\n"
                                                  "  (clojure.core/aset f# \"$fn_ptr\" " fn-hash ")\n"
-                                                 "  (clojure.core/aset f# \"$env\" (client.registry/dehydrate " (pr-str env-map) "))\n"
+                                                 "  (clojure.core/aset f# \"$env\" (paradise.shared.client.registry/dehydrate " (pr-str env-map) "))\n"
                                                  "  f#)")]
                         (z/replace loc (z/node (z/of-string replacement-str)))))))]
     {:new-source (z/root-string mod-zloc)
@@ -263,7 +273,7 @@ Have to avoid registering in the few files that do not need it.
 
 #+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn skip-file? [code]
-  (re-find #"\(ns\s+(utils\.macros|client\.registry|client\.state|client\.core)" code))
+  (re-find #"\(ns\s+(paradise\.shared\.utils\.macros|paradise\.shared\.client\.registry|paradise\.shared\.client\.state|paradise\.shared\.client\.core|re-frame\.db|net)" code))
 #+end_src
 
 
