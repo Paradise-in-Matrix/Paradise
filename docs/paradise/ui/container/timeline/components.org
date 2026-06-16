@@ -8,8 +8,8 @@ The components for the timeline. Need to move these to the correct spot.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/components.cljs
-(ns container.timeline.components
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/components.cljs
+(ns paradise.ui.container.timeline.components
   (:require [re-frame.core :as re-frame]
             [clojure.string :as str]
             ))
@@ -17,7 +17,7 @@ The components for the timeline. Need to move these to the correct spot.
 
 **** Code
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/components.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/components.cljs
 (defn timeline-empty-state [room-id]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:div.timeline-empty {:style {:padding "40px" :text-align "center"}}
