@@ -1,9 +1,9 @@
-(ns container.call.events
+(ns paradise.ui.container.call.events
   (:require [re-frame.core :as rf]
             [taoensso.timbre :as log]
             [cljs-workers.core :as main]
-            [client.state :as state]
-            [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
+            [paradise.shared.client.state :as state]
+            [paradise.ui.container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
 
 (defn click-iframe-button! [iframe-ref test-id]
   (when-let [iframe @iframe-ref]
