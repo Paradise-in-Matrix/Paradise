@@ -1,4 +1,4 @@
-(ns overlays.notifications
+(ns paradise.ui.overlays.notifications
 (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [promesa.core :as p]
@@ -6,8 +6,8 @@
             [cljs.core.async.interop :refer-macros [<p!]]
             ["@capacitor/core" :refer [Capacitor registerPlugin]]
             ["@capacitor/push-notifications" :refer [PushNotifications]]
-            [client.state :refer [!config] :as state]
-            [client.session-store :as store]
+            [paradise.shared.client.state :refer [!config] :as state]
+            [paradise.shared.client.session-store :as store]
             [cljs-workers.core :as main]))
 
 (def shadow-device (registerPlugin "ShadowDevice"))
