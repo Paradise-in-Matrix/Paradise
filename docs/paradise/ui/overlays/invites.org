@@ -9,15 +9,15 @@ populated based on DMs to give the user a familiar UI.
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/invites.cljs
-(ns overlays.invites
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/invites.cljs
+(ns paradise.ui.overlays.invites
   (:require
-   [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
+   [paradise.ui.global :refer [avatar handle-list-navigation selectable-list]]
    [re-frame.core :as re-frame]
    [reagent.core :as r]
    [clojure.string :as str]
-   [utils.macros :refer [defui]]
-   [overlays.base :refer [modal-component popover-component]]))
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 #+end_src
 
 
@@ -25,7 +25,7 @@ populated based on DMs to give the user a familiar UI.
 
 **** Component
 
-#+begin_src clojurescript :tangle ../../src/overlays/invites.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/invites.cljs
 (defui invite-menu-content [{:keys [target-room-id]}]
   (let [tr        @(re-frame/subscribe [:i18n/tr])
         rooms-map @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
@@ -201,7 +201,7 @@ populated based on DMs to give the user a familiar UI.
 **** CSS
 
 
-#+begin_src css :tangle ../../css/invites.css
+#+begin_src css :tangle ../../../../css/invites.css
 
 .invite-user-row {
     display: flex;
