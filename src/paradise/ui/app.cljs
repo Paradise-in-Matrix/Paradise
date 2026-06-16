@@ -1,35 +1,41 @@
-(ns app
+(ns paradise.ui.app
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [clojure.string :as str]
+   [re-frame.db :as db]
+   [paradise.shared.client.state :as state]
    [reagent.core :as r]
+   [eve.alpha :as eve]
+   [eve.atom :as ea]
+   [eve.mem :as mem]
+   [eve.deftype-proto.alloc :as alloc]
    [reagent.dom.client :as rdom]
-   [navigation.spaces.bar :refer [spaces-sidebar]]
-   [client.key-handler :refer [global-key-listener]]
-   [overlays.notifications :as notifications]
-   [overlays.settings]
-   [overlays.invites]
-   [overlays.creation]
-   [overlays.quick-switcher]
-   [overlays.lightbox]
-   [overlays.profiles]
-   [overlays.reactions]
-   [plugin-storage]
-   [auth.events :refer [login-screen]]
-   [container.call.call-container :refer [persistent-call-container]]
-   [client.config :refer [load-config check-remote-version load-i18n]]
-   [client.state :refer [!config]]
-   [client.session-store :as store]
+   [paradise.ui.navigation.spaces.bar :refer [spaces-sidebar]]
+   [paradise.shared.client.key-handler :refer [global-key-listener]]
+   [paradise.ui.overlays.notifications :as notifications]
+   [paradise.ui.overlays.messages]
+   [paradise.ui.overlays.settings]
+   [paradise.ui.overlays.invites]
+   [paradise.ui.overlays.creation]
+   [paradise.ui.overlays.quick-switcher]
+   [paradise.ui.overlays.lightbox]
+   [paradise.ui.overlays.profiles]
+   [paradise.ui.overlays.reactions]
+   [paradise.shared.plugin-storage]
+   [paradise.ui.auth.events :refer [login-screen]]
+   [paradise.ui.container.call.call-container :refer [persistent-call-container]]
+   [paradise.shared.client.config :refer [load-config check-remote-version load-i18n eve-enabled?]]
+   [paradise.shared.client.state :refer [!config]]
+   [paradise.shared.client.session-store :as store]
    [taoensso.tempura :as tempura :refer [tr]]
-   [utils.global-ui :refer [global-reaction-picker modal-root popover-root global-context-menu satellite-overlay make-swipe-handlers]]
+   [paradise.ui.global :refer [modal-root popover-root context-menu-root satellite-overlay make-swipe-handlers]]
    ["@capacitor/app" :refer [App]]
-   [utils.macros :refer [i18n-data defui]]
-   [utils.svg :as icons]
-   [navigation.rooms.room-list :refer [room-list]]
-   [container.base :refer [container]]
-   ))
+   [paradise.shared.utils.macros :refer [i18n-data defui]]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.navigation.rooms.room-list :refer [room-list]]
+   [paradise.ui.container.base :refer [container]]))
 
 #_(def default-db
   {:spaces {"!space1:example.com" {:id "!space1:example.com" :name "Main Space" :parent-id nil}
@@ -74,6 +80,7 @@
  (fn [db _]
    (-> db
        (assoc-in [:ui :sidebar-open?] false)
+       (assoc-in [:active-context-menu] nil)
        (assoc-in [:active-popover] nil)
        (assoc-in [:active-modal] nil))))
 
@@ -84,7 +91,9 @@
    (if open?
      (let [dispatches (cond-> []
                         (:active-modal db)   (conj [:ui/close-modal])
-                        (:active-popover db) (conj [:ui/close-popover]))]
+                        (:active-popover db) (conj [:ui/close-popover])
+                        (:active-context-menu db) (conj [:ui/close-context-menu])
+                        )]
        (merge
         {:db (assoc-in db [:ui :sidebar-open?] true)
         ;; :native/hide-keyboard nil
@@ -159,7 +168,10 @@
  :i18n/dictionary
  (fn [db _] (:dictionary db)))
 
-(re-frame/reg-sub
+(defonce !tr-cache (atom {:locale nil :is-empty? true :fn nil}))
+
+
+#_(re-frame/reg-sub
  :i18n/tr
  :<- [:i18n/locale]
  :<- [:i18n/dictionary]
@@ -167,6 +179,26 @@
    (if (empty? dictionary)
      (fn [k & _] (str "[" (name (last k)) "]"))
      (partial tempura/tr {:dict dictionary} [locale :en]))))
+
+;; May need to check the above and ensure it is stable in the app-db impl
+
+(re-frame/reg-sub
+ :i18n/tr
+ :<- [:i18n/locale]
+ :<- [:i18n/dictionary]
+ (fn [[locale dictionary] _]
+   (let [{old-locale :locale old-empty? :is-empty? cached-fn :fn} @!tr-cache
+         dict-empty? (empty? dictionary)]
+     (if (and (= locale old-locale) (= dict-empty? old-empty?) cached-fn)
+       cached-fn
+       (let [native-dict (if (satisfies? eve.map/EveHashMap dictionary)
+                           (eve.atom/eve->cljs dictionary)
+                           dictionary)
+             new-fn (if dict-empty?
+                      (fn [k & _] (str "[" (name (last k)) "]"))
+                      (partial tempura/tr {:dict native-dict} [locale :en]))]
+         (reset! !tr-cache {:locale locale :is-empty? dict-empty? :fn new-fn})
+         new-fn)))))
 
 (re-frame/reg-event-db
  :i18n/set-dictionary
@@ -301,8 +333,8 @@
                 ])
          [modal-root]
          [popover-root]
-         [global-key-listener]
-         [global-context-menu]]
+         [context-menu-root]
+         [global-key-listener]]
         [:div "Unknown State"]))))
 
 
@@ -327,8 +359,32 @@
     (init-capacitor-listeners!)
     (.render @root (r/as-element [main-layout]))))
 
+(defn get-eve-worker-payload [eve-atom]
+      (let [ds       (.-domain-state ^js eve-atom)
+            transfer (eve/sab-transfer-data eve-atom)]
+        {:root-sab      (:root-sab ds)
+         :rmap-sab      (:rmap-sab ds)
+         :slab-sabs     (:slab-sabs transfer)
+         :atom-slot-idx (.-atom-slot-idx ^js eve-atom)}))
+
+(defn init-eve []
+      (when eve-enabled?
+      (alloc/init! :capacities {0 50000
+                                1 50000
+                                2 25000
+                                3 25000
+                                4 10000
+                                5 10000})
+      (let [eve-db (ea/atom {})
+            full-payload (get-eve-worker-payload eve-db)]
+        (reset! state/!shared-app-db eve-db)
+        (reset! state/!eve-app-db-payload full-payload)
+        (re-frame.db/set-eve-atom! eve-db))))
+
+
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
+  (init-eve)
   (re-frame/dispatch [:app/load-settings-by-stage :boot])
   (re-frame/dispatch [:app/start-boot-sequence])
   (mount-root))
