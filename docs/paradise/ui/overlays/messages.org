@@ -11,13 +11,13 @@ sizeable item namespace.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/overlays/messages.cljs
-(ns overlays.messages
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/messages.cljs
+(ns paradise.ui.overlays.messages
   (:require
    [re-frame.core :as re-frame]
-   [overlays.base :refer [context-menu-component]]
-   [utils.svg :as icons]
-   [client.state :as state]
+   [paradise.ui.overlays.base :refer [context-menu-component]]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.shared.client.state :as state]
    [cljs-workers.core :as main]
    [cljs-workers.mesh :as mesh]
    [cljs.core.async :refer [go <!]]
@@ -28,7 +28,7 @@ sizeable item namespace.
 **** Reframe Events
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/messages.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/messages.cljs
 (re-frame/reg-event-fx
  :ui/copy-to-clipboard
  (fn [_ [_ text]]
@@ -44,7 +44,7 @@ sizeable item namespace.
 
 
 **** Message (Event) Actions
-#+begin_src clojurescript :tangle ../../src/overlays/messages.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/messages.cljs
 (defn build-message-actions [item active-room current-user-id x y tr]
   (let [msg-id   (:id item)
         e-t-id   (:event-or-transaction-id item)
@@ -78,7 +78,7 @@ sizeable item namespace.
 
 **** Context Menu
 
-#+begin_src clojurescript :tangle ../../src/overlays/messages.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/messages.cljs
 (defn ^:ui message-context-menu-content [{:keys [item active-room my-id x y close-fn]}]
   (let [tr    @(re-frame/subscribe [:i18n/tr])
         items (build-message-actions item active-room my-id x y tr)]
