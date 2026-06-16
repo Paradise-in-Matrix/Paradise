@@ -1,4 +1,4 @@
-(ns utils.logger
+  (ns paradise.shared.utils.logger
   (:require
    [clojure.string :as str]
    [taoensso.timbre :as timbre]
