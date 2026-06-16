@@ -1,7 +1,7 @@
-(ns utils.helpers
+(ns paradise.shared.utils.helpers
   (:require
-   [utils.net :as net]
-   [utils.images :refer [mxc-image]]
+   [net :as net]
+   [paradise.media.component :refer [media]]
    [clojure.string :as str]
    [promesa.core :as p]
    [hickory.core :as h]
@@ -29,11 +29,15 @@
    :ol   #{:start :type :data-md}
    :ul   #{:data-md}
    :a    #{:name :target :href :rel :data-md}
-   :img  #{:width :height :alt :title :src :data-mx-emoticon}
+   :img  #{:width :height :alt :title :src :data-mx-emoticon :class :className}
+
    :code #{:class :data-md}
-   :strong #{:data-md} :i #{:data-md} :em #{:data-md} :u #{:data-md} :s #{:data-md} :del #{:data-md}})
+   :strong #{:data-md} :i #{:data-md} :em #{:data-md} :u #{:data-md} :s #{:data-md} :del #{:data-md}
+   })
+
 
 (def non-text-tags #{:style :script :textarea :option :noscript :mx-reply})
+
 
 (defn- parse-style-str
   "Converts 'color: red; margin-top: 10px' into {:color 'red' :margin-top '10px'}"
@@ -64,13 +68,17 @@
 (defn- transform-img [attrs]
   (let [src (get attrs :src "")]
     (if (and (string? src) (str/starts-with? src "mxc://"))
-      {:tag mxc-image
+      {:tag "comp:media.component/media-native"
        :attrs {:mxc   src
                :class "timeline-emotes"
+               :className "timeline-emotes"
                :alt   (get attrs :alt)}}
       {:tag :a
        :attrs {:href src :rel "noopener" :target "_blank"}
        :content [(or (get attrs :alt) src)]})))
+
+
+
 
 (defn- filter-code-classes [attrs]
   (if-let [cls (:class attrs)]
@@ -141,7 +149,7 @@
     (str/escape (str raw-text) {\& "&amp;" \< "&lt;" \> "&gt;" \" "&quot;" \' "&#39;"})))
 
 
-(defn linkify-text [text]
+#_(defn linkify-text [text]
   (if (str/blank? text)
     text
     (let [pattern #"https?://[^\s]+"
@@ -159,14 +167,31 @@
                parts))))))
 
 
+(defn linkify-text [text]
+  (if (str/blank? text)
+    [text]
+    (let [pattern #"https?://[^\s]+"
+          parts (str/split text pattern -1)
+          matches (re-seq pattern text)]
+      (if (empty? matches)
+        [text]
+        (remove nil?
+                (mapcat
+                 (fn [i part]
+                   (let [url (nth matches i nil)]
+                     (if url
+                       [part [:a {:href url :target "_blank" :rel "noopener noreferrer"} url]]
+                       [part])))
+                 (range (count parts))
+                 parts))))))
+
+
 
 (def block-level-tags #{:p :div :h1 :h2 :h3 :h4 :h5 :h6 :blockquote :li :tr})
 
 (defn hiccup->text [node]
   (cond
-    (string? node)
-    node
-
+    (string? node) node
     (vector? node)
     (let [tag (first node)
           has-attrs? (map? (second node))
@@ -174,23 +199,12 @@
           children (if has-attrs? (drop 2 node) (drop 1 node))
           inner-text (str/join "" (map hiccup->text children))]
       (cond
-        (= tag :br)
-        "\n"
-
-        (contains? block-level-tags tag)
-        (str inner-text "\n")
-
-        (or (:mxc attrs) (= tag :img) (= tag utils.images/mxc-image))
-        " [e] "
-
-        :else
-        inner-text))
-
-    (sequential? node)
-    (str/join "" (map hiccup->text node))
-
-    :else
-    ""))
+        (= tag :br) "\n"
+        (contains? block-level-tags tag) (str inner-text "\n")
+        (or (:mxc attrs) (= tag :img) (= tag "mxc-image")) " [e] "
+        :else inner-text))
+    (sequential? node) (str/join "" (map hiccup->text node))
+    :else ""))
 
 (defn process-raw-event [e source]
   (let [html-txt     (or (get-in e [:content :inner :content :html]) "")
@@ -214,6 +228,44 @@
         (update :type keyword)
         (assoc :raw e))))
 
+
+(defn extract-metadata [raw-file]
+  (p/create
+   (fn [resolve-fn _]
+     (let [mime      (.-type raw-file)
+           is-image? (str/starts-with? mime "image/")
+           is-video? (str/starts-with? mime "video/")
+           reader    (js/FileReader.)
+           att-id    (str (random-uuid))]
+       (set! (.-onload reader)
+             (fn [e]
+               (let [raw-ab    (.. e -target -result)
+                     ab-size   (.-byteLength raw-ab)
+                     sab       (mesh/register-buffer! att-id ab-size)
+                     sab-view  (js/Uint8Array. sab)
+                     temp-view (js/Uint8Array. raw-ab)
+                     _         (.set sab-view temp-view)
+                     base-att  {:id          att-id
+                                :buffer      {:mesh/buffer-id att-id}
+                                :mime        mime
+                                :filename    (.-name raw-file)
+                                :size        (.-size raw-file)
+                                :preview-url (js/URL.createObjectURL raw-file)}]
+                 (if (or is-image? is-video?)
+                   (let [el  (if is-image? (js/Image.) (js/document.createElement "video"))
+                         url (js/URL.createObjectURL raw-file)]
+                     (if is-image?
+                       (set! (.-onload el)
+                             (fn []
+                               (js/URL.revokeObjectURL url)
+                               (resolve-fn (assoc base-att :width (.-width el) :height (.-height el)))))
+                       (set! (.-onloadedmetadata el)
+                             (fn []
+                               (js/URL.revokeObjectURL url)
+                               (resolve-fn (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
+                     (set! (.-src el) url))
+                   (resolve-fn base-att)))))
+       (.readAsArrayBuffer reader raw-file)))))
 
 (defonce relative-formatter
   (js/Intl.RelativeTimeFormat. js/undefined #js {:numeric "auto"}))
@@ -265,15 +317,14 @@
 (defn get-status-string [tr type names]
   (let [cnt (count names)
         base-path (if (= type :typing)
-                    "container.timeline.status.typing"
-                    "container.timeline.status.reading")]
+                    "paradise.ui.container.timeline.status.typing"
+                    "paradise.ui.container.timeline.status.reading")]
     (case cnt
       0 ""
       1 (tr [(keyword base-path "one")] [(truncate-name (first names) 16)])
       2 (tr [(keyword base-path "two")] [(truncate-name (first names) 16) (truncate-name (second names) 16)])
       3 (tr [(keyword base-path "three")] [(truncate-name (first names) 16) (truncate-name (second names) 16) (truncate-name (nth names 2) 16)])
       (tr [(keyword base-path "many")] [(truncate-name (first names) 16) (truncate-name (second names) 16) (- cnt 2)]))))
-
 
 (defn fetch-state-event [homeserver token room-id event-type state-key]
   (let [clean-hs (str/replace homeserver #"/+$" "")
