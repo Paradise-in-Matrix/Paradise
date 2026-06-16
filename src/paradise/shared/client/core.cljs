@@ -1,0 +1,229 @@
+(ns paradise.shared.client.core
+  (:require
+   [paradise.shared.utils.logger :as logger]
+   [re-frame.core :as re-frame]
+   [goog.object]
+   [paradise.ui.app :as app]
+   ["react" :as react]
+   [re-frame.db :as db]
+   [reagent.core :as r]
+   [promesa.core :as p]
+   [paradise.shared.client.state :as state]
+   [paradise.shared.client.config :refer [eve-enabled?]]
+   [paradise.shared.client.session-store :as store]
+   [cljs-workers.core :as main]
+   [cljs-workers.mesh :as mesh]
+   [cljs.core.async :refer [go <!]]
+   [taoensso.timbre :as log]))
+
+(defn handle-worker-stream! [data]
+  (let [is-map?  (map? data)
+        msg-type (if is-map? (:type data) (goog.object/get data "type"))
+        get-val  (fn [k-str k-kw]
+                   (if is-map? (get data k-kw) (goog.object/get data k-str)))]
+    (case msg-type
+      "home-rooms-diff"        (re-frame/dispatch [:room-list/set-home-rooms-sync (get-val "rooms" :rooms)])
+      "bg-rooms-diff"          (re-frame/dispatch [:room-list/set-bg-rooms-sync (get-val "rooms" :rooms)])
+      "global-spaces-diff"     (re-frame/dispatch [:sdk/set-spaces-list-sync (get-val "spaces" :spaces)])
+      "space-rooms-diff"       (re-frame/dispatch [:sdk/update-space-view (get-val "space-id" :space-id) (get-val "rooms" :rooms)])
+      "room-parent-resolved"   (re-frame/dispatch [:rooms/apply-parent-resolution (get-val "room-id" :room-id) (get-val "first-parent-id" :first-parent-id)])
+      "room-preview-resolved"  (re-frame/dispatch [:rooms/set-preview (get-val "room-id" :room-id) (get-val "preview" :preview)])
+
+      "timeline-ready"
+      (let [source-str (get-val "source" :source)
+            room-id    (get-val "room-id" :room-id)
+            ast-nodes  (get-val "ast-nodes" :ast-nodes)
+            paths      (get-val "lambda-paths" :lambda-paths)]
+
+        (swap! state/!ast-handoff assoc room-id {:ast-nodes ast-nodes :paths paths})
+
+        (re-frame/dispatch [:timeline/process-virtualized-data room-id source-str])
+        (re-frame/dispatch [:app/worker-redraw-ping]))
+
+      "widget-message"         (re-frame/dispatch [:call/recv-widget-message (get-val "data" :data)])
+      "recovery-state-update"  (re-frame/dispatch [:sdk/handle-recovery-stream (keyword (get-val "state" :state))])
+      "timeline-loading"       (re-frame/dispatch [:timeline/set-loading (get-val "room-id" :room-id) (get-val "loading?" :loading?)])
+      "typing-update"          (re-frame/dispatch [:sdk/update-typing-users (get-val "room-id" :room-id) (get-val "users" :users)])
+
+      "pagination-status"      (re-frame/dispatch [:sdk/update-pagination-status (get-val "room-id" :room-id) (get-val "status" :status)])
+      "media-preview-config"   (re-frame/dispatch [:settings/receive-media-preview-config (keyword (get-val "policy" :policy))])
+
+      "pins-sync"              (re-frame/dispatch [:room/sync-pinned-ids (get-val "room-id" :room-id) (get-val "pinned-ids" :pinned-ids)])
+      "pin-update"             (re-frame/dispatch [:room/update-pinned-event (get-val "room-id" :room-id) (get-val "event" :event)])
+
+      nil)))
+
+(defn init-worker! []
+  (when-not @state/!engine-pool
+    (reset! state/!engine-pool
+            (main/create-pool 1 "engine.js"
+                              {:worker-opts #js {:type "module"}
+                               :on-stream handle-worker-stream!})))
+  (when-not @state/!media-pool
+    (reset! state/!media-pool
+            (main/create-pool 3 "media.js"
+                              {:worker-opts #js {:type "module"}})))
+  (when-not @state/!virtualizer-pool
+    (reset! state/!virtualizer-pool
+            (main/create-pool 1 "virtualizer.js"
+                              {:worker-opts #js {:type "module"}
+                               :on-stream handle-worker-stream!}))))
+
+(defn bind-workers! [engine-pool media-pool virtualizer-pool app-db-payload]
+  (let [ev-chan  (js/MessageChannel.)
+        ev-port1 (.-port1 ev-chan)
+        ev-port2 (.-port2 ev-chan)
+        vm-chan  (js/MessageChannel.)
+        vm-port1 (.-port1 vm-chan)
+        vm-port2 (.-port2 vm-chan)
+        mv-chan  (js/MessageChannel.)
+        mv-port1 (.-port1 mv-chan)
+        mv-port2 (.-port2 mv-chan)
+        vv-chan  (js/MessageChannel.)
+        vv-port1 (.-port1 vv-chan)
+        vv-port2 (.-port2 vv-chan)
+        mm-chan  (js/MessageChannel.)
+        mm-port1 (.-port1 mm-chan)
+        mm-port2 (.-port2 mm-chan)
+        me-chan  (js/MessageChannel.)
+        me-port1 (.-port1 me-chan)
+        me-port2 (.-port2 me-chan)
+        db-chan  (js/MessageChannel.)
+        db-port1 (.-port1 db-chan)
+        db-port2 (.-port2 db-chan)]
+
+    (if eve-enabled?
+      (main/do-with-pool! virtualizer-pool
+                          {:handler   :bind-app-db
+                           :arguments {:eve-payload app-db-payload}})
+      (do
+        (db/set-async-broadcaster! (fn [payload] (.postMessage db-port1 payload)))
+        (set! (.-onmessage db-port1) (fn [e] (db/apply-remote-patch! (.-data e))))
+
+        (main/do-with-pool! virtualizer-pool
+                            {:handler   :bind-app-db
+                             :arguments {:eve-payload {:mode :async
+                                                       :initial-state (db/get-encoded-state)}
+                                         :port        db-port2}
+                             :transfer  [:port]})))
+
+    (main/do-with-pool! engine-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :virtualizer-pool :port ev-port1}
+                         :transfer  [:port]})
+    (main/do-with-pool! virtualizer-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :engine-pool :port ev-port2}
+                         :transfer  [:port]})
+
+    (main/do-with-pool! media-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :virtualizer-pool :port vm-port1}
+                         :transfer  [:port]})
+    (main/do-with-pool! virtualizer-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :media-pool :port vm-port2}
+                         :transfer  [:port]})
+
+    (mesh/register-thread! :media-pool mm-port1)
+    (main/do-with-pool! media-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :main-thread :port mm-port2}
+                         :transfer  [:port]})
+
+    (mesh/register-thread! :engine-pool me-port1)
+    (main/do-with-pool! engine-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :main-thread :port me-port2}
+                         :transfer  [:port]})
+
+    (mesh/register-thread! :virtualizer-pool mv-port1)
+    (main/do-with-pool! virtualizer-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :main-thread :port mv-port2}
+                         :transfer  [:port]})
+
+    (main/do-with-pool! virtualizer-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :virtualizer-pool :port vv-port1}
+                         :transfer  [:port]})
+    (main/do-with-pool! virtualizer-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :virtualizer-loopback :port vv-port2}
+                         :transfer  [:port]})))
+
+
+
+(extend-type eve.vec/EveVector
+  IReversible
+  (-rseq [coll]
+    (let [c (count coll)]
+      (when (pos? c)
+        (map #(nth coll %) (range (dec c) -1 -1))))))
+
+(extend-type eve.map/EveHashMap
+  IEquiv
+  (-equiv [this other]
+    (and (instance? eve.map/EveHashMap other)
+         (= (.-offset__ this) (.-offset__ other))))
+  IHash
+  (-hash [this]
+    (hash (.-offset__ this))))
+
+(extend-type eve.vec/EveVector
+  IEquiv
+  (-equiv [this other]
+    (and (instance? eve.vec/EveVector other)
+         (= (.-offset__ this) (.-offset__ other))))
+  IHash
+  (-hash [this]
+    (hash (.-offset__ this))))
+
+(re-frame/reg-event-fx
+ :app/bootstrap
+ (fn [_ [_ target-user-id]]
+   (log/debug "Bootstrapping:" target-user-id)
+   (go
+     (init-worker!)
+     (let [app-db-payload   @state/!eve-app-db-payload
+           engine-pool      @state/!engine-pool
+           media-pool       @state/!media-pool
+           virtualizer-pool @state/!virtualizer-pool]
+       (bind-workers! engine-pool media-pool virtualizer-pool app-db-payload)
+       (let [init-res (<! (main/do-with-pool! engine-pool {:handler :init-wasm}))]
+         (if (= (:status init-res) "success")
+           (let [boot-res (<! (main/do-with-pool! engine-pool {:handler :bootstrap
+                                                               :arguments {:target-user-id target-user-id}}))]
+             (case (:status boot-res)
+               "success" (re-frame/dispatch [:auth/login-success boot-res])
+               "empty"   (re-frame/dispatch [:auth/set-status :logged-out])
+               "error"   (log/error "Bootstrap failed:" (:msg boot-res))))
+           (log/error "WASM failed to load!" (:msg init-res))))))
+   {}))
+
+
+
+(re-frame/reg-event-fx
+ :sdk/start-sync
+ (fn [_ _]
+   (go
+     (let [pool @state/!engine-pool
+           res  (<! (main/do-with-pool! pool {:handler :start-sync}))]
+       (if (= (:status res) "success")
+         (log/info "Matrix sync loop started successfully.")
+         (log/error "Failed to start sync:" (:msg res)))))
+   {}))
+
+(re-frame/reg-event-fx
+ :sdk/ignite-session
+ (fn [_ _]
+   {:fx [[:dispatch [:sdk/start-sync]]
+         [:dispatch [:sdk/fetch-own-profile]]
+         [:dispatch [:sdk/fetch-all-emotes]]]}))
+
+(defn ^:export init []
+  (init-worker!)
+  (app/init)
+  (logger/init!)
+  (log/debug  "Entering Paradise!")
+  )
