@@ -1,9 +1,9 @@
-(ns worker.settings
+(ns paradise.engine.settings
   (:require
    [cljs-workers.worker :as worker]
-   [client.session-store :refer [SessionStore]]
-   [worker.state :as state]
-   [utils.net :refer [set-auth-context!] :as net]
+   [paradise.shared.client.session-store :refer [SessionStore]]
+   [paradise.engine.state :as state]
+   [net :refer [set-auth-context!] :as net]
    [promesa.core :as p]
    [taoensso.timbre :as log]
    [clojure.string :as str]
