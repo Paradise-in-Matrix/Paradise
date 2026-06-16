@@ -1,11 +1,11 @@
-(ns overlays.invites
+(ns paradise.ui.overlays.invites
   (:require
-   [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
+   [paradise.ui.global :refer [avatar handle-list-navigation selectable-list]]
    [re-frame.core :as re-frame]
    [reagent.core :as r]
    [clojure.string :as str]
-   [utils.macros :refer [defui]]
-   [overlays.base :refer [modal-component popover-component]]))
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 
 (defui invite-menu-content [{:keys [target-room-id]}]
   (let [tr        @(re-frame/subscribe [:i18n/tr])
