@@ -1,4 +1,4 @@
-(ns plugin-storage
+(ns paradise.shared.plugin-storage
   (:require
    [re-frame.core :as rf]
    [cljs.reader :as reader]
@@ -6,11 +6,9 @@
    [cljs.core.async.interop :refer-macros [<p!]]
    [promesa.core :as p]
    [cljs-workers.core :as main]
-   [sci-runner :as runner]
-   [client.state :as state]
+   [paradise.shared.sci-runner.ui :as runner]
+   [paradise.shared.client.state :as state]
    ))
-
-
 
 
 (defn inject-css! [id url]
@@ -23,11 +21,11 @@
 
 (defn inject-script! [url]
   (p/create
-   (fn [resolve reject]
+   (fn [resolve-fn reject]
      (let [script (.createElement js/document "script")]
        (set! (.-src script) url)
        (set! (.-crossOrigin script) "anonymous")
-       (set! (.-onload script) #(resolve true))
+       (set! (.-onload script) #(resolve-fn true))
        (set! (.-onerror script) #(reject (str "Failed to load script: " url)))
        (.appendChild js/document.head script)))))
 
