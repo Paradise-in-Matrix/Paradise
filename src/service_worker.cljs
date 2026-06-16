@@ -6,7 +6,7 @@
             ["workbox-strategies" :refer [CacheFirst]]
             ["workbox-range-requests" :refer [RangeRequestsPlugin]]
             ["workbox-expiration" :refer [ExpirationPlugin]])
-  (:require-macros [utils.macros :refer [load-static-config]]))
+  (:require-macros [paradise.shared.utils.macros :refer [load-static-config]]))
 
 
 (defonce active-sessions (atom {}))
@@ -61,12 +61,12 @@
 (defn wait-for-session! []
   (if (not-empty @active-sessions)
     (p/resolved true)
-    (js/Promise. (fn [resolve _]
-                   (swap! session-resolvers conj resolve)))))
+    (js/Promise. (fn [resolve-fn _]
+                   (swap! session-resolvers conj resolve-fn)))))
 
 (defn- get-token-from-vault [user-id]
   (p/create
-   (fn [resolve _]
+   (fn [resolve-fn _]
      (let [req (.open js/indexedDB "sw-vault" 1)]
        (set! (.-onsuccess req)
              (fn [e]
@@ -77,14 +77,14 @@
                                  (.get store user-id)
                                  (when store (.getAll store)))]
                    (if-not get-req
-                     (resolve nil)
+                     (resolve-fn nil)
                      (set! (.-onsuccess get-req)
                            (fn [res]
                              (let [result (.. res -target -result)]
                                (if (array? result)
-                                 (resolve (some-> (first result) .-token))
-                                 (resolve (some-> result .-token))))))))))
-       (set! (.-onerror req) #(resolve nil))))))
+                                 (resolve-fn (some-> (first result) .-token))
+                                 (resolve-fn (some-> result .-token))))))))))
+       (set! (.-onerror req) #(resolve-fn nil))))))
 
 (defn prune-cache! [name max-items]
   (p/let [cache (js/caches.open name)
@@ -159,7 +159,7 @@
 
 #_(defn- get-session-from-vault [user-id]
   (p/create
-   (fn [resolve reject]
+   (fn [resolve-fn reject]
      (let [req (.open js/indexedDB "sw-vault" 1)]
        (set! (.-onsuccess req)
              (fn [e]
@@ -168,15 +168,15 @@
                      store (.objectStore tx "tokens")]
                  (if user-id
                    (let [get-req (.get store user-id)]
-                     (set! (.-onsuccess get-req) #(resolve (.. % -target -result)))
-                     (set! (.-onerror get-req) #(resolve nil)))
+                     (set! (.-onsuccess get-req) #(resolve-fn (.. % -target -result)))
+                     (set! (.-onerror get-req) #(resolve-fn nil)))
                    (let [all-req (.getAll store)]
                      (set! (.-onsuccess all-req)
                            (fn [ae]
                              (let [results (vec (.. ae -target -result))]
                                (if (empty? results)
-                                 (resolve nil)
-                                 (resolve (->> results
+                                 (resolve-fn nil)
+                                 (resolve-fn (->> results
                                                (sort-by #(.-updated_at %) >)
                                                first)))))))))))))))
 
