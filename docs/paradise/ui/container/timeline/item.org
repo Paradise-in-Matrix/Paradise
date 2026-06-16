@@ -8,8 +8,8 @@ It is convenient to define the actual items that make up a timeline.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(ns container.timeline.item
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
+(ns paradise.ui.container.timeline.item
   (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
@@ -17,18 +17,17 @@ It is convenient to define the actual items that make up a timeline.
             [re-frame.db :as db]
             [cljs-workers.mesh :as mesh]
             [cljs-workers.core :as main]
-            [client.state :as state]
+            [paradise.shared.client.state :as state]
             [cljs.core.async :refer [go <!]]
-            [utils.helpers :refer [sanitize-custom-html hiccup->text format-divider-date format-time linkify-text truncate-name]]
-            [utils.images :refer [mxc->url mxc-image]]
-            [utils.global-ui :refer [avatar long-press-props swipe-to-action-wrapper request-batched-redraw!]]
-            [container.members :refer [profile-popover-trigger]]
-            [container.timeline.hydrator :refer [get-cached-react-tree]]
-            [input.base :refer [inline-editor]]
-            [utils.svg :as icons]
+            [paradise.shared.utils.helpers :refer [sanitize-custom-html hiccup->text format-divider-date format-time linkify-text truncate-name]]
+            [paradise.media.component :refer [mxc->url media]]
+            [paradise.ui.global :refer [avatar long-press-props swipe-to-action-wrapper request-batched-redraw!]]
+            [paradise.ui.container.members :refer [profile-popover-trigger]]
+            [paradise.ui.container.timeline.hydrator :refer [get-cached-react-tree]]
+            [paradise.ui.input.base :refer [inline-editor]]
+            [paradise.shared.utils.svg :as icons]
             ["react" :as react]
             [goog.object]
-            [media.component :refer [media]]
             ))
 #+end_src
 
@@ -38,7 +37,7 @@ It is convenient to define the actual items that make up a timeline.
 
 ***** Reframe Events and Subscriptions
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (re-frame/reg-event-db
  :msg/open-reaction-picker
  (fn [db [_ room-id event-or-transaction-id  x y]]
@@ -79,7 +78,7 @@ It is convenient to define the actual items that make up a timeline.
 
 **** Item Reframe Events, Effects, and Subscriptions
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (re-frame/reg-event-fx
  :sdk/toggle-reaction
  (fn [_ [_ room-id event-id emoji-key]]
@@ -133,7 +132,7 @@ that is currently on screen.
 
 ***** Reframe Events and Subscriptions
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (re-frame/reg-event-fx
  :room/mark-read
  (fn [_ [_ room-id event-id]]
@@ -208,7 +207,7 @@ to alert other users they read the message.
 
 We want to make sure we observe just the messages in the viewport to deliver
 read receipts. This prevents any sort of spamming to the home server.
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defonce visibility-observer
   (delay
     (js/IntersectionObserver.
@@ -237,7 +236,7 @@ read receipts. This prevents any sort of spamming to the home server.
 **** Hover and Context Menus for Items
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui translated-label [k]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [:span (tr k)]))
@@ -247,15 +246,15 @@ read receipts. This prevents any sort of spamming to the home server.
 
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn ^:ui event-menu [mx my current-item active-room my-id]
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
+(defn event-menu [mx my current-item active-room my-id]
   (re-frame/dispatch
    [:ui/open-context-menu :message-actions
     {:x mx :y my :item (js->clj current-item :keywordize-keys true) :active-room active-room :my-id my-id}]))
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui message-hover-toolbar [item active-room current-user-id]
   (let [tr @(re-frame/subscribe [:i18n/tr])
         react-str (tr [:container.timeline.item/react])
@@ -264,7 +263,8 @@ read receipts. This prevents any sort of spamming to the home server.
         more-str  (tr [:container.timeline.item/more])]
     (fn [item active-room current-user-id tr]
       (let [msg-id (:id item)
-            e-t-id (:event-or-transaction-id item)]
+            e-t-id (:event-or-transaction-id item)
+            ]
         [:div.message-hover-toolbar
          [:div.toolbar-btn
           {:title    react-str
@@ -289,7 +289,8 @@ read receipts. This prevents any sort of spamming to the home server.
            [:div.toolbar-btn
             {:title edit-str
              :on-click #(re-frame/dispatch
-                         [:input/set-context active-room :edit item])}
+                         [:input/set-context active-room :edit
+                          item])}
             [icons/edit]])
          [:div.toolbar-btn
           {:title more-str
@@ -300,6 +301,9 @@ read receipts. This prevents any sort of spamming to the home server.
 
                          (event-menu mx my item active-room current-user-id)))}
           [icons/more]]]))))
+
+
+
 #+end_src
 
 
@@ -309,7 +313,7 @@ read receipts. This prevents any sort of spamming to the home server.
 **** Message Content Rendering
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (def sanitize-cache (atom {}))
 
 (defn memoized-sanitize [html]
@@ -336,7 +340,7 @@ read receipts. This prevents any sort of spamming to the home server.
 
 ***** TODO Properly support lazy loaded media (to prevent layout shifts). Later decrypted messages are problematic here.
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui async-media-wrapper [event content {:keys [class default-ratio tag-type on-click controls style]}]
   (let [info        (:info content)
         w           (:w info)
@@ -373,7 +377,7 @@ read receipts. This prevents any sort of spamming to the home server.
        :style (merge {:width "100%" :height "100%" :display "block" :object-fit "contain"} style)}]]))
 #+end_src
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui image-message [event content]
   [:div.image-attachment-container
    [async-media-wrapper event content
@@ -395,7 +399,7 @@ read receipts. This prevents any sort of spamming to the home server.
 
 #+end_src
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui video-message [event content]
   [:div.video-attachment-container
    [async-media-wrapper event content
@@ -408,7 +412,7 @@ read receipts. This prevents any sort of spamming to the home server.
       [message-text content]])])
 #+end_src
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui sticker-message [event content]
   [async-media-wrapper event content
    {:class "media-sticker"
@@ -417,7 +421,7 @@ read receipts. This prevents any sort of spamming to the home server.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui file-message [event content tr]
   (let [hs-url @(re-frame/subscribe [:sdk/homeserver-url])
         {:keys [caption source info]} content]
@@ -437,7 +441,7 @@ read receipts. This prevents any sort of spamming to the home server.
 Could be a bit more generic given the insight gleamed
 working on deferred rendered components.
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn extract-first-url [text]
   (when text
     (when-let [match (re-find #"https?://[^\s\"'<>]+" text)]
@@ -543,7 +547,7 @@ working on deferred rendered components.
 #+end_src
 
 
-#+begin_src css :tangle ../../../css/timeline-item.css
+#+begin_src css :tangle ../../../../../css/timeline-item.css
 
 .preview-skeleton {
   height: 100px;
@@ -628,7 +632,7 @@ individual's display name.
 
 ****** TODO Need to calculate the height (because they can wrap)
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 
 (defn ^:ui reaction-pill [emoji count senders my-id active-room event-id reactions]
   (let [members-map @(re-frame/subscribe [:room/members-map active-room])
@@ -653,7 +657,7 @@ individual's display name.
                   (re-frame/dispatch [:sdk/toggle-reaction active-room event-id emoji]))
       :style {:cursor "pointer" :user-select "none"}}
      (if (str/starts-with? emoji "mxc://")
-       [mxc-image
+       [media
         {:mxc   emoji
          :class "reaction-custom"
          :style {:pointer-events "none"
@@ -677,7 +681,7 @@ individual's display name.
 
 **** State Event Rendering
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui state-event-view [{:keys [sender-name content]}]
   (let [{:keys [tag inner]} content]
     [:div.timeline-state-event
@@ -691,7 +695,7 @@ individual's display name.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui system-event-view [icon text]
   [:div.timeline-system-event
    [:span.system-icon icon]
@@ -742,7 +746,7 @@ enabling the components themselves to provide their estimated heights.
 It isn't quite ready for that yet, but we can get it to a dynamically functional
 state for now.
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui timeline-avatar [content-tag merge-with-prev? popover-member custom-tags active-room]
   [:div.timeline-avatar-wrapper
    {:class (when merge-with-prev? "is-merged")}
@@ -774,7 +778,7 @@ in isolation
 It may, in fact, be useful to provide the virtualizer
 library itself some context of deferred components...
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn ^:ui reply-container [tr in-reply-to room-id]
   (when in-reply-to
     (let [reply-id  (:event-id in-reply-to)
@@ -798,31 +802,13 @@ library itself some context of deferred components...
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
-(defn ^:ui render-message-content [tr msg-type-tag content-map in-reply-to reply-msg event]
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
+(defn render-message-content [tr msg-type-tag content-map in-reply-to event]
   (let [is-edited? (:is-edited? content-map)
         raw-body   (:body content-map)
-        room-id    (:room-id event)
-        target-id  (if (string? in-reply-to) in-reply-to (:id reply-msg))]
+        room-id    (:room-id event)]
     [:div.message-render-container
-     (when in-reply-to
-       [:div.timeline-reply-banner
-        {:style {:cursor "pointer"}
-         :on-click (fn [e]
-                     (.preventDefault e)
-                     (.stopPropagation e)
-                     (when (and room-id target-id)
-                       (re-frame/dispatch [:room/pretty-jump room-id target-id])))}
-        [:div.reply-indicator [icons/reply]]
-        [:div.reply-content
-         (if reply-msg
-           [:<>
-            [:span.reply-sender (truncate-name (:sender-name reply-msg) 16)]
-            [:span.reply-preview
-             (get-in reply-msg [:content :inner :content :body]
-                     (tr [:container.timeline.status/media-preview]))]]
-           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])
-
+     [reply-container tr in-reply-to room-id]
      (case msg-type-tag
        "Text"    [message-text content-map]
        "Notice"  [message-text content-map]
@@ -838,19 +824,20 @@ library itself some context of deferred components...
 
 (defn ^:ui timeline-body [item content active-room is-editing-this?]
   (let [{:keys [tag inner in-reply-to]} content
-        reply-id  (:event-id in-reply-to)
-        tr               @(re-frame/subscribe [:i18n/tr])
-        reply-msg @(re-frame/subscribe [:timeline/event active-room reply-id])]
-  [:div.timeline-body
-   (cond
-     is-editing-this? [inline-editor item active-room]
-     (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to reply-msg item]
-     (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
-     (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
-     (or (= tag "Message") (= tag "Notice") (= tag "Emote"))
-     (let [{m-tag :tag m-content :content} (if (= tag "Message") inner content)]
-       [render-message-content tr (or m-tag "Text") m-content in-reply-to reply-msg item])
-     :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
+        tr               @(re-frame/subscribe [:i18n/tr])]
+
+    [:div.timeline-body
+     (cond
+       is-editing-this?
+       [inline-editor item active-room]
+;;       ["comp:paradise.ui.input.base/inline-editor" item active-room]
+       (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to item]
+       (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
+       (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
+       (or (= tag "Message") (= tag "Notice") (= tag "Emote"))
+       (let [{m-tag :tag m-content :content} (if (= tag "Message") inner content)]
+         [render-message-content tr (or m-tag "Text") m-content in-reply-to item])
+       :else [:span.unknown (tr [:container.timeline.status/unknown-kind] [tag]) (str "Unknown message kind: " tag)])]))
 
 
 (defn ^:ui event-tile-render [item]
@@ -906,7 +893,7 @@ library itself some context of deferred components...
 
 ******* TODO Need to improve read receipt consistency
 
-#+begin_src clojurescript :tangle ../../../src/container/timeline/item.cljs
+#+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
 (defn event-tile [layout-node]
   (let [id         (:id layout-node)
         unread?    (:unread? layout-node)
