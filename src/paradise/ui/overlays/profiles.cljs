@@ -1,12 +1,13 @@
-(ns overlays.profiles
+(ns paradise.ui.overlays.profiles
   (:require
-   [overlays.base :refer [popover-component
+   [paradise.ui.overlays.base :refer [popover-component
                           context-menu-component]]
    [taoensso.timbre :as log]
    [re-frame.core :as re-frame]
-   [utils.global-ui :refer [avatar]]
-   [utils.images :refer [mxc-image]]
-   [plugins :as plugins]))
+   [paradise.ui.global :refer [avatar]]
+   [paradise.media.component :refer [media]]
+   [paradise.shared.plugins :as plugins]))
+
 
 (defn ^:ui profile-preview-content [args]
   (let [{:keys [member tags]} args
@@ -31,16 +32,16 @@
       (when role-name
         [:div.profile-preview-role-row
          (when icon-mxc
-           [mxc-image {:mxc icon-mxc
+           [media {:mxc icon-mxc
                        :class "member-item-role-icon"
                        :alt role-name}])
          [:span.profile-preview-role-text {:style {:color role-color}}
           role-name]])
       [plugins/plugin-slot :profile-actions {:member member}]]]))
 
+
 (defmethod popover-component :profile-preview [_]
   profile-preview-content)
-
 
 (defn build-member-actions [{:keys [user-id display-name]} active-room]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
