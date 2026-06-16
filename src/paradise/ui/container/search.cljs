@@ -1,14 +1,14 @@
-(ns container.search
+(ns paradise.ui.container.search
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]
    [reagent.core :as r]
-   [utils.svg :as icons]
-   [container.reusable :refer [message-preview-item]]))
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.container.reusable :refer [message-preview-item]]))
 
 (re-frame/reg-event-fx
  :room/execute-search
@@ -46,7 +46,7 @@
  (fn [db [_ room-id]]
    (get-in db [:search-data room-id] {:loading? false :results [] :query ""})))
 
-(defn search []
+(defn ^:ui search []
   (let [active-room  @(re-frame/subscribe [:rooms/active-id])
         search-state @(re-frame/subscribe [:room/search-state active-room])
         loading?     (:loading? search-state)
