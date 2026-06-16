@@ -1,13 +1,11 @@
-(ns input.autocomplete
+(ns paradise.ui.input.autocomplete
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [utils.macros :refer [defui]]
-   [utils.images :refer [mxc->url mxc-image]]
-   [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
-
-
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.media.component :refer [mxc->url media]]
+   [paradise.ui.global :refer [avatar handle-list-navigation selectable-list]]
    ))
 
 (re-frame/reg-sub
@@ -181,7 +179,7 @@
                           (if is-emoji?
                             (let [[shortcode emote-data] item]
                               [:<>
-                               [mxc-image {:mxc (:url emote-data) :class "suggestion-img" :alt shortcode}]
+                               [media {:mxc (:url emote-data) :class "suggestion-img" :alt shortcode}]
                                [:span.suggestion-text ":" shortcode ":"]])
                             [:<>
                              [avatar {:id    (:user-id item)
