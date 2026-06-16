@@ -9,19 +9,19 @@ so we'll keep them nicely collected here.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
-(ns container.reusable
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/reusable.cljs
+(ns paradise.ui.container.reusable
   (:require [re-frame.core :as re-frame]
-            [container.timeline.item :refer [event-tile-render]]
-            [navigation.rooms.entry :refer [build-room-actions]]
-            [utils.svg :as icons]))
+            [paradise.ui.container.timeline.item :refer [event-tile-render]]
+            [paradise.ui.navigation.rooms.entry :refer [build-room-actions]]
+            [paradise.shared.utils.svg :as icons]))
 #+end_src
 
 
 
 **** Reframe Events and Subscriptions
 
-#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/reusable.cljs
 
 (re-frame/reg-event-db
  :container/set-main-focus
@@ -50,7 +50,7 @@ so we'll keep them nicely collected here.
 
 ***** Room Header Component
 
-#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/reusable.cljs
 (defn ^:ui room-header [{:keys [display-name compact? active-id]}]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         main-focus    @(re-frame/subscribe [:container/main-focus])
@@ -126,7 +126,7 @@ so we'll keep them nicely collected here.
 
 ***** Room Header CSS
 
-#+begin_src css :tangle ../../css/room-header.css
+#+begin_src css :tangle ../../../../css/room-header.css
 
 .main-content, .sidebar {
     display: flex;
@@ -283,7 +283,7 @@ so we'll keep them nicely collected here.
 Now we also can supply a reusable container for those events
 as often times these on-off events are useful to be used as a jump-to.
 
-#+begin_src clojurescript :tangle ../../src/container/reusable.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/reusable.cljs
 (defn ^:ui message-preview-item [room-id event]
   (let [tr         @(re-frame/subscribe [:i18n/tr])
         hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
@@ -301,7 +301,7 @@ as often times these on-off events are useful to be used as a jump-to.
 ***** Jump To CSS
 
 
-#+begin_src css :tangle ../../css/room-header.css
+#+begin_src css :tangle ../../../../css/room-header.css
 
 .message-preview-card {
     padding: 12px;
