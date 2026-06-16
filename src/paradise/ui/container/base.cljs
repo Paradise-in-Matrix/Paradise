@@ -1,21 +1,21 @@
-(ns container.base
+(ns paradise.ui.container.base
   (:require
    [re-frame.core :as re-frame]
-   [container.call.events]
-   [container.call.core]
-   [container.call.call-view :refer [call-view]]
-   [container.timeline.base :refer [timeline]]
-   [container.members :refer [member-list]]
-   [container.search :refer [search]]
-   [container.pins :refer [pins]]
-   [utils.helpers :refer [fetch-room-state]]
-   [utils.svg :as icons]
+   [paradise.ui.container.call.events]
+   [paradise.ui.container.call.core]
+   [paradise.ui.container.call.call-view :refer [call-view]]
+   [paradise.ui.container.timeline.base :refer [timeline]]
+   [paradise.ui.container.members :refer [member-list]]
+   [paradise.ui.container.search :refer [search]]
+   [paradise.ui.container.pins :refer [pins]]
+   [paradise.shared.utils.helpers :refer [fetch-room-state]]
+   [paradise.shared.utils.svg :as icons]
    [taoensso.timbre :as log]
    [promesa.core :as p]
    [reagent.core :as r]
    [reagent.dom.client :as rdom]
-   [plugins :as plugins]
-   [utils.macros :refer [defui]]))
+   [paradise.shared.plugins :as plugins]
+   [paradise.shared.utils.macros :refer [defui]]))
 
 
 (defn thread-view []
