@@ -1,19 +1,16 @@
-(ns container.members
+(ns paradise.ui.container.members
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    ["react-virtuoso" :refer [GroupedVirtuoso]]
    [reagent.core :as r]
-   [utils.images :refer [mxc-image]]
-   [utils.svg :as icons]
-   [utils.global-ui :refer [avatar]]
+   [paradise.media.component :refer [media]]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.global :refer [avatar]]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]))
-
-
-
+   [paradise.shared.client.state :as state]))
 
 (re-frame/reg-event-fx
  :room/fetch-members
@@ -30,7 +27,7 @@
      (log/error "Cannot fetch members: No engine pool"))
    {:db (assoc-in db [:room-members room-id :loading?] true)}))
 
-(re-frame/reg-event-db
+ (re-frame/reg-event-db
  :room/fetch-members-success
  (fn [db [_ room-id raw-members]]
    (let [clean-members (mapv (fn [m]
@@ -203,22 +200,6 @@
     :on-click #(re-frame/dispatch [:room/set-member-filter-type room-id type])}
    (str label " (" (or count 0) ")")])
 
-(defn build-member-actions [{:keys [user-id display-name]} active-room]
-  (let [tr           @(re-frame/subscribe [:i18n/tr])]
-    [{:id "view-profile"
-      :label (tr [:container.member-actions/view-profile])
-      :action #(log/info "View profile for:" user-id)}
-     {:id "mention"
-      :label (tr [:container.member-actions/mention] [display-name])
-      :action #(log/info "Mention:" user-id)}
-     {:id "message"
-      :label (tr [:container.member-actions/message])
-      :action #(log/info "DM:" user-id)}
-     {:id "kick"
-      :label (tr [:container.member-actions/kick])
-      :class-name "text-danger"
-      :action #(log/info "Kick:" user-id)}]))
-
 (defn profile-popover-trigger [member custom-tags active-room pos child]
   (let [open-popover! (fn [current-target]
                         (let [rect (.getBoundingClientRect current-target)
@@ -226,33 +207,35 @@
                                    (- (.-left rect) 265)
                                    (+ (.-right rect) 15))
                               py (.-top rect)]
+                          (log/error member)
                           (re-frame/dispatch
                            [:ui/open-popover :profile-preview
-                            {:x          px
-                             :y          py
-                             :width      265
-                             :height     150
-                             :backdrop?  true
-                             :member     member
-                             :tags       custom-tags}])))
+                            {:x         px
+                             :y         py
+                             :width     265
+                             :height    150
+                             :backdrop? true
+                             :member    member
+                             :tags      custom-tags}])))
         trigger-props {:on-click (fn [e]
-                                     (.stopPropagation e)
-                                     (open-popover! (.-currentTarget e)))
-                         :on-context-menu (fn [e]
-                                            (.preventDefault e)
-                                            (.stopPropagation e)
-                                            (re-frame/dispatch [:ui/close-popover])
-                                            (re-frame/dispatch
-                                             [:context-menu/open
-                                              {:x (.-clientX e)
-                                               :y (.-clientY e)
-                                               :items (build-member-actions member active-room)}]))}
+                                   (.stopPropagation e)
+                                   (open-popover! (.-currentTarget e)))
+                       :on-context-menu (fn [e]
+                                          (.preventDefault e)
+                                          (.stopPropagation e)
+                                          (re-frame/dispatch [:ui/close-popover])
+                                          (re-frame/dispatch
+                                           [:ui/open-context-menu :member-actions
+                                            {:x (.-clientX e)
+                                             :y (.-clientY e)
+                                             :member member
+                                             :active-room active-room}]))}
 
-          [tag & xs] child
-          has-props? (map? (first xs))
-          old-props  (if has-props? (first xs) {})
-          body       (if has-props? (rest xs) xs)]
-      (into [tag (merge old-props trigger-props)] body)))
+        [tag & xs] child
+        has-props? (map? (first xs))
+        old-props  (if has-props? (first xs) {})
+        body       (if has-props? (rest xs) xs)]
+    (into [tag (merge old-props trigger-props)] body)))
 
 (defn member-item [m custom-tags active-room]
   (let [pl         (:power-level m)
@@ -269,7 +252,7 @@
         (when role-name
           [:div.member-item-role-badge {:style {:color role-color :border (str "1px solid " role-color)}}
            (when icon-mxc
-             [mxc-image {:mxc icon-mxc :class "member-item-role-icon"}])
+             [media {:mxc icon-mxc :class "member-item-role-icon"}])
            role-name])]
        [:span.member-item-user-id (:user-id m)]]]]))
 
