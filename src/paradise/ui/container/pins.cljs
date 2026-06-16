@@ -1,13 +1,13 @@
-(ns container.pins
+(ns paradise.ui.container.pins
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]
    [reagent.core :as r]
-   [utils.svg :as icons]
-   [container.reusable :refer [message-preview-item]]))
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.container.reusable :refer [message-preview-item]]))
 
 
 
@@ -40,7 +40,7 @@
    (vals (get-in db [:rooms/data room-id :pinned-events] {}))))
 
 
-(defn pins []
+(defn ^:ui pins []
   (let [active-room @(re-frame/subscribe [:rooms/active-id])
         pins        @(re-frame/subscribe [:room/pinned-events active-room])
         tr          @(re-frame/subscribe [:i18n/tr])]
