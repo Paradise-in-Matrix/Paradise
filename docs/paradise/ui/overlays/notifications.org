@@ -13,8 +13,8 @@ They are technically an overlay, so we'll group them here also.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
-(ns overlays.notifications
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/notifications.cljs
+(ns paradise.ui.overlays.notifications
 (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [promesa.core :as p]
@@ -22,8 +22,8 @@ They are technically an overlay, so we'll group them here also.
             [cljs.core.async.interop :refer-macros [<p!]]
             ["@capacitor/core" :refer [Capacitor registerPlugin]]
             ["@capacitor/push-notifications" :refer [PushNotifications]]
-            [client.state :refer [!config] :as state]
-            [client.session-store :as store]
+            [paradise.shared.client.state :refer [!config] :as state]
+            [paradise.shared.client.session-store :as store]
             [cljs-workers.core :as main]))
 #+end_src
 
@@ -66,7 +66,7 @@ So we need to ensure there is visible clarity to this shortcoming provided
 to the user.
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/notifications.cljs
 (def shadow-device (registerPlugin "ShadowDevice"))
 
 (re-frame/reg-event-fx
@@ -194,7 +194,7 @@ reasonable manner.
 Instead we have to register the listeners for the app
 to utilize the nice features inside of Capacitor.
 
-#+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/notifications.cljs
 (re-frame/reg-event-fx
  :push/store-native-token
  (fn [{:keys [db]} [_ token]]
@@ -234,7 +234,7 @@ to utilize the nice features inside of Capacitor.
 
 Just some helper functions
 
-#+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/notifications.cljs
 (defn url-base64->uint8-array [base64-string]
   (let [padding (.repeat "=" (mod (- 4 (mod (.-length base64-string) 4)) 4))
         base64 (-> (.replace base64-string (js/RegExp. "-" "g") "+")
@@ -263,7 +263,7 @@ We embed the registration in an easily callable reframe event.
 ***** Web
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/notifications.cljs
 
 (re-frame/reg-event-fx
  :push/register-pusher
@@ -353,7 +353,7 @@ We embed the registration in an easily callable reframe event.
 ***** Status
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/notifications.cljs
 (re-frame/reg-sub
  :push/status
  (fn [db _]
@@ -405,7 +405,7 @@ We embed the registration in an easily callable reframe event.
 
 ***** Push Enable (Prompt User) / Disable
 
-#+begin_src clojurescript :tangle ../../src/overlays/notifications.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/notifications.cljs
 (re-frame/reg-event-fx
  :push/enable
  (fn [{:keys [db]} _]
