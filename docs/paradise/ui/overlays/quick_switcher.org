@@ -13,18 +13,18 @@ switching.
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/quick_switcher.cljs
-(ns overlays.quick-switcher
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/quick_switcher.cljs
+(ns paradise.ui.overlays.quick-switcher
 (:require
- [utils.svg :as icons]
- [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
- [utils.images :refer [mxc-image]]
- [utils.macros :refer [defui]]
+ [paradise.shared.utils.svg :as icons]
+ [paradise.ui.global :refer [avatar handle-list-navigation selectable-list]]
+ [paradise.media.component :refer [media]]
+ [paradise.shared.utils.macros :refer [defui]]
  [re-frame.core :as re-frame]
  [reagent.core :as r]
  [clojure.string :as str]
  [taoensso.timbre :as log]
- [overlays.base :refer [modal-component popover-component]]))
+ [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 #+end_src
 
 
@@ -33,7 +33,7 @@ switching.
 
 ***** Reframe
 
-#+begin_src clojurescript :tangle ../../src/overlays/quick_switcher.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/quick_switcher.cljs
 (re-frame/reg-event-db
  :quick-switcher/toggle
  (fn [db _]
@@ -62,7 +62,7 @@ switching.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/overlays/quick_switcher.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/quick_switcher.cljs
 (defui quick-switcher-content []
   (let [tr        @(re-frame/subscribe [:i18n/tr])
         rooms-map @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
@@ -136,7 +136,7 @@ switching.
 #+end_src
 
 
-#+begin_src css :tangle ../../css/switcher.css
+#+begin_src css :tangle ../../../../css/switcher.css
 
 .quick-switcher-item {
   border-radius: 8px;
