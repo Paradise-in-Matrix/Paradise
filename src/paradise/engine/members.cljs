@@ -1,8 +1,8 @@
-(ns worker.members
+(ns paradise.engine.members
   (:require [cljs-workers.worker :as worker]
             [clojure.string :as str]
-            [utils.net :as net]
-            [worker.state :as state])
+            [net :as net]
+            [paradise.engine.state :as state])
   (:require-macros [cljs.core.async.macros :refer [go]]
                    [cljs.core.async.interop :refer [<p!]]))
 
