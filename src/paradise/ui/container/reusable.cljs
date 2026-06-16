@@ -1,9 +1,8 @@
-(ns container.reusable
+(ns paradise.ui.container.reusable
   (:require [re-frame.core :as re-frame]
-            [container.timeline.item :refer [event-tile-render]]
-            [navigation.rooms.entry :refer [build-room-actions]]
-            [utils.macros :refer [defui]]
-            [utils.svg :as icons]))
+            [paradise.ui.container.timeline.item :refer [event-tile-render]]
+            [paradise.ui.navigation.rooms.entry :refer [build-room-actions]]
+            [paradise.shared.utils.svg :as icons]))
 
 
 (re-frame/reg-event-db
@@ -26,7 +25,7 @@
  (fn [db _]
    (:side-panel db nil)))
 
-(defui room-header [{:keys [display-name compact? active-id]}]
+(defn ^:ui room-header [{:keys [display-name compact? active-id]}]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
         main-focus    @(re-frame/subscribe [:container/main-focus])
         side-panel    @(re-frame/subscribe [:container/side-panel])
@@ -97,7 +96,7 @@
          [icons/more-vertical]]])]))
 
 
-(defn message-preview-item [room-id event]
+(defn ^:ui message-preview-item [room-id event]
   (let [tr         @(re-frame/subscribe [:i18n/tr])
         hs-url           @(re-frame/subscribe [:sdk/homeserver-url])
         is-mobile?       @(re-frame/subscribe [:ui/mobile?])
