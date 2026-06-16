@@ -1,16 +1,16 @@
-(ns input.drafts
+(ns paradise.ui.input.drafts
   (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [utils.macros :refer [defui]]
-            [utils.svg :as icons]
+            [paradise.shared.utils.macros :refer [defui]]
+            [paradise.shared.utils.svg :as icons]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
-            [client.state :as state]
+            [paradise.shared.client.state :as state]
             ))
 
 
-(defn reify-attachment [att]
+#_(defn reify-attachment [att]
   (let [mime       (or (:mime att) (:mimetype att) "application/octet-stream")
         safe-bytes (if (= (type (:buffer att)) js/Uint8Array)
                      (:buffer att)
@@ -38,7 +38,7 @@
       (.new (.-File (.-DraftAttachment sdk))
             #js {:fileInfo file-info :source source}))))
 
-(defui prepare-attachment [sdk att]
+#_(defui prepare-attachment [sdk att]
   (let [mime       (or (:mime att) (:mimetype att) "application/octet-stream")
         safe-bytes (if (= (type (:buffer att)) js/Uint8Array)
                      (:buffer att)
