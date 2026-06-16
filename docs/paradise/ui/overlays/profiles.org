@@ -12,16 +12,16 @@ aspect.
 **** Imports
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/profiles.cljs
-(ns overlays.profiles
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/profiles.cljs
+(ns paradise.ui.overlays.profiles
   (:require
-   [overlays.base :refer [popover-component
+   [paradise.ui.overlays.base :refer [popover-component
                           context-menu-component]]
    [taoensso.timbre :as log]
    [re-frame.core :as re-frame]
-   [utils.global-ui :refer [avatar]]
-   [utils.images :refer [media]]
-   [plugins :as plugins]))
+   [paradise.ui.global :refer [avatar]]
+   [paradise.media.component :refer [media]]
+   [paradise.shared.plugins :as plugins]))
 
 #+end_src
 
@@ -33,7 +33,7 @@ aspect.
 ***** Component
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/profiles.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/profiles.cljs
 (defn ^:ui profile-preview-content [args]
   (let [{:keys [member tags]} args
         pl         (:power-level member)
@@ -73,7 +73,7 @@ aspect.
 ***** CSS
 
 
-#+begin_src css :tangle ../../css/profiles.css
+#+begin_src css :tangle ../../../../css/profiles.css
 .profile-preview-card {
       position: fixed;
       z-index: 9998;
@@ -150,7 +150,7 @@ aspect.
 **** Member Actions
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/profiles.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/profiles.cljs
 (defn build-member-actions [{:keys [user-id display-name]} active-room]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
     [{:id "view-profile"
@@ -170,7 +170,7 @@ aspect.
 
 
 
-#+begin_src clojurescript :tangle ../../src/overlays/profiles.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/profiles.cljs
 (defn ^:ui member-context-menu-content [{:keys [member active-room x y close-fn]}]
   (let [items (build-member-actions member active-room)]
     [:<>
