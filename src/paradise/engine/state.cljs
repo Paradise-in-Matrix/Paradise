@@ -1,5 +1,7 @@
-(ns worker.state)
+(ns paradise.engine.state)
 
+
+(defonce !shared-app-db (atom nil))
 (defonce !client (atom nil))
 (defonce !media-cache (atom {}))
 (defonce !plugin-handlers (atom {}))
