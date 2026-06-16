@@ -1,11 +1,11 @@
-(ns worker.spaces
+(ns paradise.engine.spaces
   (:require
    [cljs-workers.worker :as worker]
    [promesa.core :as p]
    [taoensso.timbre :as log]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [worker.state :as state]
-   [worker.rooms :refer [process-parent-queue!]]
+   [paradise.shared.client.diff-handler :refer [apply-matrix-diffs]]
+   [paradise.engine.state :as state]
+   [paradise.engine.rooms :refer [process-parent-queue!]]
    [cljs.core.async :refer [<! timeout]]
    [cljs.core.async.interop :refer-macros [<p!]])
   (:require-macros
