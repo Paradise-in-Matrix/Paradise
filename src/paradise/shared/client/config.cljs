@@ -1,8 +1,8 @@
-(ns client.config
+(ns paradise.shared.client.config
   (:require [cljs.reader :refer [read-string]]
             [taoensso.timbre :as log]
             [re-frame.core :as re-frame]
-            [utils.net :as net]
+            [net :as net]
             [promesa.core :as p]))
 
 (defn load-config []
@@ -26,3 +26,9 @@
         (p/then #(read-string %))
         (p/then :version)
         (p/catch (fn [_] nil)))))
+
+(defonce eve-enabled?
+  false
+  #_(and (exists? js/SharedArrayBuffer)
+       (exists? js/crossOriginIsolated)
+       js/crossOriginIsolated))
