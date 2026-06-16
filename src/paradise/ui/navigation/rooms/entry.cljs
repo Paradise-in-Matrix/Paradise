@@ -1,15 +1,15 @@
-(ns navigation.rooms.entry
+(ns paradise.ui.navigation.rooms.entry
   (:require
    [clojure.string :as str]
    [re-frame.core :as re-frame]
    [cljs-workers.core :as main]
    [reagent.core :as r]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]
    [taoensso.timbre :as log]
-   [utils.svg :as icons]
-   [utils.macros :refer [defui]]
-   [utils.global-ui :refer [avatar long-press-props]]))
+   [paradise.shared.utils.svg :as icons]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.global :refer [avatar long-press-props]]))
 
 (defn build-room-actions [tr room-id parent-id room-name is-space? is-dm? context membership]
   (let [is-joined?  (= membership "joined")
