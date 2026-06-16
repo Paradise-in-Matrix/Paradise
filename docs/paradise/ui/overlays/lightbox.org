@@ -7,13 +7,13 @@ Lightbox (or image previewer) is how we intend to provide a nice way to interact
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/overlays/lightbox.cljs
-(ns overlays.lightbox
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/lightbox.cljs
+(ns paradise.ui.overlays.lightbox
   (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
-            [overlays.base :refer [modal-component]]
-            [utils.svg :as icons]
-            [utils.macros :refer [defui]]
+            [paradise.ui.overlays.base :refer [modal-component]]
+            [paradise.shared.utils.svg :as icons]
+            [paradise.shared.utils.macros :refer [defui]]
             ))
 #+end_src
 
@@ -26,7 +26,7 @@ So we define the component contents and then register in the modal multi-method.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/overlays/lightbox.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/lightbox.cljs
 (defui image-lightbox-content [{:keys [url]}]
   (r/with-let [!state           (r/atom {:scale 1 :last-scale 1 :x 0 :y 0 :last-x 0 :last-y 0 :start-dist 0})
                !active-pointers (atom {})
@@ -125,7 +125,7 @@ So we define the component contents and then register in the modal multi-method.
 
 
 
-#+begin_src css :tangle ../../css/lightbox.css
+#+begin_src css :tangle ../../../../css/lightbox.css
 .lightbox-close-btn {
     position: absolute;
     right: 20px;
