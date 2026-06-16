@@ -1,14 +1,15 @@
-(ns worker.timeline
+(ns paradise.engine.timeline
   (:require
    [cljs-workers.worker :as worker]
+   [cljs-workers.mesh :as mesh]
    [promesa.core :as p]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    ["ffi-bindings" :as sdk :refer [TimelineConfiguration MessageType ReceiptType]]
    [cljs.core.async.interop :refer-macros [<p!]]
-   [client.diff-handler :refer [apply-matrix-diffs]]
-   [utils.net :as net]
-   [worker.state :as state])
+   [paradise.shared.client.diff-handler :refer [apply-matrix-diffs]]
+   [net :as net]
+   [paradise.engine.state :as state])
   (:require-macros
    [cljs.core.async.macros :refer [go]]))
 
@@ -164,6 +165,14 @@
           {:id id-str :type :unknown})))
 
 
+(defn push-timeline-diff! [room-id source events]
+  (log/debug "Sending timeline diff via Mesh to virtualizer...")
+  (mesh/do-with-thread! :virtualizer-pool
+                        {:handler :process-timeline-diff
+                         :arguments {:events events
+                                     :room-id room-id
+                                     :source source}}))
+
 (defn apply-timeline-diffs-async! [room-id source updates]
   (let [q-key [room-id source]]
     (swap! !timeline-mutexes update q-key #(or % (p/resolved [])))
@@ -177,10 +186,7 @@
                                        (apply-matrix-diffs current-events updates wrap-item))))
                            (p/then (fn [next-events]
                                      (swap! !timeline-arrays assoc q-key next-events)
-                                     (worker/stream! {:type "timeline-diff"
-                                                      :room-id room-id
-                                                      :source source
-                                                      :events next-events})))
+                                     (push-timeline-diff! room-id source next-events)))
                            (p/catch (fn [err] (log/error "Timeline Diff Panic:" err))))))))))
 
 (defmulti focus (fn [{:keys [type]}] type))
