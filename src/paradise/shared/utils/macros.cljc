@@ -1,4 +1,4 @@
-(ns utils.macros
+(ns paradise.shared.utils.macros
   (:require [clojure.java.io :as io]
             [clojure.edn :as edn]
             [cljs.analyzer.api :as ana]
@@ -21,6 +21,25 @@
   `(js/goog.object.get ~obj ~(name prop)))
 
 
+(defmacro register-and-capture [fn-hash form]
+  (let [locals (keys &env)
+        clean-ks (remove #(clojure.string/includes? (name %) "__") locals)
+        env-map (into {} (map (fn [k] [(keyword (name k)) k]) clean-ks))
+        bind-syms (mapv symbol (map name clean-ks))
+        bind-form (if (empty? bind-syms) '_ `{:keys ~bind-syms})]
+    `(do
+       (clojure.core/swap! paradise.shared.client.registry/!anon-fns clojure.core/assoc ~fn-hash
+                           (fn [~bind-form] ~form))
+       (clojure.core/let [f# ~form]
+         (clojure.core/aset f# "$fn_ptr" ~fn-hash)
+         (clojure.core/aset f# "$env" ~env-map)
+         f#))))
+
+(defmacro defoverride [comp-name args & body]
+  (list 'do
+        (list* 'defn comp-name args body)
+        (list 'swap! 'paradise.shared.client.registry/!active-overrides 'assoc (keyword (name comp-name))
+              (list 'hash-map :plugin-id (list 'deref 'paradise.shared.sci-runner.ui/!current-eval-plugin) :fn comp-name))))
 
 
 (defmacro expose-ns [ns-sym]
@@ -42,13 +61,14 @@
         default-name (symbol (str comp-name "-default"))]
     `(do
        (defn ~default-name ~args ~@body)
-       (swap! client.state/!components #(if (contains? % ~kw) % (assoc % ~kw ~default-name)))
+       (swap! paradise.shared.client.registry/!components #(if (contains? % ~kw) % (assoc % ~kw ~default-name)))
        (defn ~comp-name [& args#]
-         (let [override# (get @client.state/!active-overrides ~kw)
+         (let [override# (get @paradise.shared.client.registry/!active-overrides ~kw)
                live#     (if override#
                            (:fn override#)
-                           (get @client.state/!components ~kw))]
+                           (get @paradise.shared.client.registry/!components ~kw))]
            (into [live#] args#))))))
+
 
 
 (defmacro gen-translation-map [dir-path]
