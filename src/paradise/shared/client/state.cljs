@@ -1,10 +1,19 @@
-(ns client.state
+(ns paradise.shared.client.state
   (:require [reagent.core :as r]))
+
+(defonce !shared-app-db (atom {}))
+(defonce !eve-app-db-payload (atom nil))
 
 (defonce !engine-pool (atom nil))
 (defonce !media-pool (atom nil))
+(defonce !virtualizer-pool (atom nil))
 (defonce !config (atom nil))
+
+(defonce !ast-handoff (atom {}))
+(defonce !attachments-cache (atom {}))
+
 (defonce !components (r/atom {}))
+(defonce !pure-fns (atom {}))
 (defonce !active-overrides (r/atom {}))
 (defonce !slots (r/atom {}))
 
@@ -33,5 +42,3 @@
                    (map (fn [[slot-id items]]
                           [slot-id (into [] (remove #(= (name (:plugin-id % "unknown")) target-str) items))])
                         slots))))))
-
-(set! (.-dumpRegistry js/window) #(clj->js @!components))
