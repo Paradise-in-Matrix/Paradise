@@ -1,10 +1,10 @@
-(ns worker.media-previews
+(ns paradise.engine.media-previews
   (:require [cljs-workers.worker :as worker]
             [clojure.string :as str]
-            [utils.net :as net]
+            [net :as net]
             [taoensso.timbre :as log]
             ["ffi-bindings" :as sdk]
-            [worker.state :as state])
+            [paradise.engine.state :as state])
   (:require-macros [cljs.core.async.macros :refer [go]]
                    [cljs.core.async.interop :refer [<p!]]))
 
