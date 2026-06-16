@@ -12,16 +12,16 @@ away.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
-(ns input.drafts
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/drafts.cljs
+(ns paradise.ui.input.drafts
   (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [utils.macros :refer [defui]]
-            [utils.svg :as icons]
+            [paradise.shared.utils.macros :refer [defui]]
+            [paradise.shared.utils.svg :as icons]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
-            [client.state :as state]
+            [paradise.shared.client.state :as state]
             ))
 #+end_src
 
@@ -33,9 +33,9 @@ away.
 Inside the sdk attachments can be handle more or less universally as long as we
 provide a nice implementation to do so. So it's easier to just have a method that
 converts the attachment to a format we like to work with.
-#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/drafts.cljs
 
-(defn reify-attachment [att]
+#_(defn reify-attachment [att]
   (let [mime       (or (:mime att) (:mimetype att) "application/octet-stream")
         safe-bytes (if (= (type (:buffer att)) js/Uint8Array)
                      (:buffer att)
@@ -162,8 +162,8 @@ For now this is just exploratory.
 
 ***** Preparing Attachments
 
-#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
-(defui prepare-attachment [sdk att]
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/drafts.cljs
+#_(defui prepare-attachment [sdk att]
   (let [mime       (or (:mime att) (:mimetype att) "application/octet-stream")
         safe-bytes (if (= (type (:buffer att)) js/Uint8Array)
                      (:buffer att)
@@ -195,7 +195,7 @@ For now this is just exploratory.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/drafts.cljs
 (defui attachment-preview [room-id attachment index]
   [:div.attachment-preview
    (let [{:keys [mimetype mime preview-url filename]} attachment
@@ -222,7 +222,7 @@ For now this is just exploratory.
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/attachments.css
+#+begin_src css :tangle ../../../../css/attachments.css
   .composer-attachments {
       display: flex;
       flex-direction: row;
@@ -279,7 +279,17 @@ For now this is just exploratory.
 
 **** Massive Blob of Reframe Events
 
-#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
+
+ Currently Eve is breaking this because attachments are in the app-db
+ Eve and attachments both are SAB objects and I'm not sure
+ Eve knows how to handle other ones
+ Will probably pull attachments out and send the URI which references
+ the SAB attachment instead
+
+
+
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/drafts.cljs
 
 (re-frame/reg-event-fx
  :composer/clear-after-submit
@@ -419,7 +429,7 @@ continue sending as a file though until I reify everything properly.
 
 
 
-#+begin_src clojurescript :tangle ../../src/input/drafts.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/drafts.cljs
 (defui send-attachments! [sdk timeline room attachments text html]
   (let [total (count attachments)]
     (p/let [_ (p/loop [idx 0]
