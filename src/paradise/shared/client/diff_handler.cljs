@@ -1,4 +1,4 @@
-(ns client.diff-handler
+(ns paradise.shared.client.diff-handler
   (:require
    [taoensso.timbre :as log]
    [promesa.core :as p]
