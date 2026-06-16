@@ -1,12 +1,7 @@
-(ns container.timeline.components
-  (:require [reagent.core :as r]
-            [re-frame.core :as re-frame]
+(ns paradise.ui.container.timeline.components
+  (:require [re-frame.core :as re-frame]
             [clojure.string :as str]
-            [taoensso.timbre :as log]
-            [utils.helpers :refer [truncate-name]]
-            [container.timeline.item :as item]
-            ["@chenglou/pretext" :refer [prepare layout]]
-            [container.timeline.item :refer [connected-event-tile]]))
+            ))
 
 (defn timeline-empty-state [room-id]
   (let [tr @(re-frame/subscribe [:i18n/tr])]
