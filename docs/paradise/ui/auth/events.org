@@ -7,24 +7,24 @@ Probably needs a better name (and logical grouping)
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/auth/events.cljs
-(ns auth.events
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/auth/events.cljs
+(ns paradise.ui.auth.events
   (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
-            [client.state :as state]
+            [paradise.shared.client.state :as state]
             [cljs-workers.core :as main]
             [cljs.core.async :refer [go <!]]
-            [utils.macros :refer [defui]]
-            [client.session-store :as store]
-            [utils.svg :as icons]
-            [utils.net :refer [set-auth-context!]]
+            [paradise.shared.utils.macros :refer [defui]]
+            [paradise.shared.client.session-store :as store]
+            [paradise.shared.utils.svg :as icons]
+            [net :refer [set-auth-context!]]
             [service-worker-handler :refer [register-sw!]]
             [taoensso.timbre :as log]))
 #+end_src
 
 **** Login Reframe Components
 
-#+begin_src clojurescript :tangle ../../src/auth/events.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/auth/events.cljs
 
 (re-frame/reg-event-db
  :auth/set-status
@@ -127,7 +127,8 @@ Probably needs a better name (and logical grouping)
 
 **** Logout
 
-#+begin_src clojurescript :tangle ../../src/auth/events.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/auth/events.cljs
+
 (re-frame/reg-fx
  :session/delete-from-store
  (fn [user-id]
@@ -139,6 +140,7 @@ Probably needs a better name (and logical grouping)
      (set! (.-onsuccess req) #(log/info "Successfully wiped paradise-settings database."))
      (set! (.-onerror req) #(log/error "Failed to wipe paradise-settings."))
      (set! (.-onblocked req) #(log/warn "Wiping paradise-settings was BLOCKED by an open connection.")))))
+
 
 (re-frame/reg-event-fx
  :session/nuke-single-account
@@ -195,12 +197,12 @@ Probably needs a better name (and logical grouping)
          delete-promises
          (map (fn [db-name]
                 (js/Promise.
-                 (fn [resolve]
+                 (fn [resolve-fn]
                    (let [req (js/window.indexedDB.deleteDatabase db-name)]
-                     (set! (.-onsuccess req) #(resolve true))
-                     (set! (.-onerror req) #(resolve false))
+                     (set! (.-onsuccess req) #(resolve-fn true))
+                     (set! (.-onerror req) #(resolve-fn false))
                      (set! (.-onblocked req) #(do (log/warn db-name "is blocked!")
-                                                  (resolve false)))))))
+                                                  (resolve-fn false)))))))
               stores-to-delete)]
      (-> (js/Promise.all (clj->js delete-promises))
          (.then (fn []
@@ -214,7 +216,7 @@ Probably needs a better name (and logical grouping)
 
 ***** Login Field
 
-#+begin_src clojurescript :tangle ../../src/auth/events.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/auth/events.cljs
 (defui login-field [{:keys [id label type value on-change disabled]}]
   [:div.field-group.mb-4
    [:label.field-label {:for id} label]
@@ -231,7 +233,7 @@ Probably needs a better name (and logical grouping)
 
 This needs to be broken up a good bit, but it'll suffice for now
 
-#+begin_src clojurescript :tangle ../../src/auth/events.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/auth/events.cljs
 (defui login-screen []
   (let [fields (r/atom {:hs (or js/process.env.MATRIX_HOMESERVER "https://matrix.org")
                         :user ""
@@ -303,7 +305,7 @@ This needs to be broken up a good bit, but it'll suffice for now
 We likely need to redo the above component and make the naming scheme
 more meaningfully accurate.
 
-#+begin_src css :tangle ../../css/login.css
+#+begin_src css :tangle ../../../../css/login.css
 .auth-page-container {
   display: flex;
   align-items: center;
