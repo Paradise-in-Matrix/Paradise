@@ -1,14 +1,14 @@
-(ns container.call.core
+(ns paradise.ui.container.call.core
   (:require
    [re-frame.core :as rf]
    [re-frame.db :as rf-db]
-   [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref]]
-   [container.call.call-view :as call-view]
+   [paradise.ui.container.call.call-container :refer [primary-iframe-ref backup-iframe-ref]]
+   [paradise.ui.container.call.call-view :as call-view]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]))
+   [paradise.shared.client.state :as state]))
 
 (defonce window-listener-attached? (atom false))
 
