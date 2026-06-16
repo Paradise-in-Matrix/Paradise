@@ -1,9 +1,9 @@
-(ns overlays.lightbox
+(ns paradise.ui.overlays.lightbox
   (:require [re-frame.core :as re-frame]
             [reagent.core :as r]
-            [overlays.base :refer [modal-component]]
-            [utils.svg :as icons]
-            [utils.macros :refer [defui]]
+            [paradise.ui.overlays.base :refer [modal-component]]
+            [paradise.shared.utils.svg :as icons]
+            [paradise.shared.utils.macros :refer [defui]]
             ))
 
 (defui image-lightbox-content [{:keys [url]}]
