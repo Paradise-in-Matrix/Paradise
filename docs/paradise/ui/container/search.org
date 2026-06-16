@@ -17,24 +17,24 @@ https://spec.matrix.org/v1.17/client-server-api/#post_matrixclientv3search
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/container/search.cljs
-(ns container.search
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/search.cljs
+(ns paradise.ui.container.search
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [cljs.core.async :refer [go <!]]
    [reagent.core :as r]
-   [utils.svg :as icons]
-   [container.reusable :refer [message-preview-item]]))
+   [paradise.shared.utils.svg :as icons]
+   [paradise.ui.container.reusable :refer [message-preview-item]]))
 #+end_src
 
 
 **** Reframe
 
-#+begin_src clojurescript :tangle ../../src/container/search.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/search.cljs
 (re-frame/reg-event-fx
  :room/execute-search
  (fn [{:keys [db]} [_ room-id query]]
@@ -83,7 +83,7 @@ nice clean filter instructions and provide more complex search options.
 
 For now though, text search will do.
 
-#+begin_src clojurescript :tangle ../../src/container/search.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/search.cljs
 (defn ^:ui search []
   (let [active-room  @(re-frame/subscribe [:rooms/active-id])
         search-state @(re-frame/subscribe [:room/search-state active-room])
@@ -142,7 +142,7 @@ Initially we included the jump button here, but it'll be useful
 for pins so we've moved it to reusable.
 
 
-#+begin_src css :tangle ../../css/search.css
+#+begin_src css :tangle ../../../../css/search.css
 
 .sidebar-search-container {
     display: flex;
