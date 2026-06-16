@@ -1,7 +1,7 @@
-(ns client.key-handler
+(ns paradise.shared.client.key-handler
   (:require
    [reagent.core :as r]
-   [utils.macros :refer [defui]]
+   [paradise.shared.utils.macros :refer [defui]]
    [re-frame.core :as re-frame]))
 
 
