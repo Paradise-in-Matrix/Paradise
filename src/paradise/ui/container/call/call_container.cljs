@@ -1,10 +1,10 @@
-(ns container.call.call-container
+(ns paradise.ui.container.call.call-container
   (:require [reagent.core :as r]
             [taoensso.timbre :as log]
             [re-frame.core :as rf]
             [re-frame.db :as rf-db]
-            [client.state :as state]
-            [utils.macros :refer [defui]]
+            [paradise.shared.client.state :as state]
+            [paradise.shared.utils.macros :refer [defui]]
             ))
 
 (defonce primary-iframe-ref (r/atom nil))
