@@ -1,4 +1,4 @@
-(ns utils.build
+(ns plugin-build
   (:require
    [utils.macros]
    [clojure.java.io :as io]
