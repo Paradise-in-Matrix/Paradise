@@ -16,17 +16,15 @@ and the tab completion.
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/input/autocomplete.cljs
-(ns input.autocomplete
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
+(ns paradise.ui.input.autocomplete
   (:require
    [re-frame.core :as re-frame]
    [taoensso.timbre :as log]
    [clojure.string :as str]
-   [utils.macros :refer [defui]]
-   [utils.images :refer [mxc->url mxc-image]]
-   [utils.global-ui :refer [avatar handle-list-navigation selectable-list]]
-
-
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.media.component :refer [mxc->url media]]
+   [paradise.ui.global :refer [avatar handle-list-navigation selectable-list]]
    ))
 #+end_src
 
@@ -35,7 +33,7 @@ and the tab completion.
 
 ****** TODO need to populate mentions on room change
 
-#+begin_src clojurescript :tangle ../../src/input/autocomplete.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
 (re-frame/reg-sub
  :mention/filtered-users
  (fn [[_ room-id]]
@@ -106,7 +104,7 @@ and the tab completion.
 **** Key down Handler
 
 
-#+begin_src clojurescript :tangle ../../src/input/autocomplete.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
 (defonce !active-command (atom nil))
 
 (defui handle-suggestion-keydown [^js props type]
@@ -131,7 +129,7 @@ and the tab completion.
 **** Option Loaders
 
 
-#+begin_src clojurescript :tangle ../../src/input/autocomplete.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
 (defui emoji-suggestion-options []
   #js {:char ":"
        :command (fn [^js props]
@@ -192,7 +190,7 @@ and the tab completion.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/input/autocomplete.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
 (defui suggestion-menu []
   (let [{:keys [active? type rect index] :as state} @(re-frame/subscribe [:suggestion/state])
         room-id @(re-frame/subscribe [:rooms/active-id])
@@ -227,7 +225,7 @@ and the tab completion.
                           (if is-emoji?
                             (let [[shortcode emote-data] item]
                               [:<>
-                               [mxc-image {:mxc (:url emote-data) :class "suggestion-img" :alt shortcode}]
+                               [media {:mxc (:url emote-data) :class "suggestion-img" :alt shortcode}]
                                [:span.suggestion-text ":" shortcode ":"]])
                             [:<>
                              [avatar {:id    (:user-id item)
@@ -245,7 +243,7 @@ and the tab completion.
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/drafts.css
+#+begin_src css :tangle ../../../../css/drafts.css
 
 .suggestion-popup {
       position: absolute;
