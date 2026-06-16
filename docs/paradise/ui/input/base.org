@@ -13,25 +13,26 @@ too much detail it is headless, so we can theme and customize it without much fr
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
-(ns input.base
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
+(ns paradise.ui.input.base
   (:require [promesa.core :as p]
             [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
-            [input.drafts :refer [attachment-preview]]
-            [input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
-            [input.emotes :refer [emoji-sticker-board]]
-            [input.autocomplete :refer [suggestion-menu]]
+            [paradise.ui.input.drafts :refer [attachment-preview]]
+            [paradise.ui.input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
+            [paradise.ui.input.emotes :refer [emoji-sticker-board]]
+            [paradise.ui.input.autocomplete :refer [suggestion-menu]]
+            [paradise.ui.global :refer [request-batched-redraw!]]
             [reagent.core :as r]
-            [utils.images :refer [mxc->url]]
-            [utils.helpers :refer [truncate-name]]
-            [utils.svg :as icons]
-            [utils.macros :refer [defui]]
+            [paradise.media.component :refer [mxc->url]]
+            [paradise.shared.utils.helpers :refer [truncate-name]]
+            [paradise.shared.utils.svg :as icons]
+            [paradise.shared.utils.macros :refer [defui]]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
-            [client.state :as state]
-            [plugins :as plugins]))
+            [paradise.shared.client.state :as state]
+            [paradise.shared.plugins :as plugins]))
 #+end_src
 
 
@@ -39,7 +40,7 @@ too much detail it is headless, so we can theme and customize it without much fr
 **** Upload Reframe Event
 
 We'll need a way to generically upload to Matrix for anything from updating avatars, to sticker packs, or to files.
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 (re-frame/reg-event-fx
  :sdk/upload-media
  (fn [_ [_ file on-success-event]]
@@ -72,7 +73,7 @@ viewing for other clients. However, even if we don't clients will natively handl
 it.
 Important to note we must do this here as this is when the browser is loading the
 buffer of data so we can actually check the data associated and pass it on.
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 (defn extract-metadata [raw-file]
   (p/create
    (fn [resolve-fn _]
@@ -121,7 +122,7 @@ buffer of data so we can actually check the data associated and pass it on.
 **** Message Submit
 
 
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 
 
 (re-frame/reg-event-fx
@@ -198,7 +199,7 @@ So instead, we must inform the server that we are sending a Sticker directly.
 Later on this ideally will be changed, but for now this is the only path
 forward.
 
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 (re-frame/reg-event-fx
  :sdk/send-sticker
  (fn [_ [_ room-id mxc alt-text info]]
@@ -220,7 +221,7 @@ forward.
 **** Reframe events and subscriptions
 
 
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 (re-frame/reg-event-db
  :sdk/upload-complete
  (fn [db _]
@@ -241,11 +242,15 @@ forward.
 (re-frame/reg-event-db
  :input/set-context
  (fn [db [_ room-id mode target-item]]
+   (when (= mode :edit)
+     (request-batched-redraw! room-id))
    (assoc-in db [:input-context room-id] {:mode mode :target target-item})))
 
 (re-frame/reg-event-db
  :input/clear-context
  (fn [db [_ room-id]]
+   (when (= (get-in db [:input-context room-id :mode]) :edit)
+     (request-batched-redraw! room-id))
    (update db :input-context dissoc room-id)))
 
 (re-frame/reg-sub
@@ -277,8 +282,8 @@ forward.
 This is the editor used for editing to be specific. Outside that it likely won't
 be used.
 
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
-(defn ^:ui inline-editor [item active-id]
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
+(defn ^:react inline-editor [item active-id]
   (r/with-let [!editor (r/atom nil)]
     (fn [item active-id]
       (let [m-content    (get-in item [:content :inner :content])
@@ -320,7 +325,7 @@ Ideally, we should break this apart more later.
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/input/base.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 
 (defn ^:ui timeline-send-button [{:keys [submit-message! editor attachments]}]
   [:button.timeline-send-btn
@@ -460,7 +465,7 @@ Ideally, we should break this apart more later.
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/base-composer.css
+#+begin_src css :tangle ../../../../css/base-composer.css
 .timeline-upload-btn,
 .timeline-emoji-btn,
 .timeline-send-btn {
