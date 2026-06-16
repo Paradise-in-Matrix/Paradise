@@ -13,18 +13,18 @@ magnitudes simpler.
 
 
 ***** Imports
-#+begin_src clojurescript :tangle ../../src/container/call/events.cljs
-(ns container.call.events
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/events.cljs
+(ns paradise.ui.container.call.events
   (:require [re-frame.core :as rf]
             [taoensso.timbre :as log]
             [cljs-workers.core :as main]
-            [client.state :as state]
-            [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
+            [paradise.shared.client.state :as state]
+            [paradise.ui.container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
 #+end_src
 
 
 ***** Reframe bits
-#+begin_src clojurescript :tangle ../../src/container/call/events.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/events.cljs
 (defn click-iframe-button! [iframe-ref test-id]
   (when-let [iframe @iframe-ref]
     (let [doc (or (.-contentDocument iframe)
@@ -191,14 +191,14 @@ this is not a smooth experience for the user.
 
 ***** Components
 
-#+begin_src clojurescript :tangle ../../src/container/call/call_container.cljs
-(ns container.call.call-container
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/call_container.cljs
+(ns paradise.ui.container.call.call-container
   (:require [reagent.core :as r]
             [taoensso.timbre :as log]
             [re-frame.core :as rf]
             [re-frame.db :as rf-db]
-            [client.state :as state]
-            [utils.macros :refer [defui]]
+            [paradise.shared.client.state :as state]
+            [paradise.shared.utils.macros :refer [defui]]
             ))
 
 (defonce primary-iframe-ref (r/atom nil))
@@ -273,7 +273,7 @@ this is not a smooth experience for the user.
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/calls.css
+#+begin_src css :tangle ../../../../css/calls.css
 
   .hide-on-desktop {
       display: flex !important;
@@ -302,14 +302,14 @@ this is not a smooth experience for the user.
 
 **** Call View
 
-#+begin_src clojurescript :tangle ../../src/container/call/call_view.cljs
-(ns container.call.call-view
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/call_view.cljs
+(ns paradise.ui.container.call.call-view
   (:require [reagent.core :as r]
             [re-frame.core :as rf]
             [goog.functions :as gf]
-            [utils.macros :refer [defui]]
-            [container.reusable :refer [room-header]]
-            [container.call.call-container :refer [host-rect]]))
+            [paradise.shared.utils.macros :refer [defui]]
+            [paradise.ui.container.reusable :refer [room-header]]
+            [paradise.ui.container.call.call-container :refer [host-rect]]))
 
 (defui call-view [room-id]
   (let [host-ref    (r/atom nil)
@@ -384,22 +384,22 @@ this is not a smooth experience for the user.
 This is the center piece of our calling logic. What actually
 facilitates the iframe and the widget in the rust-sdk.
 
-#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
-(ns container.call.core
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/core.cljs
+(ns paradise.ui.container.call.core
   (:require
    [re-frame.core :as rf]
    [re-frame.db :as rf-db]
-   [container.call.call-container :refer [primary-iframe-ref backup-iframe-ref]]
-   [container.call.call-view :as call-view]
+   [paradise.ui.container.call.call-container :refer [primary-iframe-ref backup-iframe-ref]]
+   [paradise.ui.container.call.call-view :as call-view]
    [taoensso.timbre :as log]
    [clojure.string :as str]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]))
+   [paradise.shared.client.state :as state]))
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/core.cljs
 (defonce window-listener-attached? (atom false))
 
 
@@ -417,7 +417,7 @@ facilitates the iframe and the widget in the rust-sdk.
 
 #+end_src
 
-#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/core.cljs
 (rf/reg-event-fx
  :call/init-widget
  (fn [{:keys [db]} [_ room-id opts]]
@@ -464,7 +464,7 @@ facilitates the iframe and the widget in the rust-sdk.
 #+end_src
 
 
-#+begin_src clojurescript :tangle ../../src/container/call/core.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/core.cljs
 (rf/reg-event-fx
  :call/attach-window-listener
  (fn [_ _]
