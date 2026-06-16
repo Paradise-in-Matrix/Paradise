@@ -13,8 +13,8 @@ https://github.com/matrix-org/matrix-spec-proposals/pull/2545
 
 **** Imports
 
-#+begin_src clojurescript :tangle ../../src/input/emotes.cljs
-(ns input.emotes
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/emotes.cljs
+(ns paradise.ui.input.emotes
   (:require
    [promesa.core :as p]
    [re-frame.core :as re-frame]
@@ -22,12 +22,12 @@ https://github.com/matrix-org/matrix-spec-proposals/pull/2545
    [clojure.string :as str]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    [reagent.core :as r]
-   [utils.helpers :refer [fetch-state-event fetch-room-state]]
-   [utils.global-ui :refer [click-away-wrapper]]
-   [utils.macros :refer [defui]]
-   [utils.images :refer [mxc-image]]
+   [paradise.shared.utils.helpers :refer [fetch-state-event fetch-room-state]]
+   [paradise.ui.global :refer [click-away-wrapper]]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.media.component :refer [media]]
    ["emojibase-data/en/data.json" :as emoji-data]
    ["react" :as react]
    ))
@@ -78,7 +78,7 @@ another space (unless the user has made them set as global).
 
 ***** Reframe
 
-#+begin_src clojurescript :tangle ../../src/input/emotes.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/emotes.cljs
 (re-frame/reg-event-fx
  :sdk/fetch-room-emotes
  (fn [_ [_ source-type room-id]]
@@ -142,7 +142,7 @@ So we just use the unicode-emoji-json package as it is just a bunch of mappings.
 
 We then initialize them as a 'pack'
 
-#+begin_src clojurescript :tangle ../../src/input/emotes.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/emotes.cljs
 (defonce categorized-system-packs
   (let [unwrap (fn [mod] (if (and mod (.-default mod)) (.-default mod) mod))
         raw-data (js->clj (unwrap emoji-data) :keywordize-keys true)
@@ -191,7 +191,7 @@ We then initialize them as a 'pack'
 
 ***** Component
 
-#+begin_src clojurescript :tangle ../../src/input/emotes.cljs
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/emotes.cljs
 (defui emoji-sticker-board [{:keys [on-close on-insert-emoji on-insert-native on-send-sticker inline?]}]
   (re-frame/dispatch [:sdk/fetch-all-emotes])
   (let [selected-pack-id (r/atom nil)
@@ -245,7 +245,7 @@ We then initialize them as a 'pack'
                                          (:is-unicode? pack-data)
                                          [:span.pack-text-icon (:hero-icon pack-data)]
                                          avatar
-                                         [mxc-image {:mxc   avatar
+                                         [media {:mxc   avatar
                                                      :class "pack-icon"
                                                      :alt   pname}]
                                          :else
@@ -277,7 +277,7 @@ We then initialize them as a 'pack'
                                                        (on-insert-emoji shortcode (:url item))))}
                                         (if (:is-unicode? item)
                                           [:span.native-emoji {:title shortcode} (:unicode item)]
-                                          [mxc-image {:mxc   (:url item)
+                                          [media {:mxc   (:url item)
                                                       :class "emoji-img"
                                                       :title shortcode
                                                       :alt   shortcode}])]))]
@@ -309,7 +309,7 @@ We then initialize them as a 'pack'
 
                                        (if (:is-unicode? active-pack)
                                          [:span.native-emoji {:title shortcode} (:unicode item)]
-                                         [mxc-image {:mxc   (:url item)
+                                         [media {:mxc   (:url item)
                                                      :class "emoji-img"
                                                      :title shortcode
                                                      :alt   shortcode}])])]])]])]]
@@ -324,7 +324,7 @@ We then initialize them as a 'pack'
 
 ***** CSS
 
-#+begin_src css :tangle ../../css/emojis.css
+#+begin_src css :tangle ../../../../css/emojis.css
 .emoji-picker-anchor {
     position: relative;
     display: inline-block;
