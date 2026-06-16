@@ -1,9 +1,9 @@
-(ns navigation.rooms.room-summary
+(ns paradise.ui.navigation.rooms.room-summary
   (:require [promesa.core :as p]
             [clojure.string :as str]
             [taoensso.timbre :as log]
             )
-  (:require-macros [utils.macros :refer [ocall oget]]))
+  (:require-macros [paradise.shared.utils.macros :refer [ocall oget]]))
 
 (defn build-room-summary [room room-info latest-event]
   (let [
