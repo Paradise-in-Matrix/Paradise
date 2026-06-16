@@ -1,22 +1,21 @@
-(ns overlays.settings
+(ns paradise.ui.overlays.settings
   (:require
    [promesa.core :as p]
    [re-frame.core :as re-frame]
    [reagent.core :as r]
-   [utils.svg :as icons]
-   [utils.macros :refer [defui]]
-   [overlays.base :refer [modal-component]]
-   [utils.global-ui :refer [avatar]]
-   [client.session-store :as store]
-   [plugins :as plugins]
+   [paradise.shared.utils.svg :as icons]
+   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.ui.overlays.base :refer [context-menu-component modal-component]]
+   [paradise.ui.global :refer [avatar]]
+
+   [paradise.shared.client.session-store :as store]
+   [paradise.shared.plugins :as plugins]
    [taoensso.timbre :as log]
-   [utils.macros :refer [config]]
+   [paradise.shared.utils.macros :refer [config]]
    [cljs.core.async :refer [go <!]]
    [cljs-workers.core :as main]
-   [client.state :as state]
+   [paradise.shared.client.state :as state]
    ))
-
-
 
 (re-frame/reg-sub
  :sdk/profile
@@ -219,14 +218,45 @@
 
 
 
-(defui sidebar-profile-mini []
+(defn build-profile-actions [tr user-id]
+  (->> [{:id "status"
+         :label (tr [:settings.context-menu/set-status])
+         :dispatch [:ui/open-modal :status-picker]}
+        {:id "copy"
+         :label (tr [:settings.context-menu/copy-id])
+         :dispatch [:ui/copy-to-clipboard user-id]}
+        {:id "logout"
+         :label (tr [:settings.context-menu/logout])
+         :class-name "danger"
+         :dispatch [:sdk/logout]}]
+       (remove nil?)
+       (vec)))
+
+(defn ^:ui profile-context-menu-content [{:keys [user-id x y close-fn]}]
+  (let [tr    @(re-frame/subscribe [:i18n/tr])
+        items (build-profile-actions tr user-id)]
+    [:<>
+     (for [{:keys [id label dispatch class-name icon]} items]
+       ^{:key (or id label)}
+       [:div.context-menu-item
+        {:class class-name
+         :on-click (fn [e]
+                     (.stopPropagation e)
+                     (when dispatch
+                       (re-frame/dispatch dispatch))
+                     (re-frame/dispatch [:ui/close-context-menu]))}
+        (when icon [:span.item-icon icon])
+        [:span.item-label label]])]))
+
+(defmethod context-menu-component :profile-actions [_]
+  profile-context-menu-content)
+
+(defn ^:ui sidebar-profile-mini []
   (let [tr      @(re-frame/subscribe [:i18n/tr])
         profile @(re-frame/subscribe [:sdk/profile])]
     [:div.sidebar-profile-mini
-     {:style {
-              :bottom "env(safe-area-inset-bottom, 16px)"
-              :position "absolute"
-              }}
+     {:style {:bottom "env(safe-area-inset-bottom, 16px)"
+              :position "absolute"}}
      [:div.profile-trigger
       {:style {:user-select "none"}
        :on-click (fn [e]
@@ -235,19 +265,11 @@
        :on-context-menu (fn [e]
                           (.preventDefault e)
                           (re-frame/dispatch
-                           [:context-menu/open
+                           [:ui/open-context-menu
+                            :profile-actions
                             {:x (.-clientX e)
                              :y (.-clientY e)
-                             :items [{:id "status"
-                                      :label (tr [:settings.context-menu/set-status])
-                                      :action #(log/info "Status")}
-                                     {:id "copy"
-                                      :label (tr [:settings.context-menu/copy-id])
-                                      :action #(log/info "Copied")}
-                                     {:id "logout"
-                                      :label (tr [:settings.context-menu/logout])
-                                      :action #(re-frame/dispatch [:sdk/logout])
-                                      :class-name "danger"}]}]))}
+                             :user-id (:user-id profile)}]))}
       [avatar {:id   (:user-id profile)
                :name (or (:display-name profile) "?")
                :url  (:avatar-url profile)
@@ -255,7 +277,7 @@
       [:div.status-dot]]]))
 
 
-(defui verification-tab []
+(defn ^:ui verification-tab []
   (r/with-let [!passphrase (r/atom "")]
     (let [tr              @(re-frame/subscribe [:i18n/tr])
           status          @(re-frame/subscribe [:verification/status])
