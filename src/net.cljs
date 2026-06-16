@@ -1,4 +1,4 @@
-(ns utils.net
+(ns net
   (:require [promesa.core :as p]
             [clojure.string :as str]
             ))
