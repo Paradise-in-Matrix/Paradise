@@ -249,21 +249,21 @@ particularly a thread-traversal compliant POJO.
                               (clojure.string/split tag-name #"\."))
 
             has-attrs? (map? (second node))
-            attrs (if has-attrs? (second node) {})
-            children (if has-attrs? (drop 2 node) (drop 1 node))
-            js-props (process-props attrs)]
+            attrs      (if has-attrs? (second node) {})
+            children   (if has-attrs? (drop 2 node) (drop 1 node))
+            js-props   (process-props attrs)]
 
         (when (seq classes)
-          (let [existing (goog.object/get js-props "className")
+          (let [existing       (goog.object/get js-props "className")
                 joined-classes (clojure.string/join " " classes)
-                final-class (if existing (str joined-classes " " existing) joined-classes)]
+                final-class    (if existing (str joined-classes " " existing) joined-classes)]
             (aset js-props "className" final-class)))
 
-        #js {:type (cond
-                     is-comp? (if (.startsWith tag "comp:") tag (str "comp:" tag))
-                     (empty? tag) "div"
-                     :else tag)
-             :props (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
+        #js {:type     (cond
+                         is-comp? (if (.startsWith tag "comp:") tag (str "comp:" tag))
+                         (empty? tag) "div"
+                         :else tag)
+             :props    (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
              :children (to-array (map hiccup->pojo children))})
 
       (to-array (map hiccup->pojo node)))
@@ -275,11 +275,11 @@ particularly a thread-traversal compliant POJO.
     (object? node)
     (if (goog.object/containsKey node "_owner")
       (let [raw-props (.-props node)
-            children (goog.object/get raw-props "children")
-            js-props (process-props raw-props)]
+            children  (goog.object/get raw-props "children")
+            js-props  (process-props raw-props)]
         (js/Reflect.deleteProperty js-props "children")
-        #js {:type (.-type node)
-             :props (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
+        #js {:type     (.-type node)
+             :props    (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
              :children (cond
                          (array? children) (.map children hiccup->pojo)
                          (some? children) #js [(hiccup->pojo children)]
