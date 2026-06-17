@@ -97,6 +97,7 @@ ingest them all at once.
   {'capacitor.browser {'Browser Browser}
    'capacitor.core    {'Capacitor Capacitor}
 
+   'paradise.shared.sci-runner.ui (expose-ns paradise.shared.sci-runner.ui)
    'taoensso.timbre {'info  log-info-macro
                      'warn  log-warn-macro
                      'error log-error-macro
