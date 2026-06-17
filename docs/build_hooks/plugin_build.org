@@ -154,10 +154,10 @@ easily done. It'll be something that needs to be revisited.
 
 (defn custom-macro? [sym]
   (when (symbol? sym)
-    (let [macro-var (ns-resolve 'utils.macros (symbol (name sym)))]
+    (let [macro-var (ns-resolve 'paradise.shared.utils.macros (symbol (name sym)))]
       (and macro-var
            (:macro (meta macro-var))
-           (= (ns-name (:ns (meta macro-var))) 'utils.macros)))))
+           (= (ns-name (:ns (meta macro-var))) 'paradise.shared.utils.macros)))))
 
 (defn expand-macros [form]
   (with-redefs [clojure.tools.analyzer.passes.jvm.validate/validate identity]
@@ -185,7 +185,7 @@ easily done. It'll be something that needs to be revisited.
                 (scrub-jvm-artifacts expanded))
 
               (custom-macro? sym)
-              (let [qualified-macro (symbol "utils.macros" (name sym))]
+              (let [qualified-macro (symbol "paradise.shared.utils.macros" (name sym))]
                 (macroexpand-1 (cons qualified-macro (rest x))))
               :else x))
           x))
