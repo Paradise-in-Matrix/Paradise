@@ -93,4 +93,14 @@ The naming scheme for this might shift in time.
    virtualizer-namespaces))
 
 
+(defn eval-virtualizer-plugin! [plugin-id code-str]
+  (reset! !current-eval-plugin plugin-id)
+  (try
+    (sci/eval-string* virtualizer-context code-str)
+    {:status :success}
+    (catch :default e
+      (js/console.error (str "Virtualizer Plugin Eval Error [" plugin-id "]:") e)
+      {:status :error
+       :error (ex-message e)})))
+
 #+end_src
