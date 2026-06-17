@@ -649,15 +649,21 @@ overwrite the components class.
          (doseq [script-url scripts]
            (<p! (inject-script! script-url))))
 
-       (when-let [worker-form (:worker-form-str plugin-map)]
-         (let [res (<! (main/do-with-pool! @state/!engine-pool
-                                           {:handler :evaluate-worker-form
-                                            :arguments {:form-str worker-form}}))]
-           (when (= (:status res) "error")
-             (throw (js/Error. (str "Worker Eval Failed: " (:msg res)))))))
+       (when-let [modules (:modules plugin-map)]
+         (doseq [{:keys [ns target code]} modules]
+           (case target
+             :engine
+             (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                               {:handler :evaluate-worker-form
+                                                :arguments {:plugin-id (:id plugin-map)
+                                                            :form-str code}}))]
+               (when (= (:status res) "error")
+                 (throw (js/Error. (str "Engine Eval Failed for " ns ": " (:msg res))))))
 
-       (when-let [ui-form (:ui-form-str plugin-map)]
-         (runner/evaluate-ui-form (:id plugin-map) ui-form))
+             :ui
+             (runner/evaluate-ui-form (:id plugin-map) code)
+
+             (js/console.warn "Unknown target for namespace:" ns "- skipping evaluation."))))
 
        (rf/dispatch [:plugins/installation-success url plugin-map])
 
@@ -665,6 +671,7 @@ overwrite the components class.
          (js/console.error "Plugin Boot Sequence Failed:" e)
          (rf/dispatch [:plugins/installation-failed url (str e)]))))
    {}))
+
 
 (rf/reg-event-db
  :plugins/installation-failed
