@@ -111,6 +111,19 @@
           "lambda-paths" lambda-paths}
      true)))
 
+
+(defn precompile-and-cache-event [e source]
+  (let [eid    (measurements/extract-id e)
+        cached (get @!event-cache eid)]
+    (if (and cached (= (:raw cached) e))
+      cached
+      (let [new-event (parsing/precompile-event-data e source)]
+        (swap! !event-cache assoc eid (assoc new-event :raw e))
+        new-event))))
+
+(defn process-timeline-events [events source]
+  (mapv #(precompile-and-cache-event % source) events))
+
 (worker/register :recalculate-timeline
                  (fn [{:keys [room-id]}]
                    (let [sources (keys (get @!room-events room-id))]
@@ -135,23 +148,21 @@
 
                      {:status :success})))
 
-
 (worker/register :process-timeline-diff
                  (fn [{:keys [events room-id source]}]
-                   (let [processed-events (mapv
-                                           (fn [e]
-                                             (let [eid    (measurements/extract-id e)
-                                                   cached (get @!event-cache eid)]
-                                               (if (and cached (= (:raw cached) e))
-                                                 cached
-                                                 (let [new-event (parsing/precompile-event-data e source)]
-                                                   (swap! !event-cache assoc eid (assoc new-event :raw e))
-                                                   new-event))))
-                                           events)
+                   (let [processed-events (process-timeline-events events source)
                          enriched-events  (measurements/enrich-timeline-items processed-events)]
                      (swap! !room-events assoc-in [room-id source] enriched-events)
                      (recalculate-and-stream! room-id source)
                      {:status :success})))
+
+
+(worker/register :eval-virtualizer-plugin
+  (fn [{:keys [arguments]}]
+    (let [{:keys [plugin-id code]} arguments]
+      (sci-runner/eval-virtualizer-plugin! plugin-id code))))
+
+
 
 
 (worker/bootstrap)
