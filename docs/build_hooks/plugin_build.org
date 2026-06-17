@@ -240,21 +240,18 @@ easily done. It'll be something that needs to be revisited.
 
 #+begin_src clojurescript :tangle ../../src/plugin_build.clj
 (defn -main [& args]
-  (let [metadata        (edn/read-string (slurp "manifest.edn"))
-        ui-form-str     (process-and-expand-file "src/ui.cljs")
-        worker-form-str (process-and-expand-file "src/worker.cljs")
-        payload         (assoc metadata
-                               :ui-form-str ui-form-str
-                               :worker-form-str worker-form-str)
+  (let [metadata (edn/read-string (slurp "manifest.edn"))
+        modules  (process-src-directory "src")
+        payload  (assoc metadata :modules modules)
 
-        out-dir         (io/file "dist")
-        out-file        (io/file out-dir "plugin.edn")]
+        out-dir  (io/file "dist")
+        out-file (io/file out-dir "plugin.edn")]
 
     (when-not (.exists out-dir)
       (.mkdir out-dir))
 
     (spit out-file (pr-str payload))
-    (println "Plugin packed and AOT-expanded successfully to" (.getPath out-file))))
+    (println "Plugin packed and AOT-expanded successfully. Processed" (count modules) "files to" (.getPath out-file))))
 #+end_src
 
 
