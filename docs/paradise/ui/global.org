@@ -252,20 +252,17 @@ It makes allowing potential support for dynamic behavior later
 much simpler.
 
 #+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/open-modal
- (fn [db [_ modal-id props]]
-   (assoc db :active-modal {:id modal-id :props props})))
+ (fn [_ [_ modal-id props]]
+   (reset! !active-modal {:id modal-id :props props})
+   {}))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/close-modal
- (fn [db _]
-   (dissoc db :active-modal)))
-
-(re-frame/reg-sub
- :ui/active-modal
- (fn [db _]
-   (:active-modal db)))
+ (fn [_ _]
+   (reset! !active-modal nil)
+   {}))
 #+end_src
 
 
@@ -291,10 +288,9 @@ much simpler.
     [modal-inner props children]))
 
 (defn modal-root []
-  (let [active-modal @(re-frame/subscribe [:ui/active-modal])]
+  (let [active-modal @!active-modal]
     (when active-modal
       (let [{:keys [id props]} active-modal
-            _ (log/error active-modal)
             close-fn           #(re-frame/dispatch [:ui/close-modal])
             TargetComponent    (modal-component id)]
         [generic-modal
