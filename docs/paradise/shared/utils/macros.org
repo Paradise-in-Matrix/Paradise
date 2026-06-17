@@ -107,25 +107,6 @@ registry of components instead of manually aggregating them.
 
 
 
-
-
-
-**** Generating Translation map (Depreciated)
-
-This allows us to aggregate the language JSONs from the node_modules
-in order to serve them properly to users. It's just a fancy way
-to write a dynamic import of JSONs for ClojureScript.
-#+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/macros.cljc
-(defmacro gen-translation-map [dir-path]
-  (let [files (filter #(.endsWith (.getName %) ".json") 
-                      (file-seq (io/file dir-path)))
-        mapping (into {} (for [f files]
-                           (let [lang (second (re-find #"([^/]+)\.json$" (.getPath f)))]
-                             [lang `(fn [] (js/import ~(.getPath f)))])))]
-    mapping))
-#+end_src
-
-
 Load our static macros and provide them globally
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/macros.cljs
 (ns paradise.shared.utils.macros
