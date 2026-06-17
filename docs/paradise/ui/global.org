@@ -48,6 +48,16 @@ them collected together
 #+end_src
 
 
+**** Overlay States
+We store these here instead of the app-db explicitly to
+enable passing functions through them.
+
+#+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
+(defonce !active-context-menu (r/atom nil))
+(defonce !active-modal (r/atom nil))
+(defonce !active-popover (r/atom nil))
+#+end_src
+
 
 **** Context Menu Root
 
