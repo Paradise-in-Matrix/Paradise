@@ -204,7 +204,7 @@ Just use Reagent.
       (cond
         (= tag :br) "\n"
         (contains? block-level-tags tag) (str inner-text "\n")
-        (or (:mxc attrs) (= tag :img) (= tag "mxc-image")) " [e] "
+        (or (:mxc attrs) (= tag :img) (= tag "media-native")) " [e] "
         :else inner-text))
     (sequential? node) (str/join "" (map hiccup->text node))
     :else ""))
