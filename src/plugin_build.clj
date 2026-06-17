@@ -1,6 +1,6 @@
 (ns plugin-build
   (:require
-   [utils.macros]
+   [paradise.shared.utils.macros]
    [clojure.java.io :as io]
    [clojure.edn :as edn]
    [clojure.walk :as walk]
@@ -84,10 +84,10 @@
 
 (defn custom-macro? [sym]
   (when (symbol? sym)
-    (let [macro-var (ns-resolve 'utils.macros (symbol (name sym)))]
+    (let [macro-var (ns-resolve 'paradise.shared.utils.macros (symbol (name sym)))]
       (and macro-var
            (:macro (meta macro-var))
-           (= (ns-name (:ns (meta macro-var))) 'utils.macros)))))
+           (= (ns-name (:ns (meta macro-var))) 'paradise.shared.utils.macros)))))
 
 (defn expand-macros [form]
   (with-redefs [clojure.tools.analyzer.passes.jvm.validate/validate identity]
@@ -115,7 +115,7 @@
                 (scrub-jvm-artifacts expanded))
 
               (custom-macro? sym)
-              (let [qualified-macro (symbol "utils.macros" (name sym))]
+              (let [qualified-macro (symbol "paradise.shared.utils.macros" (name sym))]
                 (macroexpand-1 (cons qualified-macro (rest x))))
               :else x))
           x))
@@ -134,19 +134,41 @@
         pure-ast     (sanitize-ast expanded-ast)]
     (pr-str pure-ast)))
 
-(defn -main [& args]
-  (let [metadata        (edn/read-string (slurp "manifest.edn"))
-        ui-form-str     (process-and-expand-file "src/ui.cljs")
-        worker-form-str (process-and-expand-file "src/worker.cljs")
-        payload         (assoc metadata
-                               :ui-form-str ui-form-str
-                               :worker-form-str worker-form-str)
 
-        out-dir         (io/file "dist")
-        out-file        (io/file out-dir "plugin.edn")]
+(defn determine-target-from-ns [raw-code]
+  (if-let [match (re-find #"\(ns\s+([^\s\)]+)" raw-code)]
+    (let [ns-name (second match)]
+      (cond
+        (str/includes? ns-name ".ui") :ui
+        (str/includes? ns-name ".engine") :engine
+        :else :unknown))
+    :unknown))
+
+(defn process-src-directory [dir-path]
+  (let [cljs-files (->> (io/file dir-path)
+                        file-seq
+                        (filter #(and (.isFile %) (str/ends-with? (.getName %) ".cljs"))))]
+    (mapv (fn [file]
+            (let [raw-code (slurp file)
+                  target   (determine-target-from-ns raw-code)
+                  ns-name  (second (re-find #"\(ns\s+([^\s\)]+)" raw-code))
+                  expanded (process-and-expand-file (.getPath file))]
+              {:ns ns-name
+               :target target
+               :code expanded}))
+          cljs-files)))
+
+
+(defn -main [& args]
+  (let [metadata (edn/read-string (slurp "manifest.edn"))
+        modules  (process-src-directory "src")
+        payload  (assoc metadata :modules modules)
+
+        out-dir  (io/file "dist")
+        out-file (io/file out-dir "plugin.edn")]
 
     (when-not (.exists out-dir)
       (.mkdir out-dir))
 
     (spit out-file (pr-str payload))
-    (println "Plugin packed and AOT-expanded successfully to" (.getPath out-file))))
+    (println "Plugin packed and AOT-expanded successfully. Processed" (count modules) "files to" (.getPath out-file))))
