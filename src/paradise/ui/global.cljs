@@ -28,20 +28,21 @@
              :cursor "default"}}]
    (into [:<>] children)])
 
-(re-frame/reg-event-db
+(defonce !active-context-menu (r/atom nil))
+(defonce !active-modal (r/atom nil))
+(defonce !active-popover (r/atom nil))
+
+(re-frame/reg-event-fx
  :ui/open-context-menu
- (fn [db [_ id props]]
-   (assoc db :active-context-menu {:id id :props props})))
+ (fn [_ [_ id props]]
+   (reset! !active-context-menu {:id id :props props})
+   {}))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/close-context-menu
- (fn [db _]
-   (dissoc db :active-context-menu)))
-
-(re-frame/reg-sub
- :ui/active-context-menu
- (fn [db _]
-   (:active-context-menu db)))
+ (fn [_ _]
+   (reset! !active-context-menu nil)
+   {}))
 
 (defn ^:ui context-menu-root []
   (r/with-let [!drag-y (r/atom 0)
@@ -55,7 +56,7 @@
                                 (.removeEventListener js/window "touchend" enable-clicks! true)
                                 (.removeEventListener js/window "pointerup" enable-clicks! true)
                                 (.removeEventListener js/window "touchcancel" enable-clicks! true))]
-    (let [active-menu @(re-frame/subscribe [:ui/active-context-menu])]
+    (let [active-menu @!active-context-menu]
       (when-not active-menu
         (reset! !drag-y 0)
         (reset! !start-y 0)
@@ -118,20 +119,17 @@
             (when Target
               [Target (assoc props :close-fn close-fn)])]])))))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/open-modal
- (fn [db [_ modal-id props]]
-   (assoc db :active-modal {:id modal-id :props props})))
+ (fn [_ [_ modal-id props]]
+   (reset! !active-modal {:id modal-id :props props})
+   {}))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/close-modal
- (fn [db _]
-   (dissoc db :active-modal)))
-
-(re-frame/reg-sub
- :ui/active-modal
- (fn [db _]
-   (:active-modal db)))
+ (fn [_ _]
+   (reset! !active-modal nil)
+   {}))
 
 (defn- modal-inner
   [{:keys [on-close backdrop-props window-props]} children]
@@ -153,10 +151,9 @@
     [modal-inner props children]))
 
 (defn modal-root []
-  (let [active-modal @(re-frame/subscribe [:ui/active-modal])]
+  (let [active-modal @!active-modal]
     (when active-modal
       (let [{:keys [id props]} active-modal
-            _ (log/error active-modal)
             close-fn           #(re-frame/dispatch [:ui/close-modal])
             TargetComponent    (modal-component id)]
         [generic-modal
@@ -166,23 +163,20 @@
           :window-props   (:window-props props)}
          [TargetComponent props]]))))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/open-popover
- (fn [db [_ id props]]
-   (assoc db :active-popover {:id id :props props})))
+ (fn [_ [_ id props]]
+   (reset! !active-popover {:id id :props props})
+   {}))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/close-popover
- (fn [db _]
-   (dissoc db :active-popover)))
-
-(re-frame/reg-sub
- :ui/active-popover
- (fn [db _]
-   (:active-popover db)))
+ (fn [_ _]
+   (reset! !active-popover nil)
+   {}))
 
 (defn popover-root []
-  (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
+  (let [active-popover @!active-popover]
     (when active-popover
       (let [{:keys [id props]} active-popover
             props    (if (map? props) props (js->clj props :keywordize-keys true))
@@ -200,44 +194,13 @@
                [:div.popover-backdrop
                 {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
                  :on-click close-fn
-                 :on-context-menu (fn [e] #_(.preventDefault e) (close-fn))}])
+                 :on-context-menu (fn [e] (close-fn))}])
              [:div.popover-container
               {:style {:left (str render-x "px")
                        :top  (str render-y "px")
                        :position "fixed"
                        :z-index 12000}}
               [Target (assoc props :close-fn close-fn)]]]))))))
-
-
-
-
-(defn satellite-overlay [child-component]
-  (let [picker-state @(re-frame/subscribe [:msg/active-reaction-picker])]
-    (when picker-state
-      (let [{:keys [room-id event-or-transaction-id x y]} picker-state
-            width  320
-            height 380
-            render-x (if (> (+ x width) js/window.innerWidth) (- x width) x)
-            render-y (if (> (+ y height) js/window.innerHeight) (- y height) y)]
-        [:div.satellite-overlay
-         {:style {:left (str render-x "px")
-                  :top (str render-y "px")
-                  :position "fixed"
-                  :z-index 1000}}
-         [:div.satellite-content
-          [child-component
-           {:on-close #(re-frame/dispatch [:msg/close-reaction-picker])
-            :on-insert-native
-            (fn [unicode-char]
-              (re-frame/dispatch [:sdk/toggle-reaction room-id  event-or-transaction-id unicode-char])
-              (re-frame/dispatch [:msg/close-reaction-picker]))
-             :on-insert-emoji
-            (fn [shortcode url]
-              (re-frame/dispatch [:sdk/toggle-reaction room-id event-or-transaction-id  url])
-              (re-frame/dispatch [:msg/close-reaction-picker]))
-            :on-send-sticker
-            (fn [& _]
-              (log/warn "Cannot send stickers as a reaction!"))}]]]))))
 
 
 
