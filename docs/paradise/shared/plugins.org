@@ -518,6 +518,7 @@ overwrite the components class.
    [cljs-workers.core :as main]
    [paradise.shared.sci-runner.ui :as runner]
    [paradise.shared.client.state :as state]
+   [paradise.shared.client.registry]
    ))
 
 #+end_src
