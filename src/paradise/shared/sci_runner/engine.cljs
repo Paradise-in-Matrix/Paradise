@@ -13,7 +13,7 @@
   {'worker.state {'register-handler state/register-handler
                   '!client state/!client
                   '!media-cache state/!media-cache}
-   'utils.net {'fetch net/fetch}
+   'net {'fetch net/fetch}
    'cljs-workers.worker {'register worker/register}})
 
 (def worker-context
