@@ -608,7 +608,7 @@ overwrite the components class.
      {:db (-> db
               (assoc :plugins/installed-urls new-urls)
               (update :plugins/active dissoc plugin-id))
-      :settings/save ["plugin_urls" (clj->js new-urls)]})))
+      :dispatch [:settings/save "plugin_urls" (clj->js new-urls)]})))
 
 
 (rf/reg-event-db
