@@ -35,12 +35,22 @@
          (clojure.core/aset f# "$env" ~env-map)
          f#))))
 
-(defmacro defoverride [comp-name args & body]
-  (list 'do
-        (list* 'defn comp-name args body)
-        (list 'swap! 'paradise.shared.client.registry/!active-overrides 'assoc (keyword (name comp-name))
-              (list 'hash-map :plugin-id (list 'deref 'paradise.shared.sci-runner.ui/!current-eval-plugin) :fn comp-name))))
 
+(defmacro defoverride [comp-name args & body]
+  (let [comp-str  (name comp-name)
+        local-sym (symbol comp-str)]
+    `(do
+       (defn ~local-sym ~args ~@body)
+       (let [provided-kw# (keyword ~(str comp-name))
+             target-kw#   (if (namespace provided-kw#)
+                            provided-kw#
+                            (first (filter #(= (name %) ~comp-str)
+                                           (keys @paradise.shared.client.registry/!components))))
+             final-kw#    (or target-kw# provided-kw#)]
+
+         (swap! paradise.shared.client.registry/!active-overrides assoc final-kw#
+                {:plugin-id @paradise.shared.sci-runner.ui/!current-eval-plugin
+                 :fn ~local-sym})))))
 
 (defmacro expose-ns [ns-sym]
   (let [public-vars (keys (ana/ns-publics env/*compiler* ns-sym))]
@@ -49,11 +59,6 @@
                  [`(quote ~v) (symbol (str ns-sym "/" v))])
                public-vars))))
 
-(defmacro defoverride [comp-name args & body]
-  (list 'do
-        (list* 'defn comp-name args body)
-        (list 'swap! 'client.state/!active-overrides 'assoc (keyword (name comp-name))
-              (list 'hash-map :plugin-id (list 'deref 'sci-runner/!current-eval-plugin) :fn comp-name))))
 
 
 (defmacro defui [comp-name args & body]
@@ -70,14 +75,6 @@
            (into [live#] args#))))))
 
 
-
-(defmacro gen-translation-map [dir-path]
-  (let [files (filter #(.endsWith (.getName %) ".json") 
-                      (file-seq (io/file dir-path)))
-        mapping (into {} (for [f files]
-                           (let [lang (second (re-find #"([^/]+)\.json$" (.getPath f)))]
-                             [lang `(fn [] (js/import ~(.getPath f)))])))]
-    mapping))
 
 (defmacro load-static-config [path]
   (edn/read-string (slurp path)))
