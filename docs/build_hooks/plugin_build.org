@@ -53,7 +53,7 @@ One regret is that I didn't write more on this topic.
 #+begin_src clojurescript :tangle ../../src/plugin_build.clj
 (ns plugin-build
   (:require
-   [utils.macros]
+   [paradise.shared.utils.macros]
    [clojure.java.io :as io]
    [clojure.edn :as edn]
    [clojure.walk :as walk]
