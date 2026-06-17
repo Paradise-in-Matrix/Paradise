@@ -30,7 +30,7 @@
    [paradise.shared.client.state :refer [!config]]
    [paradise.shared.client.session-store :as store]
    [taoensso.tempura :as tempura :refer [tr]]
-   [paradise.ui.global :refer [modal-root popover-root context-menu-root satellite-overlay make-swipe-handlers]]
+   [paradise.ui.global :refer [modal-root popover-root context-menu-root make-swipe-handlers]]
    ["@capacitor/app" :refer [App]]
    [paradise.shared.utils.macros :refer [i18n-data defui]]
    [paradise.shared.utils.svg :as icons]
@@ -74,16 +74,6 @@
  (fn [_]
    (when-let [active-el (.-activeElement js/document)]
      (.blur active-el))))
-
-(re-frame/reg-event-db
- :ui/clear-overlays
- (fn [db _]
-   (-> db
-       (assoc-in [:ui :sidebar-open?] false)
-       (assoc-in [:active-context-menu] nil)
-       (assoc-in [:active-popover] nil)
-       (assoc-in [:active-modal] nil))))
-
 
 (re-frame/reg-event-fx
  :ui/set-sidebar
