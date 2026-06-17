@@ -7,7 +7,7 @@
             [paradise.ui.input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
             [paradise.ui.input.emotes :refer [emoji-sticker-board]]
             [paradise.ui.input.autocomplete :refer [suggestion-menu]]
-            [paradise.ui.global :refer [request-batched-redraw!]]
+            [paradise.ui.global :refer [request-batched-redraw! !active-popover]]
             [reagent.core :as r]
             [paradise.media.component :refer [mxc->url]]
             [paradise.shared.utils.helpers :refer [truncate-name]]
@@ -184,12 +184,8 @@
           (.focus composer)))
       50))))
 
-(re-frame/reg-sub
- :ui/inline-emoji-open?
- :<- [:ui/active-popover]
- (fn [active-popover _]
-   (= (:id active-popover) :inline-emoji)))
-
+(defn inline-emoji-open? []
+  (= (:id @!active-popover) :inline-emoji))
 
 (defn ^:react inline-editor [item active-id]
   (r/with-let [!editor (r/atom nil)]
@@ -248,7 +244,7 @@
             loaded-text    @(re-frame/subscribe [:composer/loaded-text active-id])
             cached-html    @(re-frame/subscribe [:composer/cached-html active-id])
             context        @(re-frame/subscribe [:input/context active-id])
-            picker-open?   @(re-frame/subscribe [:ui/inline-emoji-open?])
+            picker-open?   (inline-emoji-open?)
             tr             @(re-frame/subscribe [:i18n/tr])
             submit-message! (fn []
                               (when-let [ed @!editor]
