@@ -68,6 +68,8 @@ registry of components instead of manually aggregating them.
          (clojure.core/aset f# "$env" ~env-map)
          f#))))
 
+
+
 (defmacro defoverride [comp-name args & body]
   (list 'do
         (list* 'defn comp-name args body)
@@ -82,11 +84,6 @@ registry of components instead of manually aggregating them.
                  [`(quote ~v) (symbol (str ns-sym "/" v))])
                public-vars))))
 
-(defmacro defoverride [comp-name args & body]
-  (list 'do
-        (list* 'defn comp-name args body)
-        (list 'swap! 'client.state/!active-overrides 'assoc (keyword (name comp-name))
-              (list 'hash-map :plugin-id (list 'deref 'sci-runner/!current-eval-plugin) :fn comp-name))))
 
 
 (defmacro defui [comp-name args & body]
