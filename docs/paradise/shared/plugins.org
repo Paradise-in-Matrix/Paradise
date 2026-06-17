@@ -570,9 +570,9 @@ overwrite the components class.
        (paradise.shared.client.registry/remove-plugin-overrides! plugin-id)
        (paradise.shared.client.registry/remove-plugin-slots! plugin-id))
 
-     (cond-> {:db (assoc db :plugins/disabled-urls new-disabled)
-              :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]}
-       enabled? (assoc :dispatch [:plugins/execute-boot-sequence url plugin])))))
+     {:db (assoc db :plugins/disabled-urls new-disabled)
+      :fx (cond-> [[:dispatch [:settings/save "disabled_plugin_urls" (clj->js (vec new-disabled))]]]
+            enabled? (conj [:dispatch [:plugins/execute-boot-sequence url plugin]]))})))
 
 (rf/reg-event-fx
  :plugins/install-from-url
@@ -635,6 +635,7 @@ overwrite the components class.
        (.catch (fn [err]
                  (js/console.error "Plugin boot failed for" url "-" err))))
    {:db (assoc db :plugins/installing? true)}))
+
 
 (rf/reg-event-fx
  :plugins/execute-boot-sequence
