@@ -8,6 +8,7 @@
    [cljs-workers.core :as main]
    [paradise.shared.sci-runner.ui :as runner]
    [paradise.shared.client.state :as state]
+   [paradise.shared.client.registry]
    ))
 
 
@@ -54,13 +55,12 @@
          plugin-id    (:id plugin)]
      (when (and (not enabled?) plugin-id)
        (remove-css! (str "plugin-css-" (name plugin-id)))
-       (client.state/remove-plugin-overrides! plugin-id)
-       (client.state/remove-plugin-slots! plugin-id)
-       )
+       (paradise.shared.client.registry/remove-plugin-overrides! plugin-id)
+       (paradise.shared.client.registry/remove-plugin-slots! plugin-id))
 
-     (cond-> {:db (assoc db :plugins/disabled-urls new-disabled)
-              :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]}
-       enabled? (assoc :dispatch [:plugins/execute-boot-sequence url plugin])))))
+     {:db (assoc db :plugins/disabled-urls new-disabled)
+      :fx (cond-> [[:dispatch [:settings/save "disabled_plugin_urls" (clj->js (vec new-disabled))]]]
+            enabled? (conj [:dispatch [:plugins/execute-boot-sequence url plugin]]))})))
 
 (rf/reg-event-fx
  :plugins/install-from-url
@@ -79,8 +79,7 @@
                      :plugins/installed-urls new-urls)
               (update-in [:plugins/active (:id plugin-map)]
                          (constantly (assoc plugin-map :source-url source-url))))
-      :settings/save ["plugin_urls" (clj->js new-urls)]})))
-
+      :dispatch [:settings/save "plugin_urls" (clj->js new-urls)]})))
 
 (rf/reg-event-fx
  :plugins/uninstall-url
@@ -91,12 +90,12 @@
          plugin-id    (:id plugin)]
      (when plugin-id
        (remove-css! (str "plugin-css-" (name plugin-id)))
-       (client.state/remove-plugin-overrides! plugin-id))
+       (paradise.shared.client.registry/remove-plugin-overrides! plugin-id))
 
      {:db (-> db
               (assoc :plugins/installed-urls new-urls)
               (update :plugins/active dissoc plugin-id))
-      :settings/save ["plugin_urls" (clj->js new-urls)]})))
+      :dispatch [:settings/save "plugin_urls" (clj->js new-urls)]})))
 
 
 (rf/reg-event-db
@@ -125,6 +124,7 @@
                  (js/console.error "Plugin boot failed for" url "-" err))))
    {:db (assoc db :plugins/installing? true)}))
 
+
 (rf/reg-event-fx
  :plugins/execute-boot-sequence
  (fn [{:keys [db]} [_ url plugin-map]]
@@ -137,15 +137,21 @@
          (doseq [script-url scripts]
            (<p! (inject-script! script-url))))
 
-       (when-let [worker-form (:worker-form-str plugin-map)]
-         (let [res (<! (main/do-with-pool! @state/!engine-pool
-                                           {:handler :evaluate-worker-form
-                                            :arguments {:form-str worker-form}}))]
-           (when (= (:status res) "error")
-             (throw (js/Error. (str "Worker Eval Failed: " (:msg res)))))))
+       (when-let [modules (:modules plugin-map)]
+         (doseq [{:keys [ns target code]} modules]
+           (case target
+             :engine
+             (let [res (<! (main/do-with-pool! @state/!engine-pool
+                                               {:handler :evaluate-worker-form
+                                                :arguments {:plugin-id (:id plugin-map)
+                                                            :form-str code}}))]
+               (when (= (:status res) "error")
+                 (throw (js/Error. (str "Engine Eval Failed for " ns ": " (:msg res))))))
 
-       (when-let [ui-form (:ui-form-str plugin-map)]
-         (runner/evaluate-ui-form (:id plugin-map) ui-form))
+             :ui
+             (runner/evaluate-ui-form (:id plugin-map) code)
+
+             (js/console.warn "Unknown target for namespace:" ns "- skipping evaluation."))))
 
        (rf/dispatch [:plugins/installation-success url plugin-map])
 
@@ -153,6 +159,7 @@
          (js/console.error "Plugin Boot Sequence Failed:" e)
          (rf/dispatch [:plugins/installation-failed url (str e)]))))
    {}))
+
 
 (rf/reg-event-db
  :plugins/installation-failed
