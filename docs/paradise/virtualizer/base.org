@@ -294,19 +294,9 @@ React object that will be hydrated on the other end.
 
                      {:status :success})))
 
-
 (worker/register :process-timeline-diff
                  (fn [{:keys [events room-id source]}]
-                   (let [processed-events (mapv
-                                           (fn [e]
-                                             (let [eid    (measurements/extract-id e)
-                                                   cached (get @!event-cache eid)]
-                                               (if (and cached (= (:raw cached) e))
-                                                 cached
-                                                 (let [new-event (parsing/precompile-event-data e source)]
-                                                   (swap! !event-cache assoc eid (assoc new-event :raw e))
-                                                   new-event))))
-                                           events)
+                   (let [processed-events (process-timeline-events events source)
                          enriched-events  (measurements/enrich-timeline-items processed-events)]
                      (swap! !room-events assoc-in [room-id source] enriched-events)
                      (recalculate-and-stream! room-id source)
