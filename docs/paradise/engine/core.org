@@ -379,6 +379,19 @@ we need to look for the proper method to unmount them so to speak.
 #+end_src
 
 
+
+**** Method Registering
+
+We need to supply the thread a way to register SCI methods to it.
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(worker/register :evaluate-worker-form
+  (fn [{:keys [arguments]}]
+    (let [{:keys [plugin-id code]} arguments]
+      (sci/evaluate-worker-form plugin-id code))))
+#+end_src
+
+
 **** Kickoff
 
 Now we need to kick off the bootstrapping immediately, so we do so here.
