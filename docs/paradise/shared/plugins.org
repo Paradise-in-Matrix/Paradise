@@ -567,9 +567,8 @@ overwrite the components class.
          plugin-id    (:id plugin)]
      (when (and (not enabled?) plugin-id)
        (remove-css! (str "plugin-css-" (name plugin-id)))
-       (client.state/remove-plugin-overrides! plugin-id)
-       (client.state/remove-plugin-slots! plugin-id)
-       )
+       (paradise.shared.client.registry/remove-plugin-overrides! plugin-id)
+       (paradise.shared.client.registry/remove-plugin-slots! plugin-id))
 
      (cond-> {:db (assoc db :plugins/disabled-urls new-disabled)
               :settings/save ["disabled_plugin_urls" (clj->js (vec new-disabled))]}
@@ -603,7 +602,7 @@ overwrite the components class.
          plugin-id    (:id plugin)]
      (when plugin-id
        (remove-css! (str "plugin-css-" (name plugin-id)))
-       (client.state/remove-plugin-overrides! plugin-id))
+       (paradise.shared.client.registry/remove-plugin-overrides! plugin-id))
 
      {:db (-> db
               (assoc :plugins/installed-urls new-urls)
