@@ -210,6 +210,31 @@ easily done. It'll be something that needs to be revisited.
         expanded-ast (expand-macros ast-form)
         pure-ast     (sanitize-ast expanded-ast)]
     (pr-str pure-ast)))
+
+
+(defn determine-target-from-ns [raw-code]
+  (if-let [match (re-find #"\(ns\s+([^\s\)]+)" raw-code)]
+    (let [ns-name (second match)]
+      (cond
+        (str/includes? ns-name ".ui") :ui
+        (str/includes? ns-name ".engine") :engine
+        :else :unknown))
+    :unknown))
+
+(defn process-src-directory [dir-path]
+  (let [cljs-files (->> (io/file dir-path)
+                        file-seq
+                        (filter #(and (.isFile %) (str/ends-with? (.getName %) ".cljs"))))]
+    (mapv (fn [file]
+            (let [raw-code (slurp file)
+                  target   (determine-target-from-ns raw-code)
+                  ns-name  (second (re-find #"\(ns\s+([^\s\)]+)" raw-code))
+                  expanded (process-and-expand-file (.getPath file))]
+              {:ns ns-name
+               :target target
+               :code expanded}))
+          cljs-files)))
+
 #+end_src
 
 
