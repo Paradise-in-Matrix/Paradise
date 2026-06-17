@@ -119,16 +119,6 @@ https://day8.github.io/re-frame/application-state/
    (when-let [active-el (.-activeElement js/document)]
      (.blur active-el))))
 
-(re-frame/reg-event-db
- :ui/clear-overlays
- (fn [db _]
-   (-> db
-       (assoc-in [:ui :sidebar-open?] false)
-       (assoc-in [:active-context-menu] nil)
-       (assoc-in [:active-popover] nil)
-       (assoc-in [:active-modal] nil))))
-
-
 (re-frame/reg-event-fx
  :ui/set-sidebar
  (fn [{:keys [db]} [_ open?]]
