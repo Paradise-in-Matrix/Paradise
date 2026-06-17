@@ -170,24 +170,6 @@ Just use Reagent.
     (str/escape (str raw-text) {\& "&amp;" \< "&lt;" \> "&gt;" \" "&quot;" \' "&#39;"})))
 
 
-#_(defn linkify-text [text]
-  (if (str/blank? text)
-    text
-    (let [pattern #"https?://[^\s]+"
-          parts (str/split text pattern -1)
-          matches (re-seq pattern text)]
-      (if (empty? matches)
-        text
-        (into [:span]
-              (map-indexed
-               (fn [i part]
-                 (let [url (nth matches i nil)]
-                   (if url
-                     [:<> part [:a {:href url :target "_blank" :rel "noopener noreferrer"} url]]
-                     part)))
-               parts))))))
-
-
 (defn linkify-text [text]
   (if (str/blank? text)
     [text]
