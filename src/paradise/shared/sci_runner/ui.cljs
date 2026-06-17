@@ -39,6 +39,7 @@
    [paradise.ui.input.drafts]
    [paradise.ui.input.emotes]
    [paradise.ui.navigation.rooms.entry]
+   [paradise.ui.navigation.rooms.room-summary]
    [paradise.ui.navigation.rooms.room-list]
    [paradise.ui.navigation.spaces.bar]
    [paradise.ui.overlays.invites]
@@ -69,6 +70,7 @@
   {'capacitor.browser {'Browser Browser}
    'capacitor.core    {'Capacitor Capacitor}
 
+   'paradise.shared.sci-runner.ui (expose-ns paradise.shared.sci-runner.ui)
    'taoensso.timbre {'info  log-info-macro
                      'warn  log-warn-macro
                      'error log-error-macro
@@ -111,13 +113,16 @@
    'paradise.shared.utils.helpers   (expose-ns paradise.shared.utils.helpers)
    'paradise.media.component    (expose-ns paradise.media.component)
    'paradise.shared.utils.svg       (expose-ns paradise.shared.utils.svg)
-   'paradise.shared.client.state  {'!components registry/!components
+   'paradise.shared.client.registry  {'!components registry/!components
                    'reg-slot-item safe-reg-slot-item
                    '!active-overrides registry/!active-overrides
                    'remove-plugin-overrides! registry/remove-plugin-overrides!
-                   'get-slot registry/get-slot
+                   'get-slot registry/get-slot}
+   'paradise.shared.client.state {
                    '!config state/!config
                    '!engine-pool state/!engine-pool}
+
+
    'cljs-workers.core {'do-with-pool! main/do-with-pool!}})
 
 
