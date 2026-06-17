@@ -1,7 +1,7 @@
 (ns paradise.shared.utils.helpers
   (:require
    [net :as net]
-   [paradise.media.component :refer [media]]
+   [paradise.media.component :refer [media media-native]]
    [clojure.string :as str]
    [promesa.core :as p]
    [hickory.core :as h]
@@ -68,7 +68,7 @@
 (defn- transform-img [attrs]
   (let [src (get attrs :src "")]
     (if (and (string? src) (str/starts-with? src "mxc://"))
-      {:tag media
+      {:tag "comp:paradise.media.component/media-native"
        :attrs {:mxc   src
                :class "timeline-emotes"
                :className "timeline-emotes"
@@ -149,24 +149,6 @@
     (str/escape (str raw-text) {\& "&amp;" \< "&lt;" \> "&gt;" \" "&quot;" \' "&#39;"})))
 
 
-#_(defn linkify-text [text]
-  (if (str/blank? text)
-    text
-    (let [pattern #"https?://[^\s]+"
-          parts (str/split text pattern -1)
-          matches (re-seq pattern text)]
-      (if (empty? matches)
-        text
-        (into [:span]
-              (map-indexed
-               (fn [i part]
-                 (let [url (nth matches i nil)]
-                   (if url
-                     [:<> part [:a {:href url :target "_blank" :rel "noopener noreferrer"} url]]
-                     part)))
-               parts))))))
-
-
 (defn linkify-text [text]
   (if (str/blank? text)
     [text]
@@ -201,7 +183,7 @@
       (cond
         (= tag :br) "\n"
         (contains? block-level-tags tag) (str inner-text "\n")
-        (or (:mxc attrs) (= tag :img) (= tag "mxc-image")) " [e] "
+        (or (:mxc attrs) (= tag :img) (= tag "media-native")) " [e] "
         :else inner-text))
     (sequential? node) (str/join "" (map hiccup->text node))
     :else ""))
