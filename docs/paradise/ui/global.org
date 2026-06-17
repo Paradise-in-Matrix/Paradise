@@ -304,26 +304,23 @@ much simpler.
 **** Global Popover Root
 
 #+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/open-popover
- (fn [db [_ id props]]
-   (assoc db :active-popover {:id id :props props})))
+ (fn [_ [_ id props]]
+   (reset! !active-popover {:id id :props props})
+   {}))
 
-(re-frame/reg-event-db
+(re-frame/reg-event-fx
  :ui/close-popover
- (fn [db _]
-   (dissoc db :active-popover)))
-
-(re-frame/reg-sub
- :ui/active-popover
- (fn [db _]
-   (:active-popover db)))
+ (fn [_ _]
+   (reset! !active-popover nil)
+   {}))
 #+end_src
 
 
 #+begin_src clojurescript :tangle ../../../src/paradise/ui/global.cljs
 (defn popover-root []
-  (let [active-popover @(re-frame/subscribe [:ui/active-popover])]
+  (let [active-popover @!active-popover]
     (when active-popover
       (let [{:keys [id props]} active-popover
             props    (if (map? props) props (js->clj props :keywordize-keys true))
@@ -341,14 +338,13 @@ much simpler.
                [:div.popover-backdrop
                 {:style {:position "fixed" :top 0 :left 0 :right 0 :bottom 0 :z-index 11999}
                  :on-click close-fn
-                 :on-context-menu (fn [e] #_(.preventDefault e) (close-fn))}])
+                 :on-context-menu (fn [e] (close-fn))}])
              [:div.popover-container
               {:style {:left (str render-x "px")
                        :top  (str render-y "px")
                        :position "fixed"
                        :z-index 12000}}
               [Target (assoc props :close-fn close-fn)]]]))))))
-
 #+end_src
 
 
