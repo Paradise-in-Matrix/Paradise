@@ -257,6 +257,19 @@ React object that will be hydrated on the other end.
           "lambda-paths" lambda-paths}
      true)))
 
+
+(defn precompile-and-cache-event [e source]
+  (let [eid    (measurements/extract-id e)
+        cached (get @!event-cache eid)]
+    (if (and cached (= (:raw cached) e))
+      cached
+      (let [new-event (parsing/precompile-event-data e source)]
+        (swap! !event-cache assoc eid (assoc new-event :raw e))
+        new-event))))
+
+(defn process-timeline-events [events source]
+  (mapv #(precompile-and-cache-event % source) events))
+
 (worker/register :recalculate-timeline
                  (fn [{:keys [room-id]}]
                    (let [sources (keys (get @!room-events room-id))]
