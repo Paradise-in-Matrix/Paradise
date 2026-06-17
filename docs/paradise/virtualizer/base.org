@@ -299,6 +299,14 @@ React object that will be hydrated on the other end.
                      (recalculate-and-stream! room-id source)
                      {:status :success})))
 
+
+(worker/register :eval-virtualizer-plugin
+  (fn [{:keys [arguments]}]
+    (let [{:keys [plugin-id code]} arguments]
+      (sci-runner/eval-virtualizer-plugin! plugin-id code))))
+
+
+
 #+end_src
 
 
