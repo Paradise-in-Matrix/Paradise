@@ -140,13 +140,16 @@ ingest them all at once.
    'paradise.shared.utils.helpers   (expose-ns paradise.shared.utils.helpers)
    'paradise.media.component    (expose-ns paradise.media.component)
    'paradise.shared.utils.svg       (expose-ns paradise.shared.utils.svg)
-   'paradise.shared.client.state  {'!components registry/!components
+   'paradise.shared.client.registry  {'!components registry/!components
                    'reg-slot-item safe-reg-slot-item
                    '!active-overrides registry/!active-overrides
                    'remove-plugin-overrides! registry/remove-plugin-overrides!
-                   'get-slot registry/get-slot
+                   'get-slot registry/get-slot}
+   'paradise.shared.client.state {
                    '!config state/!config
                    '!engine-pool state/!engine-pool}
+
+
    'cljs-workers.core {'do-with-pool! main/do-with-pool!}})
 
 
