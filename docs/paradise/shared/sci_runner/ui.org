@@ -61,6 +61,7 @@ ingest them all at once.
    [paradise.ui.input.drafts]
    [paradise.ui.input.emotes]
    [paradise.ui.navigation.rooms.entry]
+   [paradise.ui.navigation.rooms.room-summary]
    [paradise.ui.navigation.rooms.room-list]
    [paradise.ui.navigation.spaces.bar]
    [paradise.ui.overlays.invites]
