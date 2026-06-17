@@ -12,7 +12,7 @@ So there a couple methods that don't mesh perfectly in any one location that for
 (ns paradise.shared.utils.helpers
   (:require
    [net :as net]
-   [paradise.media.component :refer [media]]
+   [paradise.media.component :refer [media media-native]]
    [clojure.string :as str]
    [promesa.core :as p]
    [hickory.core :as h]
