@@ -30,6 +30,14 @@ So there a couple methods that don't mesh perfectly in any one location that for
 So using Hickory we can actually just convert the HTML used in formatted messages into
 pure Clojure maps and navigate them natively with ease. Then when we want to display them...
 Just use Reagent.
+
+***** TODO transform-img is still using lazy string coercion
+To elaborate on the above, this just means the dehydrator isn't accounting for
+maps and so when it is sent over the thread boundary we have an object in the
+'clean' hiccup form. It works correctly as the worker-pojo is in the right form,
+but as a hacky fix we'll just leave the raw string coercion in since it doesn't
+throw an error.
+
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/helpers.cljs
 (def max-tag-nesting 100)
 
