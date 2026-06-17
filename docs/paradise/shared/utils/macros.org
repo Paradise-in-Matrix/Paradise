@@ -69,13 +69,21 @@ registry of components instead of manually aggregating them.
          f#))))
 
 
-
 (defmacro defoverride [comp-name args & body]
-  (list 'do
-        (list* 'defn comp-name args body)
-        (list 'swap! 'paradise.shared.client.registry/!active-overrides 'assoc (keyword (name comp-name))
-              (list 'hash-map :plugin-id (list 'deref 'paradise.shared.sci-runner.ui/!current-eval-plugin) :fn comp-name))))
+  (let [comp-str  (name comp-name)
+        local-sym (symbol comp-str)]
+    `(do
+       (defn ~local-sym ~args ~@body)
+       (let [provided-kw# (keyword ~(str comp-name))
+             target-kw#   (if (namespace provided-kw#)
+                            provided-kw#
+                            (first (filter #(= (name %) ~comp-str)
+                                           (keys @paradise.shared.client.registry/!components))))
+             final-kw#    (or target-kw# provided-kw#)]
 
+         (swap! paradise.shared.client.registry/!active-overrides assoc final-kw#
+                {:plugin-id @paradise.shared.sci-runner.ui/!current-eval-plugin
+                 :fn ~local-sym})))))
 
 (defmacro expose-ns [ns-sym]
   (let [public-vars (keys (ana/ns-publics env/*compiler* ns-sym))]
