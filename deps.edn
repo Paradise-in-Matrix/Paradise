@@ -1,4 +1,4 @@
-{:paths ["src" "resources" "docs"]
+{:paths ["src-gen" "hooks" "resources" "docs"]
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         org.clojure/clojurescript {:mvn/version "1.11.132"}
         thheller/shadow-cljs {:mvn/version "2.26.2"}
