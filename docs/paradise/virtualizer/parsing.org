@@ -205,7 +205,7 @@ to survive the conversion. Closures will poison it.
       (doseq [[k v] attrs] (process-kv (name k) v))
       (when (object? attrs)
         (let [keys-arr (js/Object.keys attrs)
-              len (.-length keys-arr)]
+              len      (.-length keys-arr)]
           (loop [i 0]
             (when (< i len)
               (let [k (aget keys-arr i)]
