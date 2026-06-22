@@ -11,149 +11,6 @@
    [paradise.shared.utils.macros :refer [defui]]
    [paradise.ui.global :refer [avatar long-press-props]]))
 
-(defn build-room-actions [tr room-id parent-id room-name is-space? is-dm? context membership]
-  (let [is-joined?  (= membership "joined")
-        is-invited? (= membership "invited")
-        is-knocked? (= membership "knocked")]
-    (remove nil?
-            [(when is-invited?
-               {:id "join"
-                :label (if is-space? (tr [:navigation.actions/join-space]) (tr [:navigation.actions/join-room]))
-                :icon [icons/door-open]
-                :class-name "success"
-                :action #(re-frame/dispatch [:rooms/join room-id])})
-
-             (when is-invited?
-               {:id "reject"
-                :label (tr [:navigation.actions/reject-invite])
-                :icon [icons/leave]
-                :class-name "danger"
-                :action #(re-frame/dispatch [:rooms/leave room-id])})
-
-             (when (and (not is-joined?) (not is-invited?) (not is-knocked?))
-               {:id "knock"
-                :label (tr [:navigation.actions/knock-room])
-                :icon [icons/doorbell]
-                :action #(re-frame/dispatch [:rooms/knock room-id])})
-
-             (when (and is-joined? (= context :list))
-               {:id "mark-read"
-                :label (tr [:navigation.actions/mark-read])
-                :icon [icons/check]
-                :action #(re-frame/dispatch [:rooms/mark-read room-id])})
-
-             (when is-joined?
-               {:id "notifications"
-                :label (tr [:navigation.actions/notification-settings])
-                :icon [icons/bell]
-                :action #(re-frame/dispatch [:ui/open-modal :notification-settings {:room-id room-id}])})
-
-             (when is-joined?
-               {:id "invite"
-                :label (tr (if is-dm? [:navigation.actions/invite-to] [:navigation.actions/invite-here]))
-                :icon [icons/members-plus]
-                :action #(re-frame/dispatch [:ui/open-modal (if is-dm? :invite-room :invite-user)
-                                             {:backdrop-props {:class "lightbox-backdrop"}
-                                              :window-props   {:style {:background "transparent"
-                                                                       :box-shadow "none"}}
-                                              :target-room-id room-id}])})
-
-             (when (and is-joined? (not is-dm?) (= context :header))
-               {:id "call"
-                :label (tr [:container.header/start-call])
-                :icon [icons/phone]
-                :action (fn []
-                          (re-frame/dispatch [:call/init-widget room-id])
-                          (re-frame/dispatch [:container/set-main-focus :call]))})
-
-             (when (and is-joined? (= context :header))
-               {:id "search"
-                :label (tr [:container.header/search])
-                :icon [icons/search]
-                :class-name "mobile-menu-item"
-                :action #(re-frame/dispatch [:container/set-side-panel :search])})
-
-             (when (and is-joined? (= context :header))
-               {:id "pins"
-                :label (tr [:container.header/pinned-messages])
-                :icon [icons/pins]
-                :class-name "mobile-menu-item"
-                :action (fn []
-                          (re-frame/dispatch [:container/set-side-panel :pins])
-                          (re-frame/dispatch [:room/fetch-pinned-events room-id]))})
-
-             (when (and is-joined? is-dm? (= context :header))
-               {:id "members"
-                :label (tr [:container.header/member-list])
-                :icon [icons/members]
-                :action #(re-frame/dispatch [:container/set-side-panel :members])})
-
-             (when (and is-joined?)
-               {:id "create-room"
-                :icon [icons/plus-circle]
-                :label (tr [:navigation.actions/create-room])
-                :action #(re-frame/dispatch
-                          [:ui/open-modal :create-room
-                           {:backdrop-props  {:class "lightbox-backdrop"}
-                            :window-props    {:class "settings-window"
-                                              :style {:display "flex"
-                                                      :flex-direction "column"
-                                                      :align-items "center"
-                                                      :justify-content "center"
-                                                      :gap "16px"}}
-                            :target-space-id (if is-space? room-id parent-id)}])})
-             
-             (when (and is-joined?
-                        ;;perm check
-                        )
-               {:id "create-space"
-                :label (tr [:navigation.actions/create-space])
-                :icon [icons/plus-circle]
-                :action #(re-frame/dispatch [:ui/open-modal :create-space
-                                             {:backdrop-props {:class "lightbox-backdrop"}
-                                              :window-props   {:class "settings-window"
-                                                               :style {:display "flex"
-                                                                       :flex-direction "column"
-                                                                       :align-items "center"
-                                                                       :justify-content "center"
-                                                                       :gap "16px"}}
-
-                                              :target-space-id (if is-space? room-id parent-id)
-                                              }])})
-
-             (when is-joined?
-               {:id "settings"
-                :label (tr [:navigation.actions/settings])
-                :icon [icons/settings]
-                :action #(re-frame/dispatch [:ui/open-modal :room-settings {:room-id room-id}])})
-
-             (when (and is-joined? (not is-dm?))
-               {:id "duplicate"
-                :label (tr [:navigation.actions/duplicate-room])
-                :icon [icons/copy]
-                :action #(re-frame/dispatch [:ui/open-modal :duplicate-room {:room-id room-id}])})
-
-             (when (or is-joined? is-knocked?)
-               {:id "leave"
-                :label (if is-space? (tr [:navigation.actions/leave-space]) (tr [:navigation.actions/leave-room]))
-                :icon [icons/leave]
-                :class-name "danger"
-                :action #(re-frame/dispatch [:rooms/leave room-id])})
-
-             (when (and is-joined? (not is-dm?))
-               {:id "delete"
-                :label (if is-space? (tr [:navigation.actions/delete-space]) (tr [:navigation.actions/delete-room]))
-                :icon [icons/trash]
-                :class-name "danger"
-                :action #(re-frame/dispatch [:ui/open-modal :confirm-delete {:room-id room-id}])})
-
-             {:id "copy-link"
-              :label (tr [:navigation.actions/copy-link])
-              :icon [icons/link]
-              :action #(re-frame/dispatch [:rooms/copy-link room-id])
-             }
-             ])))
-
 (defui media-button [active? icon-on icon-off title on-click color-active color-inactive]
   [:button.media-btn
    {:style {:background "transparent"
@@ -550,10 +407,18 @@
                           [])
           open-menu   (fn [e mx my membership]
                         (when e (.preventDefault e) (.stopPropagation e))
+
                         (re-frame/dispatch
-                         [:context-menu/open
-                          {:x mx :y my
-                           :items (build-room-actions tr id parent-id room-name space? dm? :list membership)}]))]
+                         [:ui/open-context-menu :room-actions
+                          {:x mx
+                           :y my
+                           :room-id room-id
+                           :room-name room-name
+                           :is-space? is-space?
+                           :is-dm? is-dm?
+                           :context :list
+                           :membership membership
+                           :parent-id parent-id}]))]
       (r/as-element
        [room-item {:tr tr
                    :id id
