@@ -345,6 +345,11 @@
       (clojure.string/replace match #"[.,:;!?]$" ""))))
 
 
+(re-frame/reg-event-fx
+ :media/url-preview-success
+ (fn [{:keys [db]} [_ url data room-id]]
+   {:db (assoc-in db [:url-previews url] {:status :success :data data})}))
+
 
 (re-frame/reg-event-fx
  :media/fetch-url-preview
@@ -363,11 +368,6 @@
            (re-frame/dispatch [:media/url-preview-error url])))))
    {:db (update-in db [:url-previews url] #(or % {:status :loading}))}))
 
-(re-frame/reg-event-fx
- :media/url-preview-success
- (fn [{:keys [db]} [_ url data room-id]]
-   (request-batched-redraw! room-id)
-   {:db (assoc-in db [:url-previews url] {:status :success :data data})}))
 
 (re-frame/reg-event-db
  :media/url-preview-error
@@ -390,55 +390,52 @@
    (get-in db [:inline-playing url] false)))
 
 
-(defn ^:ui link-preview-card [url hs-url]
-  (let [{:keys [status data]} @(re-frame/subscribe [:media/url-preview url])]
-    (cond
-      (= status :loading)
-      [:div.link-preview-container.is-loading
-       [:div.preview-skeleton]]
+(defn ^:defer link-preview-card [first-url hs-url room-id]
+  (let [preview-state @(re-frame/subscribe [:media/url-preview first-url])]
+    (if-not preview-state
+      (do
+        (re-frame/dispatch [:media/fetch-url-preview first-url room-id])
+        [:div.link-preview-container.is-loading
+         [:div.preview-skeleton]])
+      (let [{:keys [status data]} preview-state]
+        (cond
+          (= status :loading)
+          [:div.link-preview-container.is-loading
+           [:div.preview-skeleton]]
+          (= status :error)
+          [:div {:style {:display "none"}}]
+          (= status :success)
+          (let [{:keys [og:title og:description og:image og:site_name]} data
+                img-url  (when og:image
+                           (if (clojure.string/starts-with? og:image "mxc://")
+                             (mxc->url og:image {:homeserver hs-url :type :thumbnail :width 400 :height 200})
+                             og:image))
+                hostname (try (.-hostname (js/URL. first-url)) (catch :default _ first-url))
+                site     (or og:site_name hostname)]
+            (if (or og:title og:description)
+              [:a.rich-embed-card {:href first-url :target "_blank" :rel "noopener noreferrer"}
+               [:div.embed-content
+                [:div.embed-site site]
+                (when og:title [:div.embed-title og:title])
+                (when og:description [:div.embed-description og:description])]
+               (when img-url
+                 [:div.embed-thumbnail [:img {:src img-url}]])]
+              [:div {:style {:display "none"}}])))))))
 
-      (= status :error)
-      nil
-
-      (= status :success)
-      (let [{:keys [og:title og:description og:image og:site_name]} data
-            img-url  (when og:image
-                       (if (str/starts-with? og:image "mxc://")
-                         (mxc->url og:image {:homeserver hs-url :type :thumbnail :width 400 :height 200})
-                         og:image))
-            hostname (try (.-hostname (js/URL. url)) (catch :default _ url))
-            site     (or og:site_name hostname)]
-        (when (or og:title og:description)
-          [:a.rich-embed-card {:href url :target "_blank" :rel "noopener noreferrer"}
-           [:div.embed-content
-            [:div.embed-site site]
-            (when og:title
-              [:div.embed-title og:title])
-            (when og:description
-              [:div.embed-description og:description])]
-           (when img-url
-             [:div.embed-thumbnail
-              [:img {:src img-url}]])])))))
-
-(defn ^:ui message-link-preview [msg-type-tag raw-body room-id]
+(defn ^:defer message-link-preview [msg-type-tag raw-body room-id]
   (let [first-url (when (#{"Text" "Notice" "Emote"} msg-type-tag)
                     (extract-first-url raw-body))]
-    (when first-url
-      (r/create-class
-       {:component-did-mount
-        (fn []
-          (re-frame/dispatch [:media/fetch-url-preview first-url room-id]))
-        :reagent-render
-        (fn [msg-type-tag raw-body room-id]
-          (let [hs-url        @(re-frame/subscribe [:sdk/homeserver-url])
-                policy        @(re-frame/subscribe [:settings/media-preview-policy])
-                room-meta     @(re-frame/subscribe [:rooms/active-metadata])
-                is-private?   (= (:join-rule room-meta) "invite")
-                show-preview? (or (= policy :on)
-                                  (and (= policy :private) is-private?))]
-            (if show-preview?
-              [link-preview-card first-url hs-url]
-              [:div {:style {:display "none"}}])))}))))
+    (if first-url
+      (let [hs-url        @(re-frame/subscribe [:sdk/homeserver-url])
+            policy        @(re-frame/subscribe [:settings/media-preview-policy])
+            room-meta     @(re-frame/subscribe [:rooms/active-metadata])
+            is-private?   (= (:join-rule room-meta) "invite")
+            show-preview? (or (= policy :on)
+                              (and (= policy :private) is-private?))]
+        (if show-preview?
+          [link-preview-card first-url hs-url room-id]
+          [:div {:style {:display "none"}}]))
+      [:div {:style {:display "none"}}])))
 
 
 
@@ -554,10 +551,47 @@
    [:span.timeline-timestamp (format-time ts)]])
 
 
-(defn ^:ui reply-container [tr in-reply-to room-id]
+(re-frame/reg-event-fx
+ :msg/fetch-reply
+ (fn [{:keys [db]} [_ room-id reply-id]]
+   (js/console.error room-id)
+   (when-not (get-in db [:reply-cache reply-id])
+     (go
+       (let [res (<! (mesh/do-with-thread! :engine-pool
+                                           {:handler :get-event
+                                            :arguments {:room-id room-id
+                                                        :event-id reply-id}}))]
+         (if (= (:status res) "success")
+           (re-frame/dispatch [:msg/reply-fetch-success room-id reply-id (:event res)])
+           (re-frame/dispatch [:msg/reply-fetch-error room-id reply-id])))))
+   {:db (update-in db [:reply-cache reply-id] #(or % {:status :loading}))}))
+
+(re-frame/reg-event-db
+ :msg/reply-fetch-error
+ (fn [db [_ room-id reply-id]]
+   (assoc-in db [:reply-cache reply-id] {:status :error})))
+
+
+(re-frame/reg-event-fx
+ :msg/reply-fetch-success
+ (fn [{:keys [db]} [_ room-id reply-id data]]
+   {:db (assoc-in db [:reply-cache reply-id] {:status :success :data data})}))
+
+(re-frame/reg-sub
+ :msg/reply-cache
+ (fn [db [_ reply-id]]
+   (get-in db [:reply-cache reply-id])))
+
+(defn ^:defer reply-container [tr in-reply-to room-id]
   (when in-reply-to
-    (let [reply-id  (:event-id in-reply-to)
-          reply-msg @(re-frame/subscribe [:timeline/event room-id reply-id])]
+    (let [reply-id (:event-id in-reply-to)
+          {:keys [status data]} @(re-frame/subscribe [:msg/reply-cache reply-id])
+          local-msg             @(re-frame/subscribe [:timeline/event room-id reply-id])
+          reply-msg             (or data local-msg)]
+
+      (when (and (not reply-msg) (not status))
+        (re-frame/dispatch [:msg/fetch-reply room-id reply-id]))
+
       [:div.timeline-reply-banner
        {:style {:cursor "pointer"}
         :on-click (fn [e]
@@ -573,6 +607,7 @@
            [:span.reply-preview
             (get-in reply-msg [:content :inner :content :body]
                     (tr [:container.timeline.status/media-preview]))]]
+
           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])))
 
 (defn render-message-content [tr msg-type-tag content-map in-reply-to event]
