@@ -87,7 +87,12 @@ the app-db anywhere that we don't plan to actually do some rendering work.
   (when-let [broadcast @!async-broadcaster]
     (let [edits (e/get-edits (e/diff old-state new-state {:algo :quick}))]
       (when (seq edits)
-        (broadcast (t/write writer edits))))))
+        (try
+          (broadcast (t/write writer edits))
+          (catch :default e
+            (js/console.error "FATAL: Transit serialization failed! Dropping patch.")
+            (js/console.error "The un-serializable edits were:" edits)
+            (throw e)))))))
 #+end_src
 
 
