@@ -81,6 +81,28 @@ We need to cache the AST or we'll be re-rendering every single time.
 (def ^:dynamic *current-event-id* nil)
 #+end_src
 
+**** Deferred components
+
+We check the deferred components to see if they've changed
+and then automatically send the main thread the updated render.
+
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
+(defn check-deferred-components! []
+  (let [changed-ids (transient #{})]
+    (doseq [[e-id deferreds] @!deferred-component-cache]
+      (doseq [{:keys [comp-fn args last-result]} deferreds]
+        (try
+          (let [raw-res    (apply comp-fn args)
+                new-result (if (fn? raw-res) (apply raw-res args) raw-res)
+                stripped   (strip-fns new-result)]
+            (when (not= stripped last-result)
+              (conj! changed-ids e-id)))
+          (catch :default e
+            (log/warn "Error evaluating deferred component:" e)))))
+    (persistent! changed-ids)))
+#+end_src
+
+
 **** Sanitizing Custom HTML
 
 
