@@ -29,7 +29,12 @@
   (when-let [broadcast @!async-broadcaster]
     (let [edits (e/get-edits (e/diff old-state new-state {:algo :quick}))]
       (when (seq edits)
-        (broadcast (t/write writer edits))))))
+        (try
+          (broadcast (t/write writer edits))
+          (catch :default e
+            (js/console.error "FATAL: Transit serialization failed! Dropping patch.")
+            (js/console.error "The un-serializable edits were:" edits)
+            (throw e)))))))
 
 (defn start-sab-sync-loop! []
   (let [sync-fn (fn []
@@ -51,6 +56,15 @@
   (reset! !eve-ref eve-atom)
   (cljs.core/reset! !reactive-state @eve-atom)
   (start-sab-sync-loop!))
+
+(extend-type js/BigInt
+  cljs.core/IEquiv
+  (-equiv [this other]
+    (js* "~{} === ~{}" this other))
+
+  cljs.core/IHash
+  (-hash [this]
+    (hash (.toString this))))
 
 (def app-db
   (reify
