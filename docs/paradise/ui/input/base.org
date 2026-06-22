@@ -243,14 +243,15 @@ forward.
  :input/set-context
  (fn [db [_ room-id mode target-item]]
    (when (= mode :edit)
-     (request-batched-redraw! room-id))
+     (request-item-redraw! room-id (:id target-item)))
    (assoc-in db [:input-context room-id] {:mode mode :target target-item})))
 
 (re-frame/reg-event-db
  :input/clear-context
  (fn [db [_ room-id]]
-   (when (= (get-in db [:input-context room-id :mode]) :edit)
-     (request-batched-redraw! room-id))
+   (let [context (get-in db [:input-context room-id])]
+     (when (= (:mode context) :edit)
+       (request-item-redraw! room-id (:id (:target context)))))
    (update db :input-context dissoc room-id)))
 
 (re-frame/reg-sub
