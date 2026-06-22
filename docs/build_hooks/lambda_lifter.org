@@ -121,50 +121,56 @@ This is more or less where we actually perform the body of work to walk the AST 
   (let [current-ns (atom "user")
         skip-instrument? (atom false)]
     (cons 'do
-      (map (fn [x]
-             (if (seq? x)
-               (cond
-                 (= (first x) 'ns)
-                 (let [ns-name (second x)
-                       reqs (if (#{'paradise.shared.client.registry 'paradie.shared.client.state 're-frame.db 'paradise.shared.client.core 'paradise.shared.utils.macros} ns-name)
-                              (do (reset! skip-instrument? true) extra-requires)
-                              (do (reset! skip-instrument? false) (conj extra-requires '[paradise.shared.client.registry])))]
-                   (reset! current-ns ns-name)
-                   (inject-requires x reqs))
-                 (and (= (first x) 'defn) (not @skip-instrument?))
-                 (let [fn-name      (second x)
-                       meta-map     (meta fn-name)
-                       is-ui?       (:ui meta-map)
-                       is-react?    (:react meta-map)
-                       fqn          (keyword (str @current-ns) (str fn-name))
-                       comp-str     (str "comp:" (str @current-ns) "/" (str fn-name))
-                       default-name (symbol (str fn-name "-default"))
-                       registry     (if (or is-ui? is-react?) 'paradise.shared.client.registry/!components 'paradise.shared.client.registry/!pure-fns)
-                       default-defn (cons 'defn (cons default-name (drop 2 x)))
-                       args-sym     (gensym "args")
-                       override-sym (gensym "override")
-                       live-fn-sym  (gensym "live-fn")]
-                   `(do
-                      ~default-defn
-                      (clojure.core/aset ~default-name "$fn_ptr" ~fqn)
-                      ~(when is-react?
-                         `(clojure.core/aset ~default-name "$react_boundary" ~comp-str))
+          (map (fn [x]
+                 (if (seq? x)
+                   (cond
+                     (= (first x) 'ns)
+                     (let [ns-name (second x)
+                           reqs (if (#{'paradise.shared.client.registry 'paradise.shared.client.state 're-frame.db 'paradise.shared.client.core 'paradise.shared.utils.macros} ns-name)
+                                  (do (reset! skip-instrument? true) extra-requires)
+                                  (do (reset! skip-instrument? false) (conj extra-requires '[paradise.shared.client.registry])))]
+                       (reset! current-ns ns-name)
+                       (inject-requires x reqs))
+                     (and (= (first x) 'defn) (not @skip-instrument?))
+                     (let [fn-name      (second x)
+                           meta-map     (meta fn-name)
+                           is-ui?       (:ui meta-map)
+                           is-react?    (:react meta-map)
+                           is-defer?    (:defer meta-map)
+                           is-ui-bound? (or is-ui? is-react? is-defer?)
+                           fqn          (keyword (str @current-ns) (str fn-name))
+                           comp-str     (str "comp:" (str @current-ns) "/" (str fn-name))
+                           default-name (symbol (str fn-name "-default"))
+                           registry     (if is-ui-bound? 'paradise.shared.client.registry/!components 'paradise.shared.client.registry/!pure-fns)
+                           default-defn (cons 'defn (cons default-name (drop 2 x)))
+                           args-sym     (gensym "args")
+                           override-sym (gensym "override")
+                           live-fn-sym  (gensym "live-fn")]
+                       `(do
+                          ~default-defn
+                          (clojure.core/aset ~default-name "$fn_ptr" ~fqn)
+                          ~(when is-react?
+                             `(clojure.core/aset ~default-name "$react_boundary" ~comp-str))
+                          ~(when is-defer?
+                             `(clojure.core/aset ~default-name "$defer_boundary" true))
 
-                      (swap! ~registry #(if (contains? % ~fqn) % (assoc % ~fqn ~default-name)))
-                      (defn ~fn-name [& ~args-sym]
-                        (let [~override-sym (get @paradise.shared.client.registry/!active-overrides ~fqn)
-                              ~live-fn-sym  (if ~override-sym
-                                              (:fn ~override-sym)
-                                              (get @~registry ~fqn))]
-                          ~(if (or is-ui? is-react?)
-                             `(into [~live-fn-sym] ~args-sym)
-                             `(apply ~live-fn-sym ~args-sym))))
-                      (clojure.core/aset ~fn-name "$fn_ptr" ~fqn)
-                      ~(when is-react?
-                         `(clojure.core/aset ~fn-name "$react_boundary" ~comp-str))))
-                 :else x)
-               x))
-           (rest ast-form)))))
+                          (swap! ~registry #(if (contains? % ~fqn) % (assoc % ~fqn ~default-name)))
+                          (defn ~fn-name [& ~args-sym]
+                            (let [~override-sym (get @paradise.shared.client.registry/!active-overrides ~fqn)
+                                  ~live-fn-sym  (if ~override-sym
+                                                  (:fn ~override-sym)
+                                                  (get @~registry ~fqn))]
+                              ~(if is-ui-bound?
+                                 `(into [~live-fn-sym] ~args-sym)
+                                 `(apply ~live-fn-sym ~args-sym))))
+                          (clojure.core/aset ~fn-name "$fn_ptr" ~fqn)
+                          ~(when is-react?
+                             `(clojure.core/aset ~fn-name "$react_boundary" ~comp-str))
+                          ~(when is-defer?
+                             `(clojure.core/aset ~fn-name "$defer_boundary" true))))
+                     :else x)
+                   x))
+               (rest ast-form)))))
 
 #+end_src
 
