@@ -493,55 +493,52 @@ working on deferred rendered components.
    (get-in db [:inline-playing url] false)))
 
 
-(defn ^:ui link-preview-card [url hs-url]
-  (let [{:keys [status data]} @(re-frame/subscribe [:media/url-preview url])]
-    (cond
-      (= status :loading)
-      [:div.link-preview-container.is-loading
-       [:div.preview-skeleton]]
+(defn ^:defer link-preview-card [first-url hs-url room-id]
+  (let [preview-state @(re-frame/subscribe [:media/url-preview first-url])]
+    (if-not preview-state
+      (do
+        (re-frame/dispatch [:media/fetch-url-preview first-url room-id])
+        [:div.link-preview-container.is-loading
+         [:div.preview-skeleton]])
+      (let [{:keys [status data]} preview-state]
+        (cond
+          (= status :loading)
+          [:div.link-preview-container.is-loading
+           [:div.preview-skeleton]]
+          (= status :error)
+          [:div {:style {:display "none"}}]
+          (= status :success)
+          (let [{:keys [og:title og:description og:image og:site_name]} data
+                img-url  (when og:image
+                           (if (clojure.string/starts-with? og:image "mxc://")
+                             (mxc->url og:image {:homeserver hs-url :type :thumbnail :width 400 :height 200})
+                             og:image))
+                hostname (try (.-hostname (js/URL. first-url)) (catch :default _ first-url))
+                site     (or og:site_name hostname)]
+            (if (or og:title og:description)
+              [:a.rich-embed-card {:href first-url :target "_blank" :rel "noopener noreferrer"}
+               [:div.embed-content
+                [:div.embed-site site]
+                (when og:title [:div.embed-title og:title])
+                (when og:description [:div.embed-description og:description])]
+               (when img-url
+                 [:div.embed-thumbnail [:img {:src img-url}]])]
+              [:div {:style {:display "none"}}])))))))
 
-      (= status :error)
-      nil
-
-      (= status :success)
-      (let [{:keys [og:title og:description og:image og:site_name]} data
-            img-url  (when og:image
-                       (if (str/starts-with? og:image "mxc://")
-                         (mxc->url og:image {:homeserver hs-url :type :thumbnail :width 400 :height 200})
-                         og:image))
-            hostname (try (.-hostname (js/URL. url)) (catch :default _ url))
-            site     (or og:site_name hostname)]
-        (when (or og:title og:description)
-          [:a.rich-embed-card {:href url :target "_blank" :rel "noopener noreferrer"}
-           [:div.embed-content
-            [:div.embed-site site]
-            (when og:title
-              [:div.embed-title og:title])
-            (when og:description
-              [:div.embed-description og:description])]
-           (when img-url
-             [:div.embed-thumbnail
-              [:img {:src img-url}]])])))))
-
-(defn ^:ui message-link-preview [msg-type-tag raw-body room-id]
+(defn ^:defer message-link-preview [msg-type-tag raw-body room-id]
   (let [first-url (when (#{"Text" "Notice" "Emote"} msg-type-tag)
                     (extract-first-url raw-body))]
-    (when first-url
-      (r/create-class
-       {:component-did-mount
-        (fn []
-          (re-frame/dispatch [:media/fetch-url-preview first-url room-id]))
-        :reagent-render
-        (fn [msg-type-tag raw-body room-id]
-          (let [hs-url        @(re-frame/subscribe [:sdk/homeserver-url])
-                policy        @(re-frame/subscribe [:settings/media-preview-policy])
-                room-meta     @(re-frame/subscribe [:rooms/active-metadata])
-                is-private?   (= (:join-rule room-meta) "invite")
-                show-preview? (or (= policy :on)
-                                  (and (= policy :private) is-private?))]
-            (if show-preview?
-              [link-preview-card first-url hs-url]
-              [:div {:style {:display "none"}}])))}))))
+    (if first-url
+      (let [hs-url        @(re-frame/subscribe [:sdk/homeserver-url])
+            policy        @(re-frame/subscribe [:settings/media-preview-policy])
+            room-meta     @(re-frame/subscribe [:rooms/active-metadata])
+            is-private?   (= (:join-rule room-meta) "invite")
+            show-preview? (or (= policy :on)
+                              (and (= policy :private) is-private?))]
+        (if show-preview?
+          [link-preview-card first-url hs-url room-id]
+          [:div {:style {:display "none"}}]))
+      [:div {:style {:display "none"}}])))
 
 
 #+end_src
