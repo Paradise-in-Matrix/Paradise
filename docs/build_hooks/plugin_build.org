@@ -64,6 +64,38 @@ One regret is that I didn't write more on this topic.
 #+end_src
 
 
+**** Defer Injection
+
+Might've been a cleaner way to do this, but I'm wanting to get this wrapped
+up and move on to other parts of Paradise. So we just sort of jam the defer
+binding in for the parser to see later in the virtualizer if it has that
+tag.
+
+May be worth looking into seeing what we can re-use in the lambda lifter
+later and making a more streamlined implementation. These are more of
+bludgeoning devices...
+
+#+begin_src clojurescript :tangle ../../src/build_hooks/plugin_build.cljs
+(defn inject-defer-boundaries [form]
+  (walk/postwalk
+   (fn [x]
+     (if (and (seq? x)
+              (symbol? (first x))
+              (#{'defn 'defoverride} (first x))
+              (symbol? (second x)))
+       (let [sym (second x)]
+         (if (:defer (meta sym))
+           (let [clean-sym (with-meta sym (dissoc (meta sym) :defer))
+                 clean-x   (cons (first x) (cons clean-sym (drop 2 x)))]
+             (list 'do
+                   clean-x
+                   (list 'clojure.core/aset clean-sym "$defer_boundary" true)))
+           x))
+       x))
+   form))
+#+end_src
+
+
 **** Sanitization
 
 We need to ensure we don't leak any Java specific namespaces into the code
