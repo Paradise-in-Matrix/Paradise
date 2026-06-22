@@ -7,7 +7,7 @@
             [paradise.ui.input.composer :refer [tiptap-component get-matrix-formatted-body prepare-html-for-editor]]
             [paradise.ui.input.emotes :refer [emoji-sticker-board]]
             [paradise.ui.input.autocomplete :refer [suggestion-menu]]
-            [paradise.ui.global :refer [request-batched-redraw! !active-popover]]
+            [paradise.ui.global :refer [request-item-redraw! !active-popover]]
             [reagent.core :as r]
             [paradise.media.component :refer [mxc->url]]
             [paradise.shared.utils.helpers :refer [truncate-name]]
@@ -159,14 +159,15 @@
  :input/set-context
  (fn [db [_ room-id mode target-item]]
    (when (= mode :edit)
-     (request-batched-redraw! room-id))
+     (request-item-redraw! room-id (:id target-item)))
    (assoc-in db [:input-context room-id] {:mode mode :target target-item})))
 
 (re-frame/reg-event-db
  :input/clear-context
  (fn [db [_ room-id]]
-   (when (= (get-in db [:input-context room-id :mode]) :edit)
-     (request-batched-redraw! room-id))
+   (let [context (get-in db [:input-context room-id])]
+     (when (= (:mode context) :edit)
+       (request-item-redraw! room-id (:id (:target context)))))
    (update db :input-context dissoc room-id)))
 
 (re-frame/reg-sub
