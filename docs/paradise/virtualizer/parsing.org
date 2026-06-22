@@ -144,8 +144,9 @@ later.
 (defn expand-hiccup [node]
   (cond
     (and (vector? node) (fn? (first node)))
-    (let [comp-fn (first node)
-          react-boundary (or (.-$react_boundary comp-fn) (goog.object/get comp-fn "$react_boundary"))]
+    (let [comp-fn        (first node)
+          react-boundary (or (.-$react_boundary comp-fn) (goog.object/get comp-fn "$react_boundary"))
+          defer-boundary (or (.-$defer_boundary comp-fn) (goog.object/get comp-fn "$defer_boundary"))]
       (if react-boundary
         (let [has-attrs? (map? (second node))
               attrs      (if has-attrs? (second node) nil)
