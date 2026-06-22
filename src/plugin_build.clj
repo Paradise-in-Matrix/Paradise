@@ -9,6 +9,24 @@
    [clojure.core.async]
    [clojure.tools.analyzer.passes.jvm.validate]))
 
+(defn inject-defer-boundaries [form]
+  (walk/postwalk
+   (fn [x]
+     (if (and (seq? x)
+              (symbol? (first x))
+              (#{'defn 'defoverride} (first x))
+              (symbol? (second x)))
+       (let [sym (second x)]
+         (if (:defer (meta sym))
+           (let [clean-sym (with-meta sym (dissoc (meta sym) :defer))
+                 clean-x   (cons (first x) (cons clean-sym (drop 2 x)))]
+             (list 'do
+                   clean-x
+                   (list 'clojure.core/aset clean-sym "$defer_boundary" true)))
+           x))
+       x))
+   form))
+
 (defn sanitize-ast [form]
   (walk/prewalk
     (fn [x]
@@ -130,7 +148,8 @@
   (let [raw-code     (slurp file-path)
         wrapped-text (str "(do\n" raw-code "\n)")
         ast-form     (read-cljs wrapped-text)
-        expanded-ast (expand-macros ast-form)
+        ast-deferred (inject-defer-boundaries ast-form)
+        expanded-ast (expand-macros ast-deferred)
         pure-ast     (sanitize-ast expanded-ast)]
     (pr-str pure-ast)))
 
