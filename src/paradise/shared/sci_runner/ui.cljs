@@ -13,6 +13,7 @@
    [sci.configs.re-frame.re-frame :as sci-re-frame]
    [clojure.string]
    [cljs-workers.core :as main]
+   [cljs-workers.mesh :as mesh]
    [promesa.core]
    ["@capacitor/core" :refer [Capacitor]]
    ["@capacitor/browser" :refer [Browser] :as browser]
@@ -114,15 +115,14 @@
    'paradise.media.component    (expose-ns paradise.media.component)
    'paradise.shared.utils.svg       (expose-ns paradise.shared.utils.svg)
    'paradise.shared.client.registry  {'!components registry/!components
-                   'reg-slot-item safe-reg-slot-item
-                   '!active-overrides registry/!active-overrides
-                   'remove-plugin-overrides! registry/remove-plugin-overrides!
-                   'get-slot registry/get-slot}
-   'paradise.shared.client.state {
-                   '!config state/!config
-                   '!engine-pool state/!engine-pool}
+                                      'reg-slot-item safe-reg-slot-item
+                                      '!active-overrides registry/!active-overrides
+                                      'remove-plugin-overrides! registry/remove-plugin-overrides!
+                                      'get-slot registry/get-slot}
+   'paradise.shared.client.state {'!config state/!config
+                                  '!engine-pool state/!engine-pool}
 
-
+   'cljs-workers.mesh   {'do-with-thread! mesh/do-with-thread!}
    'cljs-workers.core {'do-with-pool! main/do-with-pool!}})
 
 
@@ -141,9 +141,8 @@
 (defn evaluate-ui-form [plugin-id form-str]
   (reset! !current-eval-plugin plugin-id)
   (let [result (sci/eval-string* ui-context form-str)]
-    (when @state/!virtualizer-pool
-      (main/do-with-pool! @state/!virtualizer-pool
+      (mesh/do-with-thread! :virtualizer-pool
                           {:handler :eval-virtualizer-plugin
                            :arguments {:plugin-id plugin-id
-                                       :code form-str}}))
+                                       :code form-str}})
     result))
