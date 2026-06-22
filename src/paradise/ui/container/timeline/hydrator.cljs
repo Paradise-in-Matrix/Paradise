@@ -313,6 +313,7 @@
                      (.-wrapped cached-wrap)
                      (let [pojo (goog.object/get layout-node "worker-data")
                            wrapped {:id          id
+                                    :raw         (goog.object/get layout-node "raw")
                                     :type        (goog.object/get layout-node "type")
                                     :ts          (goog.object/get layout-node "ts")
                                     :bottom      (goog.object/get layout-node "bottom")
