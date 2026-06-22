@@ -95,47 +95,52 @@
       (contains? url-schemes scheme))
     false))
 
+;; check to see perf impact of that into []
+;; was kinda just lazily (hah) solving edits failing
+;; by forcing the lazyseq to evaluate immediately
+;; but this may be undesirable
 (defn sanitize-nodes [nodes depth]
   (if (> depth max-tag-nesting)
     []
-    (mapcat
-     (fn [node]
-       (cond
-         (string? node)
-         [node]
+    (into []
+      (mapcat
+       (fn [node]
+         (cond
+           (string? node)
+           [node]
 
-         (and (map? node) (= (:type node) :element))
-         (let [{:keys [tag attrs content]} node]
-           (cond
-             (contains? non-text-tags tag)
-             []
+           (and (map? node) (= (:type node) :element))
+           (let [{:keys [tag attrs content]} node]
+             (cond
+               (contains? non-text-tags tag)
+               []
 
-             (contains? permitted-tags tag)
-             (let [allowed-keys (get permitted-attrs tag #{})
-                   clean-attrs (select-keys attrs allowed-keys)
-                   [final-tag final-attrs transformed-content]
-                   (case tag
-                     (:font :span) [tag (transform-font-span clean-attrs) nil]
-                     :a            [tag (transform-a clean-attrs) nil]
-                     :code         [tag (filter-code-classes clean-attrs) nil]
-                     :img          (let [{t :tag a :attrs c :content} (transform-img clean-attrs)]
-                                     [t a c])
-                     [tag clean-attrs nil])
-                   final-attrs (if (and (= final-tag :a)
-                                        (not (valid-url? (:href final-attrs))))
-                                 (dissoc final-attrs :href)
-                                 final-attrs)
-                   children (or transformed-content
-                                (sanitize-nodes content (inc depth)))]
-               [(if (seq final-attrs)
-                  (into [final-tag final-attrs] children)
-                  (into [final-tag] children))])
+               (contains? permitted-tags tag)
+               (let [allowed-keys (get permitted-attrs tag #{})
+                     clean-attrs (select-keys attrs allowed-keys)
+                     [final-tag final-attrs transformed-content]
+                     (case tag
+                       (:font :span) [tag (transform-font-span clean-attrs) nil]
+                       :a            [tag (transform-a clean-attrs) nil]
+                       :code         [tag (filter-code-classes clean-attrs) nil]
+                       :img          (let [{t :tag a :attrs c :content} (transform-img clean-attrs)]
+                                       [t a c])
+                       [tag clean-attrs nil])
+                     final-attrs (if (and (= final-tag :a)
+                                          (not (valid-url? (:href final-attrs))))
+                                   (dissoc final-attrs :href)
+                                   final-attrs)
+                     children (or transformed-content
+                                  (sanitize-nodes content (inc depth)))]
+                 [(if (seq final-attrs)
+                    (into [final-tag final-attrs] children)
+                    (into [final-tag] children))])
 
-             :else
-             (sanitize-nodes content depth)))
+               :else
+               (sanitize-nodes content depth)))
 
-         :else []))
-     nodes)))
+           :else []))
+       nodes))))
 
 (defn sanitize-custom-html [raw-html]
   (when raw-html
