@@ -65,6 +65,7 @@ We need to cache the AST or we'll be re-rendering every single time.
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defonce !ast-node-cache (atom {}))
 (defonce !deferred-component-cache (atom {}))
+(defonce !current-event-id (atom nil))
 
 (defn flush-ast-cache! []
   (reset! !ast-node-cache {})
@@ -78,7 +79,6 @@ We need to cache the AST or we'll be re-rendering every single time.
        x))
    form))
 
-(def ^:dynamic *current-event-id* nil)
 #+end_src
 
 **** Deferred components
