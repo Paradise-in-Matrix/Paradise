@@ -1,7 +1,6 @@
 (ns paradise.ui.container.reusable
   (:require [re-frame.core :as re-frame]
             [paradise.ui.container.timeline.item :refer [event-tile-render]]
-            [paradise.ui.navigation.rooms.entry :refer [build-room-actions]]
             [paradise.shared.utils.svg :as icons]))
 
 
@@ -90,9 +89,17 @@
           :on-click (fn [e]
                       (let [mx (.-clientX e)
                             my (.-clientY e)]
-                        (re-frame/dispatch [:context-menu/open
-                                            {:x mx :y my
-                                             :items (build-room-actions tr active-id final-name is-space? is-dm? :header membership)}])))}
+                        (re-frame/dispatch
+                         [:ui/open-context-menu :room-actions
+                          {:x mx
+                           :y my
+                           :room-id active-id
+                           :room-name final-name
+                           :is-space? is-space?
+                           :is-dm? is-dm?
+                           :context :header
+                           :membership membership
+                           :parent-id nil}])))}
          [icons/more-vertical]]])]))
 
 
