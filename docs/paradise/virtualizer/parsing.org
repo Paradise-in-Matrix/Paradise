@@ -17,6 +17,7 @@ This is where we do much of that magic.
             ["@chenglou/pretext" :refer [prepareWithSegments]]
             [goog.object]
             [clojure.string :as str]
+            [clojure.walk :as walk]
             [taoensso.timbre :as log]
             [paradise.ui.container.timeline.item :refer [event-tile-render]]
             [paradise.virtualizer.state :as state]
