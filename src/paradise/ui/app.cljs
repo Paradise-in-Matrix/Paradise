@@ -21,6 +21,7 @@
    [paradise.ui.overlays.creation]
    [paradise.ui.overlays.quick-switcher]
    [paradise.ui.overlays.lightbox]
+   [paradise.ui.overlays.rooms]
    [paradise.ui.overlays.profiles]
    [paradise.ui.overlays.reactions]
    [paradise.shared.plugin-storage]
