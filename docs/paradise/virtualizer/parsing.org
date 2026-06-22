@@ -205,8 +205,8 @@ to survive the conversion. Closures will poison it.
                                      (or (.-$fn_ptr v) (goog.object/get v "$fn_ptr")))]
                            (cond
                              ptr
-                             (let [env (or (.-$env v) (goog.object/get v "$env"))
-                                   fn-str (str ptr)
+                             (let [env       (or (.-$env v) (goog.object/get v "$env"))
+                                   fn-str    (str ptr)
                                    clean-ptr (if (clojure.string/starts-with? fn-str ":")
                                                (subs fn-str 1)
                                                fn-str)]
