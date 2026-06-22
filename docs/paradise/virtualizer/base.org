@@ -107,6 +107,7 @@ we can lean more on Eve.
             [eve.atom :as ea]
             [eve.mem :as mem]
             [re-frame.db :as db]
+            [re-frame.core :as re-frame]
             [eve.wasm-mem :as wasm-mem]
             [cognitect.transit :as t]
             [editscript.core :as e]
