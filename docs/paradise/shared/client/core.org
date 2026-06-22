@@ -274,7 +274,9 @@ mechanism for multi-threaded communication.
 #+end_src
 
 
+***** SDK Sync Kick Off
 
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (re-frame/reg-event-fx
  :sdk/start-sync
  (fn [_ _]
@@ -285,7 +287,15 @@ mechanism for multi-threaded communication.
          (log/info "Matrix sync loop started successfully.")
          (log/error "Failed to start sync:" (:msg res)))))
    {}))
+#+end_src
 
+
+***** Start session
+Could probably be cleaner, but works for now.
+Basically here is where we go ahead and start initializing emotes and such for
+the user.
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (re-frame/reg-event-fx
  :sdk/ignite-session
  (fn [_ _]
