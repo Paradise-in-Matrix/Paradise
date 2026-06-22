@@ -235,11 +235,6 @@ sure we actually document the behavior and what it is for future discoverers.
           initial-state (:initial-state eve-payload)
           db-port       (first ports)]
       (cond
-        (nil? eve-payload)
-        (do
-          (js/console.error "[Worker] FATAL: eve-payload is null.")
-          {:status :error :msg "eve-payload is null"})
-
         (= mode :async)
         (let [reader    (t/reader :json)
               writer    (t/writer :json)
