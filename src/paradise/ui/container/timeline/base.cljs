@@ -56,10 +56,9 @@
 (re-frame/reg-sub
  :timeline/event
  (fn [[_ room-id _event-id]]
-   (re-frame/subscribe [:timeline/events-map room-id]))
- (fn [events-map [_ _room-id event-id]]
-   (get events-map event-id)))
-
+   (re-frame/subscribe [:timeline/events room-id]))
+ (fn [events [_ _room-id event-id]]
+   (some #(when (= (:id %) event-id) %) events)))
 
 
 (re-frame/reg-event-fx
