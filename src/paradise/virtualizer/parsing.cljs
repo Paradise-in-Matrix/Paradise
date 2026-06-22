@@ -3,6 +3,7 @@
             ["@chenglou/pretext" :refer [prepareWithSegments]]
             [goog.object]
             [clojure.string :as str]
+            [clojure.walk :as walk]
             [taoensso.timbre :as log]
             [paradise.ui.container.timeline.item :refer [event-tile-render]]
             [paradise.virtualizer.state :as state]
@@ -31,6 +32,37 @@
            :body #js {:childNodes #js []}})
 
 
+(defonce !ast-node-cache (atom {}))
+(defonce !deferred-component-cache (atom {}))
+(defonce !current-event-id (atom nil))
+
+(defn flush-ast-cache! []
+  (reset! !ast-node-cache {})
+  (reset! !deferred-component-cache {}))
+
+(defn strip-fns [form]
+  (walk/postwalk
+   (fn [x]
+     (if (or (fn? x) (= "function" (goog/typeOf x)))
+       :fn
+       x))
+   form))
+
+
+(defn check-deferred-components! []
+  (let [changed-ids (transient #{})]
+    (doseq [[e-id deferreds] @!deferred-component-cache]
+      (doseq [{:keys [comp-fn args last-result]} deferreds]
+        (try
+          (let [raw-res    (apply comp-fn args)
+                new-result (if (fn? raw-res) (apply raw-res args) raw-res)
+                stripped   (strip-fns new-result)]
+            (when (not= stripped last-result)
+              (conj! changed-ids e-id)))
+          (catch :default e
+            (log/warn "Error evaluating deferred component:" e)))))
+    (persistent! changed-ids)))
+
 (defn extract-first-url [text]
   (when text
     (when-let [match (re-find #"https?://[^\s\"'<>]+" text)]
@@ -57,9 +89,31 @@
 
 (defn expand-hiccup [node]
   (cond
+    (and (map? node) (contains? node :tag))
+    (let [tag     (:tag node)
+          attrs   (:attrs node)
+          content (:content node)
+          kids    (cond
+                    (nil? content) []
+                    (sequential? content) content
+                    :else [content])]
+      (if attrs
+        (expand-hiccup (into [tag attrs] kids))
+        (expand-hiccup (into [tag] kids))))
+
+    (and (vector? node) (string? (first node)) (clojure.string/starts-with? (first node) "comp:"))
+    (let [tag        (first node)
+          has-attrs? (map? (second node))
+          attrs      (if has-attrs? (second node) nil)
+          children   (if has-attrs? (drop 2 node) (drop 1 node))]
+      (if attrs
+        (into [tag attrs] (map expand-hiccup children))
+        (into [tag] (map expand-hiccup children))))
+
     (and (vector? node) (fn? (first node)))
-    (let [comp-fn (first node)
-          react-boundary (or (.-$react_boundary comp-fn) (goog.object/get comp-fn "$react_boundary"))]
+    (let [comp-fn        (first node)
+          react-boundary (or (.-$react_boundary comp-fn) (goog.object/get comp-fn "$react_boundary"))
+          defer-boundary (or (.-$defer_boundary comp-fn) (goog.object/get comp-fn "$defer_boundary"))]
       (if react-boundary
         (let [has-attrs? (map? (second node))
               attrs      (if has-attrs? (second node) nil)
@@ -67,45 +121,48 @@
           (if attrs
             (into [react-boundary attrs] (map expand-hiccup children))
             (into [react-boundary] (map expand-hiccup children))))
-        (let [args   (rest node)
-              result (apply comp-fn args)]
-          (if (fn? result)
-            (expand-hiccup (apply result args))
-            (expand-hiccup result)))))
-
-    (and (vector? node) (fn? (first node)))
-    (let [comp-fn (first node)
-          args    (rest node)
-          result  (apply comp-fn args)]
-      (if (fn? result)
-        (expand-hiccup (apply result args))
-        (expand-hiccup result)))
+        (let [args         (rest node)
+              raw-res      (apply comp-fn args)
+              final-result (if (fn? raw-res) (apply raw-res args) raw-res)]
+          (when (and defer-boundary !current-event-id)
+            (swap! !deferred-component-cache update !current-event-id
+                   (fnil conj [])
+                   {:comp-fn comp-fn :args args :last-result (strip-fns final-result)}))
+          (expand-hiccup final-result))))
 
     (and (vector? node) (keyword? (first node)))
-    (let [tag (first node)
+    (let [tag        (first node)
           has-attrs? (map? (second node))
-          attrs (if has-attrs? (second node) nil)
-          children (if has-attrs? (drop 2 node) (drop 1 node))]
+          attrs      (if has-attrs? (second node) nil)
+          children   (if has-attrs? (drop 2 node) (drop 1 node))]
       (if attrs
         (into [tag attrs] (map expand-hiccup children))
         (into [tag] (map expand-hiccup children))))
-
     (seq? node) (map expand-hiccup node)
-    :else node))
-
+    :else (do
+            node)))
 
 (defn process-props [attrs]
   (let [js-props #js {}
-        process-kv (fn [k-name v]
-                     (let [is-handler? (boolean (re-find #"^on(?:-[a-z]|[A-Z])" k-name))]
+        safe-val (fn sanitize [v]
+                   (cond
+                     (fn? v) (if-let [bound (or (.-$react_boundary v) (goog.object/get v "$react_boundary"))]
+                               bound v)
+                     (map? v) (reduce-kv (fn [m k val] (assoc m k (sanitize val))) {} v)
+                     (vector? v) (mapv sanitize v)
+                     (seq? v) (map sanitize v)
+                     :else v))
+        process-kv (fn [k-name raw-v]
+                     (let [v           (safe-val raw-v)
+                           is-handler? (boolean (re-find #"^on(?:-[a-z]|[A-Z])" k-name))]
                        (cond
                          is-handler?
                          (let [ptr (when (and (some? v) (or (object? v) (fn? v)))
                                      (or (.-$fn_ptr v) (goog.object/get v "$fn_ptr")))]
                            (cond
                              ptr
-                             (let [env (or (.-$env v) (goog.object/get v "$env"))
-                                   fn-str (str ptr)
+                             (let [env       (or (.-$env v) (goog.object/get v "$env"))
+                                   fn-str    (str ptr)
                                    clean-ptr (if (clojure.string/starts-with? fn-str ":")
                                                (subs fn-str 1)
                                                fn-str)]
@@ -153,7 +210,7 @@
       (doseq [[k v] attrs] (process-kv (name k) v))
       (when (object? attrs)
         (let [keys-arr (js/Object.keys attrs)
-              len (.-length keys-arr)]
+              len      (.-length keys-arr)]
           (loop [i 0]
             (when (< i len)
               (let [k (aget keys-arr i)]
@@ -175,36 +232,39 @@
       (let [tag-kw (first node)
             tag-name (cond
                        (keyword? tag-kw) (name tag-kw)
-                       (string? tag-kw) tag-kw
-                       (object? tag-kw) (or (.-displayName tag-kw) (.-name tag-kw) "unknown-object")
-                       (fn? tag-kw) (if-let [ptr (or (.-$fn_ptr tag-kw) (goog.object/get tag-kw "$fn_ptr"))]
-                                      (str "comp:" (if (keyword? ptr) (subs (str ptr) 1) (str ptr)))
-                                      (or (.-displayName tag-kw) (.-name tag-kw) "unknown-fn"))
+                       (string? tag-kw)  tag-kw
+                       (object? tag-kw)  (or (.-displayName tag-kw) (.-name tag-kw) "unknown-object")
+                       (fn? tag-kw)      (if-let [bound (or (.-$react_boundary tag-kw) (goog.object/get tag-kw "$react_boundary"))]
+                                           bound
+                                           (if-let [ptr (or (.-$fn_ptr tag-kw) (goog.object/get tag-kw "$fn_ptr"))]
+                                             (str "comp:" (if (keyword? ptr) (subs (str ptr) 1) (str ptr)))
+                                             (or (.-displayName tag-kw) (.-name tag-kw) "unknown-fn")))
                        :else "div")
 
             is-comp? (or (and (keyword? tag-kw) (= (namespace tag-kw) "comp"))
                          (and (string? tag-name) (.startsWith tag-name "comp:")))
+
 
             [tag & classes] (if is-comp?
                               [tag-name]
                               (clojure.string/split tag-name #"\."))
 
             has-attrs? (map? (second node))
-            attrs (if has-attrs? (second node) {})
-            children (if has-attrs? (drop 2 node) (drop 1 node))
-            js-props (process-props attrs)]
+            attrs      (if has-attrs? (second node) {})
+            children   (if has-attrs? (drop 2 node) (drop 1 node))
+            js-props   (process-props attrs)]
 
         (when (seq classes)
-          (let [existing (goog.object/get js-props "className")
+          (let [existing       (goog.object/get js-props "className")
                 joined-classes (clojure.string/join " " classes)
-                final-class (if existing (str joined-classes " " existing) joined-classes)]
+                final-class    (if existing (str joined-classes " " existing) joined-classes)]
             (aset js-props "className" final-class)))
 
-        #js {:type (cond
-                     is-comp? (if (.startsWith tag "comp:") tag (str "comp:" tag))
-                     (empty? tag) "div"
-                     :else tag)
-             :props (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
+        #js {:type     (cond
+                         is-comp? (if (.startsWith tag "comp:") tag (str "comp:" tag))
+                         (empty? tag) "div"
+                         :else tag)
+             :props    (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
              :children (to-array (map hiccup->pojo children))})
 
       (to-array (map hiccup->pojo node)))
@@ -216,11 +276,11 @@
     (object? node)
     (if (goog.object/containsKey node "_owner")
       (let [raw-props (.-props node)
-            children (goog.object/get raw-props "children")
-            js-props (process-props raw-props)]
+            children  (goog.object/get raw-props "children")
+            js-props  (process-props raw-props)]
         (js/Reflect.deleteProperty js-props "children")
-        #js {:type (.-type node)
-             :props (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
+        #js {:type     (.-type node)
+             :props    (if (= 0 (alength (js/Object.keys js-props))) nil js-props)
              :children (cond
                          (array? children) (.map children hiccup->pojo)
                          (some? children) #js [(hiccup->pojo children)]
@@ -266,20 +326,34 @@
                       event-tile-render)]
     (if render-fn
       (mapv (fn [item]
-              (let [outer-res  (render-fn item nil false nil nil)
-                    hiccup-ast (if (fn? outer-res)
-                                 (outer-res item nil false nil nil)
-                                 outer-res)
-                    expanded   (expand-hiccup hiccup-ast)
-                    pojo       (hiccup->pojo expanded)]
-                (assoc item :worker-data pojo)))
+              (let [id (:id item)
+                    cache-key (hash [(:raw item) (:unread? item) (:reactions item) (:merge-with-prev? item)])
+                    cached-entry (get @!ast-node-cache id)]
+                (if (and cached-entry (= (:cache-key cached-entry) cache-key))
+                  (assoc item :worker-data (:pojo cached-entry))
+                  (binding [!current-event-id id]
+                    (swap! !deferred-component-cache dissoc id)
+                    (let [outer-res  (render-fn item nil false nil nil)
+                          hiccup-ast (if (fn? outer-res)
+                                       (outer-res item nil false nil nil)
+                                       outer-res)
+                          expanded   (expand-hiccup hiccup-ast)
+                          pojo       (hiccup->pojo expanded)]
+                      (swap! !ast-node-cache (fn [m]
+                                               (let [m' (assoc m id {:cache-key cache-key :pojo pojo})]
+                                                 (if (> (count m') 2000)
+                                                   (let [evicted-id (first (keys m'))]
+                                                     (swap! !deferred-component-cache dissoc evicted-id)
+                                                     (dissoc m' evicted-id))
+                                                   m'))))
+                      (assoc item :worker-data pojo))))))
             laid-out)
       (do
         (log/error "FATAL: event-tile-render NOT FOUND registry!")
         laid-out))))
 
-(defn precompile-event-data [e source]
-  (let [processed (process-raw-event e source)
+(defn precompile-event-data [e source room-id]
+  (let [processed (process-raw-event e source room-id)
         id (:id processed)
         content   (:content processed)
         inner     (or (get-in content [:inner :content]) content)
