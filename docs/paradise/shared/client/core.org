@@ -226,19 +226,31 @@ operations here up until the point in which the client is 'started'.
 
 This is also where we establish our thread pools. Eventually we'll move
 to a cleaner pattern.
+
+
+***** Thread Booting
+
+We initialize the thread pools here. Much of the cljs-workers is so-so named.
+We'll eventually need to go back and clean these pieces up (but the function
+form of them should mostly be fine).
+Basically, this is a mess of slow iterations to build out a nice feeling
+mechanism for multi-threaded communication.
+
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (re-frame/reg-event-fx
- :app/bootstrap
- (fn [_ [_ target-user-id]]
-   (log/debug "Bootstrapping:" target-user-id)
-   (go
-     (init-worker!)
+ :app/thread-boot
+ (fn [_]
+   (init-worker!)
      (let [app-db-payload   @state/!eve-app-db-payload
            engine-pool      @state/!engine-pool
            media-pool       @state/!media-pool
            virtualizer-pool @state/!virtualizer-pool]
        (bind-workers! engine-pool media-pool virtualizer-pool app-db-payload)
-       (let [init-res (<! (main/do-with-pool! engine-pool {:handler :init-wasm}))]
+       )
+   {}
+   ))
+#+end_src
+
          (if (= (:status init-res) "success")
            (let [boot-res (<! (main/do-with-pool! engine-pool {:handler :bootstrap
                                                                :arguments {:target-user-id target-user-id}}))]
