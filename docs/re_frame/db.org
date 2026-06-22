@@ -132,6 +132,19 @@ Android Webview does not support SharedArrayBuffers
 #+end_src
 
 
+Needed particularly for transit
+#+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
+(extend-type js/BigInt
+  cljs.core/IEquiv
+  (-equiv [this other]
+    (js* "~{} === ~{}" this other))
+
+  cljs.core/IHash
+  (-hash [this]
+    (hash (.toString this))))
+#+end_src
+
+
 #+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
 (def app-db
   (reify
