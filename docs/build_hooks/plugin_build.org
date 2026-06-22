@@ -239,7 +239,8 @@ easily done. It'll be something that needs to be revisited.
   (let [raw-code     (slurp file-path)
         wrapped-text (str "(do\n" raw-code "\n)")
         ast-form     (read-cljs wrapped-text)
-        expanded-ast (expand-macros ast-form)
+        ast-deferred (inject-defer-boundaries ast-form)
+        expanded-ast (expand-macros ast-deferred)
         pure-ast     (sanitize-ast expanded-ast)]
     (pr-str pure-ast)))
 
