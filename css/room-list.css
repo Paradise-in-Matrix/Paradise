@@ -33,12 +33,11 @@
 
 .filter-bar {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 10px;
     background-color: #2b2d31;
     border-bottom: 1px solid #1e1f22;
-    overflow-x: auto;
-    scrollbar-width: none;
 }
 
 .filter-bar::-webkit-scrollbar {
