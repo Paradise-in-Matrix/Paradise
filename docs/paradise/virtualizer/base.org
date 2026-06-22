@@ -166,6 +166,11 @@ to set up the transit-cljs and editscript versions here if the
 client isn't using COEP. It may be advisable to avoid COEP anyway
 for inline video players on all platforms.
 
+Something to note, but on hot reloads sometimes the worker threads
+aren't reset and thus you may see a sync error that disappears on
+another refresh. This could be fixed but given Vite in the mix
+I'm not eager to dig into it too much for now. More important to at least make
+sure we actually document the behavior and what it is for future discoverers.
 
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
 (worker/register :bind-app-db
