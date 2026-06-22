@@ -776,10 +776,47 @@ It may, in fact, be useful to provide the virtualizer
 library itself some context of deferred components...
 
 #+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/item.cljs
-(defn ^:ui reply-container [tr in-reply-to room-id]
+(re-frame/reg-event-fx
+ :msg/fetch-reply
+ (fn [{:keys [db]} [_ room-id reply-id]]
+   (js/console.error room-id)
+   (when-not (get-in db [:reply-cache reply-id])
+     (go
+       (let [res (<! (mesh/do-with-thread! :engine-pool
+                                           {:handler :get-event
+                                            :arguments {:room-id room-id
+                                                        :event-id reply-id}}))]
+         (if (= (:status res) "success")
+           (re-frame/dispatch [:msg/reply-fetch-success room-id reply-id (:event res)])
+           (re-frame/dispatch [:msg/reply-fetch-error room-id reply-id])))))
+   {:db (update-in db [:reply-cache reply-id] #(or % {:status :loading}))}))
+
+(re-frame/reg-event-db
+ :msg/reply-fetch-error
+ (fn [db [_ room-id reply-id]]
+   (assoc-in db [:reply-cache reply-id] {:status :error})))
+
+
+(re-frame/reg-event-fx
+ :msg/reply-fetch-success
+ (fn [{:keys [db]} [_ room-id reply-id data]]
+   {:db (assoc-in db [:reply-cache reply-id] {:status :success :data data})}))
+
+(re-frame/reg-sub
+ :msg/reply-cache
+ (fn [db [_ reply-id]]
+   (get-in db [:reply-cache reply-id])))
+
+(defn ^:defer reply-container [tr in-reply-to room-id]
   (when in-reply-to
-    (let [reply-id  (:event-id in-reply-to)
-          reply-msg @(re-frame/subscribe [:timeline/event room-id reply-id])]
+    (let [reply-id (:event-id in-reply-to)
+          {:keys [status data]} @(re-frame/subscribe [:msg/reply-cache reply-id])
+          local-msg             @(re-frame/subscribe [:timeline/event room-id reply-id])
+          reply-msg             (or data local-msg)]
+
+      (when (and (not reply-msg) (not status))
+        (re-frame/dispatch [:msg/fetch-reply room-id reply-id]))
+
       [:div.timeline-reply-banner
        {:style {:cursor "pointer"}
         :on-click (fn [e]
@@ -795,6 +832,7 @@ library itself some context of deferred components...
            [:span.reply-preview
             (get-in reply-msg [:content :inner :content :body]
                     (tr [:container.timeline.status/media-preview]))]]
+
           [:span.reply-preview (tr [:container.timeline.status/reply-loading])])]])))
 #+end_src
 
