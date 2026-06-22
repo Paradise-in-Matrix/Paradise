@@ -197,9 +197,8 @@ React object that will be hydrated on the other end.
         new-event))))
 
 
-(defn process-timeline-events [events source]
-  (mapv #(precompile-and-cache-event % source) events))
-
+(defn process-timeline-events [events source room-id]
+  (mapv #(precompile-and-cache-event % source room-id) events))
 
 #+end_src
 
