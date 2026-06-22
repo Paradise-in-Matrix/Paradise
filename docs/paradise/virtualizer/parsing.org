@@ -409,8 +409,8 @@ intentionally re-render something.
 More or less gathering the ingredients for usage elsewhere.
 
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
-(defn precompile-event-data [e source]
-  (let [processed (process-raw-event e source)
+(defn precompile-event-data [e source room-id]
+  (let [processed (process-raw-event e source room-id)
         id (:id processed)
         content   (:content processed)
         inner     (or (get-in content [:inner :content]) content)
