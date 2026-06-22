@@ -124,6 +124,10 @@ throw an error.
       (contains? url-schemes scheme))
     false))
 
+;; check to see perf impact of that into []
+;; was kinda just lazily (hah) solving edits failing
+;; by forcing the lazyseq to evaluate immediately
+;; but this may be undesirable
 (defn sanitize-nodes [nodes depth]
   (if (> depth max-tag-nesting)
     []
