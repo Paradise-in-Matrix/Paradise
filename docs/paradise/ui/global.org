@@ -537,6 +537,26 @@ much simpler.
                                       {:handler :recalculate-timeline
                                        :arguments {:room-id room-id}}))
              50))))
+
+
+(defonce !pending-redraw-items (atom {}))
+
+(defn request-item-redraw! [room-id item-id]
+  (swap! !pending-redraw-items update room-id (fnil conj #{}) item-id)
+
+  (when-let [timer @!redraw-timer]
+    (js/clearTimeout timer))
+
+  (reset! !redraw-timer
+          (js/setTimeout
+           #(let [batches @!pending-redraw-items]
+              (reset! !pending-redraw-items {})
+              (doseq [[r-id i-ids] batches]
+                (mesh/do-with-thread! :virtualizer-pool
+                                      {:handler :recalculate-items
+                                       :arguments {:room-id r-id
+                                                   :item-ids (vec i-ids)}})))
+           50)))
 #+end_src
 
 
