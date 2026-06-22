@@ -272,18 +272,24 @@ https://matrix-org.github.io/matrix-rust-sdk/
                                                                (map (fn [e] {:pack-id (or (not-empty (:state_key e)) rid)
                                                                              :data    (:content e)}))))))))]
                            (if (= source-type "account")
-                             (let [raw-json (<p! (.accountData client "im.ponies.emote_rooms"))]
-                               (if-not raw-json
-                                 {:status :success :packs []}
-                                 (let [data     (js->clj (js/JSON.parse raw-json) :keywordize-keys true)
-                                       targets  (for [[rid packs] (:rooms data)
-                                                      [pack-name _] packs]
-                                                  [(name rid) (name pack-name)])
-                                       results  (<p! (p/all (map (fn [[r p]]
-                                                                   (p/then (fetch-state r "im.ponies.room_emotes" p)
-                                                                           #(when % {:pack-id p :data %})))
-                                                                 targets)))]
-                                   {:status :success :packs (remove nil? results)})))
+                             (let [rooms-json  (<p! (.accountData client "im.ponies.emote_rooms"))
+                                   rooms-data  (when rooms-json (js->clj (js/JSON.parse rooms-json) :keywordize-keys true))
+                                   targets     (if rooms-data
+                                                 (for [[rid packs] (:rooms rooms-data)
+                                                       [pack-name _] packs]
+                                                   [(name rid) (name pack-name)])
+                                                 [])
+                                   remote-results (<p! (p/all (map (fn [[r p]]
+                                                                     (p/then (fetch-state r "im.ponies.room_emotes" p)
+                                                                             #(when % {:pack-id p :data %})))
+                                                                   targets)))
+                                   personal-json (<p! (.accountData client "im.ponies.user_emotes"))
+                                   personal-pack (when personal-json
+                                                   (let [data (js->clj (js/JSON.parse personal-json) :keywordize-keys true)]
+                                                     {:pack-id "user-emotes" :data data}))
+                                   all-results (cond-> (vec (remove nil? remote-results))
+                                                 personal-pack (conj personal-pack))]
+                               {:status :success :packs all-results})
                              (let [packs (<p! (fetch-room-state room-id))]
                                {:status :success :packs packs})))
                          {:status :error :msg "No active client"})
