@@ -180,28 +180,33 @@
     (hash (.-offset__ this))))
 
 (re-frame/reg-event-fx
- :app/bootstrap
- (fn [_ [_ target-user-id]]
-   (log/debug "Bootstrapping:" target-user-id)
-   (go
-     (init-worker!)
+ :app/thread-boot
+ (fn [_]
+   (init-worker!)
      (let [app-db-payload   @state/!eve-app-db-payload
            engine-pool      @state/!engine-pool
            media-pool       @state/!media-pool
            virtualizer-pool @state/!virtualizer-pool]
        (bind-workers! engine-pool media-pool virtualizer-pool app-db-payload)
-       (let [init-res (<! (main/do-with-pool! engine-pool {:handler :init-wasm}))]
+       )
+   {}
+   ))
+
+(re-frame/reg-event-fx
+ :app/bootstrap
+ (fn [_ [_ target-user-id]]
+   (log/debug "Bootstrapping:" target-user-id)
+   (go
+       (let [init-res (<! (mesh/do-with-thread! :engine-pool {:handler :init-wasm}))]
          (if (= (:status init-res) "success")
-           (let [boot-res (<! (main/do-with-pool! engine-pool {:handler :bootstrap
+           (let [boot-res (<! (mesh/do-with-thread! :engine-pool {:handler :bootstrap
                                                                :arguments {:target-user-id target-user-id}}))]
              (case (:status boot-res)
                "success" (re-frame/dispatch [:auth/login-success boot-res])
                "empty"   (re-frame/dispatch [:auth/set-status :logged-out])
                "error"   (log/error "Bootstrap failed:" (:msg boot-res))))
-           (log/error "WASM failed to load!" (:msg init-res))))))
+           (log/error "WASM failed to load!" (:msg init-res)))))
    {}))
-
-
 
 (re-frame/reg-event-fx
  :sdk/start-sync
