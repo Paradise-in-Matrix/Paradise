@@ -154,32 +154,26 @@ later.
           (if attrs
             (into [react-boundary attrs] (map expand-hiccup children))
             (into [react-boundary] (map expand-hiccup children))))
-        (let [args   (rest node)
-              result (apply comp-fn args)]
-          (if (fn? result)
-            (expand-hiccup (apply result args))
-            (expand-hiccup result)))))
-
-    (and (vector? node) (fn? (first node)))
-    (let [comp-fn (first node)
-          args    (rest node)
-          result  (apply comp-fn args)]
-      (if (fn? result)
-        (expand-hiccup (apply result args))
-        (expand-hiccup result)))
+        (let [args         (rest node)
+              raw-res      (apply comp-fn args)
+              final-result (if (fn? raw-res) (apply raw-res args) raw-res)]
+          (when (and defer-boundary !current-event-id)
+            (swap! !deferred-component-cache update !current-event-id
+                   (fnil conj [])
+                   {:comp-fn comp-fn :args args :last-result (strip-fns final-result)}))
+          (expand-hiccup final-result))))
 
     (and (vector? node) (keyword? (first node)))
-    (let [tag (first node)
+    (let [tag        (first node)
           has-attrs? (map? (second node))
-          attrs (if has-attrs? (second node) nil)
-          children (if has-attrs? (drop 2 node) (drop 1 node))]
+          attrs      (if has-attrs? (second node) nil)
+          children   (if has-attrs? (drop 2 node) (drop 1 node))]
       (if attrs
         (into [tag attrs] (map expand-hiccup children))
         (into [tag] (map expand-hiccup children))))
-
     (seq? node) (map expand-hiccup node)
-    :else node))
-
+    :else (do
+            node)))
 #+end_src
 
 
