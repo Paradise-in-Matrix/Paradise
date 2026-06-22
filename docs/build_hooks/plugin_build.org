@@ -75,7 +75,7 @@ May be worth looking into seeing what we can re-use in the lambda lifter
 later and making a more streamlined implementation. These are more of
 bludgeoning devices...
 
-#+begin_src clojurescript :tangle ../../src/build_hooks/plugin_build.cljs
+#+begin_src clojurescript :tangle ../../src/plugin_build.clj
 (defn inject-defer-boundaries [form]
   (walk/postwalk
    (fn [x]
