@@ -6,6 +6,7 @@
    [cljs.core.async.interop :refer-macros [<p!]]
    [promesa.core :as p]
    [cljs-workers.core :as main]
+   [cljs-workers.mesh :as mesh]
    [paradise.shared.sci-runner.ui :as runner]
    [paradise.shared.client.state :as state]
    [paradise.shared.client.registry]
@@ -141,10 +142,10 @@
          (doseq [{:keys [ns target code]} modules]
            (case target
              :engine
-             (let [res (<! (main/do-with-pool! @state/!engine-pool
+             (let [res (<! (mesh/do-with-thread! :engine-pool
                                                {:handler :evaluate-worker-form
                                                 :arguments {:plugin-id (:id plugin-map)
-                                                            :form-str code}}))]
+                                                            :code code}}))]
                (when (= (:status res) "error")
                  (throw (js/Error. (str "Engine Eval Failed for " ns ": " (:msg res))))))
 
