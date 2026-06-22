@@ -223,8 +223,7 @@
 
 
 (worker/register :evaluate-worker-form
-  (fn [{:keys [arguments]}]
-    (let [{:keys [plugin-id code]} arguments]
-      (sci/evaluate-worker-form plugin-id code))))
+  (fn [{:keys [plugin-id code]}]
+      (sci/evaluate-worker-form plugin-id code)))
 
 (worker/bootstrap)
