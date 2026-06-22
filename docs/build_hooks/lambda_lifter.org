@@ -279,7 +279,7 @@ Have to avoid registering in the few files that do not need it.
 
 #+begin_src clojurescript :tangle ../../hooks/lambda_lifter.clj
 (defn skip-file? [code]
-  (re-find #"\(ns\s+(paradise\.shared\.utils\.macros|paradise\.shared\.client\.registry|paradise\.shared\.client\.state|paradise\.shared\.client\.core|re-frame\.db|net)" code))
+  (re-find #"\(ns\s+(paradise\.shared\.utils\.macros|paradise\.shared\.client\.registry|paradise\.shared\.client\.state|paradise\.shared\.client\.core|re-frame\.db|net|paradise\.virtualizer\.parsing)" code))
 #+end_src
 
 
