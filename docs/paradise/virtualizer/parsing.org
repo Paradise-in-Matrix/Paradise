@@ -59,6 +59,28 @@ the real DOM.
 #+end_src
 
 
+**** AST Cache
+
+We need to cache the AST or we'll be re-rendering every single time.
+#+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
+(defonce !ast-node-cache (atom {}))
+(defonce !deferred-component-cache (atom {}))
+
+(defn flush-ast-cache! []
+  (reset! !ast-node-cache {})
+  (reset! !deferred-component-cache {}))
+
+(defn strip-fns [form]
+  (walk/postwalk
+   (fn [x]
+     (if (or (fn? x) (= "function" (goog/typeOf x)))
+       :fn
+       x))
+   form))
+
+(def ^:dynamic *current-event-id* nil)
+#+end_src
+
 **** Sanitizing Custom HTML
 
 
