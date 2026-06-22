@@ -314,7 +314,7 @@ sure we actually document the behavior and what it is for future discoverers.
 
 (worker/register :process-timeline-diff
                  (fn [{:keys [events room-id source]}]
-                   (let [processed-events (process-timeline-events events source)
+                   (let [processed-events (process-timeline-events events source room-id)
                          enriched-events  (measurements/enrich-timeline-items processed-events)]
                      (swap! !room-events assoc-in [room-id source] enriched-events)
                      (recalculate-and-stream! room-id source)
