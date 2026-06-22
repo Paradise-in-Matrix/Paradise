@@ -133,6 +133,8 @@ Android Webview does not support SharedArrayBuffers
 
 
 Needed particularly for transit
+Matrix Rust SDK emits these
+
 #+begin_src clojurescript :tangle ../../src/re_frame/db.cljs
 (extend-type js/BigInt
   cljs.core/IEquiv
