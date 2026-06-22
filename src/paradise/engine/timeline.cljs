@@ -561,3 +561,28 @@
             {:status :error :msg (str "Search failed with status: " (.-status resp))}))
         (catch :default e
           {:status :error :msg (str e)})))))
+
+
+(worker/register :get-event
+                 (fn [{:keys [room-id event-id]}]
+                   (go
+                     (try
+                       (if-let [room (.getRoom @state/!client room-id)]
+                         (let [arrays         @!timeline-arrays
+                               live-events    (get arrays [room-id :live])
+                               focused-events (get arrays [room-id :focused])
+                               pinned-events  (get arrays [room-id :pins])
+                               local-hit      (or (some #(when (= (:id %) event-id) %) live-events)
+                                                  (some #(when (= (:id %) event-id) %) focused-events)
+                                                  (some #(when (= (:id %) event-id) %) pinned-events))]
+                           (if local-hit
+                             {:status "success" :event local-hit}
+                             {:status "error" :msg "Need to add fetch event in Engine"}
+#_                             (let [ffi-event (<p! (.getEventMethodHereOrSo room event-id))]
+                               (if ffi-event
+                                 {:status "success" :event (wrap-item (make-timeline-item-shim ffi-event event-id))}
+                                 {:status "error" :msg "Event not found in SDK"}))))
+                         {:status "error" :msg "Room not found"})
+                       (catch :default e
+                         (js/console.warn "SDK FFI crash trapped:" e)
+                         {:status "error" :msg (str e)})))))
