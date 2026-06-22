@@ -188,7 +188,8 @@
     (sequential? node) (str/join "" (map hiccup->text node))
     :else ""))
 
-(defn process-raw-event [e source]
+
+(defn process-raw-event [e source room-id]
   (let [html-txt     (or (get-in e [:content :inner :content :html]) "")
         cleaned-html (if (seq html-txt)
                        (str/replace html-txt #"(?i)<br[^>]*>\s*(?=</(?:p|div|h[1-6]|blockquote|li)>)" "")
@@ -205,6 +206,7 @@
                            ""))]
     (-> e
         (assoc :timeline-source source)
+        (assoc :room-id room-id)
         (assoc :clean-hiccup safe-hiccup)
         (assoc :clean-text plain-text)
         (update :type keyword)
