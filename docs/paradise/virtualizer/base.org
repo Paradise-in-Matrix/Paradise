@@ -286,52 +286,8 @@ sure we actually document the behavior and what it is for future discoverers.
 #+end_src
 
 
-**** (Re)calculate and Stream
-
-This performs the measurements and the parsing to generate the prebuilt
-React object that will be hydrated on the other end.
 
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
-(defn recalculate-and-stream! [room-id source]
-  (let [raw-events (get-in @!room-events [room-id source])
-        ctx        (get @!layout-context room-id {:width 400 :theme {:font "16px sans-serif" :line-height 22.8} :measured {}})
-        layout     (measurements/apply-layout raw-events (:width ctx) (:theme ctx) (:measured ctx))
-        laid-out   (measurements/strip-layout-metadata (:items layout))
-        ast-nodes  (parsing/build-ast-tree laid-out)
-        clean-ast  (mapv #(select-keys % [:id :bottom :height :worker-data :type :ts :unread?]) ast-nodes)
-        js-ast     (to-array
-                    (map (fn [node]
-                           #js {"id"          (:id node)
-                                "bottom"      (:bottom node)
-                                "height"      (:height node)
-                                "type"        (:type node)
-                                "ts"          (:ts node)
-                                "unread?"     (:unread? node)
-                                "worker-data" (:worker-data node)})
-                         clean-ast))
-        lambda-paths (parsing/extract-lambda-paths js-ast)]
-    (worker/stream!
-     js/self
-     #js {"type"         "timeline-ready"
-          "room-id"      room-id
-          "source"       source
-          "ast-nodes"    js-ast
-          "lambda-paths" lambda-paths}
-     true)))
-
-
-(defn precompile-and-cache-event [e source]
-  (let [eid    (measurements/extract-id e)
-        cached (get @!event-cache eid)]
-    (if (and cached (= (:raw cached) e))
-      cached
-      (let [new-event (parsing/precompile-event-data e source)]
-        (swap! !event-cache assoc eid (assoc new-event :raw e))
-        new-event))))
-
-(defn process-timeline-events [events source]
-  (mapv #(precompile-and-cache-event % source) events))
-
 (worker/register :recalculate-timeline
                  (fn [{:keys [room-id]}]
                    (let [sources (keys (get @!room-events room-id))]
