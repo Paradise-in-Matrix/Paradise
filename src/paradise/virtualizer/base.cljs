@@ -182,6 +182,15 @@
                      (recalculate-and-stream! room-id source)
                      {:status :success})))
 
+(worker/register :recalculate-items
+                 (fn [{:keys [room-id item-ids]}]
+                   (doseq [id item-ids]
+                     (swap! parsing/!ast-node-cache dissoc id)
+                     (swap! parsing/!deferred-component-cache dissoc id))
+                   (doseq [src (keys (get @!room-events room-id))]
+                     (recalculate-and-stream! room-id src))
+                   {:status :success}))
+
 
 (worker/register :eval-virtualizer-plugin
   (fn [{:keys [plugin-id code]}]
