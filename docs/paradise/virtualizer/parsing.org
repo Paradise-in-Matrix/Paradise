@@ -143,6 +143,27 @@ later.
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn expand-hiccup [node]
   (cond
+    (and (map? node) (contains? node :tag))
+    (let [tag     (:tag node)
+          attrs   (:attrs node)
+          content (:content node)
+          kids    (cond
+                    (nil? content) []
+                    (sequential? content) content
+                    :else [content])]
+      (if attrs
+        (expand-hiccup (into [tag attrs] kids))
+        (expand-hiccup (into [tag] kids))))
+
+    (and (vector? node) (string? (first node)) (clojure.string/starts-with? (first node) "comp:"))
+    (let [tag        (first node)
+          has-attrs? (map? (second node))
+          attrs      (if has-attrs? (second node) nil)
+          children   (if has-attrs? (drop 2 node) (drop 1 node))]
+      (if attrs
+        (into [tag attrs] (map expand-hiccup children))
+        (into [tag] (map expand-hiccup children))))
+
     (and (vector? node) (fn? (first node)))
     (let [comp-fn        (first node)
           react-boundary (or (.-$react_boundary comp-fn) (goog.object/get comp-fn "$react_boundary"))
