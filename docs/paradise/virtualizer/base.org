@@ -254,7 +254,7 @@ sure we actually document the behavior and what it is for future discoverers.
                       (finally
                         (reset! !applying-remote-patch? false))))))
 
-          (add-watch !local-db :sync-to-ui
+          (add-watch !local-db :unified-ast-sync
                      (fn [_ _ old-state new-state]
                        (when-not @!applying-remote-patch?
                          (let [edits (e/get-edits (e/diff old-state new-state {:algo :quick}))]
