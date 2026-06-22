@@ -63,6 +63,4 @@
        (when (or is-ui? is-virt?)
          (merge (:namespaces sci-reagent/config)
                 (:namespaces sci-re-frame/config)))
-       (when is-virt?
-         {'re-frame.core re-frame-mock})
        extra-namespaces)})))
