@@ -35,6 +35,7 @@ ingest them all at once.
    [sci.configs.re-frame.re-frame :as sci-re-frame]
    [clojure.string]
    [cljs-workers.core :as main]
+   [cljs-workers.mesh :as mesh]
    [promesa.core]
    ["@capacitor/core" :refer [Capacitor]]
    ["@capacitor/browser" :refer [Browser] :as browser]
