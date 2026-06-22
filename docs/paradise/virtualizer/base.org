@@ -278,6 +278,19 @@ sure we actually document the behavior and what it is for future discoverers.
                               :flush-ts (doto (make-array 1) (aset 0 0))}
                 eve-atom     (ea/->MmapAtom domain-state atom-slot-idx)]
 
+            (add-watch eve-atom :timeline-sync-watch
+                       (fn [_ _ old-state new-state]
+                         (re-frame/clear-subscription-cache!)
+                         (js/setTimeout
+                          (fn []
+                            (let [changed-ids (parsing/check-deferred-components!)]
+                              (when (seq changed-ids)
+                                (swap! parsing/!ast-node-cache #(apply dissoc % changed-ids))
+                                (swap! parsing/!deferred-component-cache #(apply dissoc % changed-ids))
+                                (doseq [r-id (keys @!room-events) src (keys (get @!room-events r-id))]
+                                  (recalculate-and-stream! r-id src)))))
+                          0)))
+
             (db/set-eve-atom! eve-atom)
             (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
             {:status :db-bound-sab}))))))
