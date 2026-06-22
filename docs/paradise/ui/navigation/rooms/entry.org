@@ -861,10 +861,18 @@ need out.
                           [])
           open-menu   (fn [e mx my membership]
                         (when e (.preventDefault e) (.stopPropagation e))
+
                         (re-frame/dispatch
-                         [:context-menu/open
-                          {:x mx :y my
-                           :items (build-room-actions tr id parent-id room-name space? dm? :list membership)}]))]
+                         [:ui/open-context-menu :room-actions
+                          {:x mx
+                           :y my
+                           :room-id room-id
+                           :room-name room-name
+                           :is-space? is-space?
+                           :is-dm? is-dm?
+                           :context :list
+                           :membership membership
+                           :parent-id parent-id}]))]
       (r/as-element
        [room-item {:tr tr
                    :id id
