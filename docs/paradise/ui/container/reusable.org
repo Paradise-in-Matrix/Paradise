@@ -13,7 +13,6 @@ so we'll keep them nicely collected here.
 (ns paradise.ui.container.reusable
   (:require [re-frame.core :as re-frame]
             [paradise.ui.container.timeline.item :refer [event-tile-render]]
-            [paradise.ui.navigation.rooms.entry :refer [build-room-actions]]
             [paradise.shared.utils.svg :as icons]))
 #+end_src
 
