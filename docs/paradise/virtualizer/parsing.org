@@ -188,8 +188,17 @@ to survive the conversion. Closures will poison it.
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn process-props [attrs]
   (let [js-props #js {}
-        process-kv (fn [k-name v]
-                     (let [is-handler? (boolean (re-find #"^on(?:-[a-z]|[A-Z])" k-name))]
+        safe-val (fn sanitize [v]
+                   (cond
+                     (fn? v) (if-let [bound (or (.-$react_boundary v) (goog.object/get v "$react_boundary"))]
+                               bound v)
+                     (map? v) (reduce-kv (fn [m k val] (assoc m k (sanitize val))) {} v)
+                     (vector? v) (mapv sanitize v)
+                     (seq? v) (map sanitize v)
+                     :else v))
+        process-kv (fn [k-name raw-v]
+                     (let [v           (safe-val raw-v)
+                           is-handler? (boolean (re-find #"^on(?:-[a-z]|[A-Z])" k-name))]
                        (cond
                          is-handler?
                          (let [ptr (when (and (some? v) (or (object? v) (fn? v)))
@@ -274,15 +283,18 @@ particularly a thread-traversal compliant POJO.
       (let [tag-kw (first node)
             tag-name (cond
                        (keyword? tag-kw) (name tag-kw)
-                       (string? tag-kw) tag-kw
-                       (object? tag-kw) (or (.-displayName tag-kw) (.-name tag-kw) "unknown-object")
-                       (fn? tag-kw) (if-let [ptr (or (.-$fn_ptr tag-kw) (goog.object/get tag-kw "$fn_ptr"))]
-                                      (str "comp:" (if (keyword? ptr) (subs (str ptr) 1) (str ptr)))
-                                      (or (.-displayName tag-kw) (.-name tag-kw) "unknown-fn"))
+                       (string? tag-kw)  tag-kw
+                       (object? tag-kw)  (or (.-displayName tag-kw) (.-name tag-kw) "unknown-object")
+                       (fn? tag-kw)      (if-let [bound (or (.-$react_boundary tag-kw) (goog.object/get tag-kw "$react_boundary"))]
+                                           bound
+                                           (if-let [ptr (or (.-$fn_ptr tag-kw) (goog.object/get tag-kw "$fn_ptr"))]
+                                             (str "comp:" (if (keyword? ptr) (subs (str ptr) 1) (str ptr)))
+                                             (or (.-displayName tag-kw) (.-name tag-kw) "unknown-fn")))
                        :else "div")
 
             is-comp? (or (and (keyword? tag-kw) (= (namespace tag-kw) "comp"))
                          (and (string? tag-name) (.startsWith tag-name "comp:")))
+
 
             [tag & classes] (if is-comp?
                               [tag-name]
