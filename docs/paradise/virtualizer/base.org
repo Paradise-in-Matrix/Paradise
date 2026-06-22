@@ -286,6 +286,7 @@ sure we actually document the behavior and what it is for future discoverers.
 #+end_src
 
 
+**** Registered Methods
 
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/base.cljs
 (worker/register :recalculate-timeline
@@ -324,10 +325,7 @@ sure we actually document the behavior and what it is for future discoverers.
 (worker/register :eval-virtualizer-plugin
   (fn [{:keys [plugin-id code]}]
       (sci-runner/eval-virtualizer-plugin! plugin-id code)))
-
-
 #+end_src
-
 
 **** Thread Initialization
 
