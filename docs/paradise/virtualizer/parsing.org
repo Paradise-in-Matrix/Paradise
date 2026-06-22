@@ -386,9 +386,6 @@ Doing this extract makes the rehydration algorithmically rather efficient.
 
 **** Render Components AST
 
-***** TODO This should cache. Currently re-renders EVERYTHING
-The caching should also be short-circuit-able so that we can
-intentionally re-render something.
 
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn build-ast-tree [laid-out]
