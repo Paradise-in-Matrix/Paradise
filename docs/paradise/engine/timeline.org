@@ -432,8 +432,7 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
                      (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
                        (try
                          (log/error event-id)
-                         (log/error (.toggleReaction tl (clj->js event-id) emoji))
-                         (<p! (.toggleReaction tl event-id emoji))
+                         (<p! (.toggleReaction tl (clj->js event-id) emoji))
                          {:status :success}
                          (catch :default e {:status :error :msg (str e)}))
                        {:status :error :msg "Timeline not found"}))))
