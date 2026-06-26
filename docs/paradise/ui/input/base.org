@@ -66,10 +66,7 @@ more when I go and add other upload places.
 (re-frame/reg-event-fx
  :sdk/handle-file-drop
  (fn [_ [_ room-id files]]
-   (doseq [raw-file files]
-     (-> (extract-metadata raw-file)
-         (p/then (fn [attachment]
-                   (re-frame/dispatch [:composer/add-attachment room-id attachment])))))
+   (handle-files! room-id files)
    {}))
 #+end_src
 
