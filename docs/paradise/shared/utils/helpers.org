@@ -278,6 +278,39 @@ spot for them to live and be utilized neatly outside of it.
 
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/helpers.cljs
+(defonce !file-registry (atom {}))
+
+(defn register-file! [file]
+  (let [id (str (random-uuid))]
+    (log/info "Registering native File in memory registry. ID:" id "Name:" (.-name file))
+    (swap! !file-registry assoc id file)
+    id))
+
+(defn get-file [id]
+  (let [f (get @!file-registry id)]
+    (log/info "Fetching file from registry. ID:" id "Found? ->" (some? f))
+    f))
+
+(defn unregister-file! [id]
+  (log/info "Unregistering file from memory registry. ID:" id)
+  (swap! !file-registry dissoc id))
+
+(defn file->array-buffer [f]
+  (p/create
+   (fn [resolve-fn reject]
+     (try
+       (if-not f
+         (resolve-fn (js/ArrayBuffer. 0))
+         (if (.-arrayBuffer f)
+           (-> (.arrayBuffer f) (.then resolve-fn) (.catch reject))
+           (let [reader (js/FileReader.)]
+             (set! (.-onload reader) #(resolve-fn (.-result reader)))
+             (set! (.-onerror reader) #(reject (.-error reader)))
+             (.readAsArrayBuffer reader f))))
+       (catch :default e
+         (reject e))))))
+
+
 (defn extract-metadata [raw-file]
   (p/create
    (fn [resolve-fn _]
