@@ -1,9 +1,12 @@
 (ns paradise.ui.input.drafts
   (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
+            [promesa.core :as p]
             [clojure.string :as str]
             [paradise.shared.utils.macros :refer [defui]]
             [paradise.shared.utils.svg :as icons]
+            [paradise.shared.utils.helpers :refer [unregister-file! file->array-buffer register-file! get-file truncate-name extract-metadata]]
+            [cljs.core.async.interop :refer-macros [<p!]]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
             [paradise.shared.client.state :as state]
@@ -66,9 +69,7 @@
 (defui attachment-preview [room-id attachment index]
   [:div.attachment-preview
    (let [{:keys [mimetype mime preview-url filename]} attachment
-         resolved-mime (or mime mimetype "application/octet-stream")
-         _ (log/error attachment)
-         ]
+         resolved-mime (or mime mimetype "application/octet-stream")]
      (cond
        (str/starts-with? resolved-mime "image/")
        [:img.preview-image {:src preview-url}]
@@ -85,13 +86,14 @@
     {:on-click #(re-frame/dispatch [:composer/remove-attachment room-id index])}
     [icons/exit]]])
 
-
 (re-frame/reg-event-fx
  :composer/clear-after-submit
  (fn [{:keys [db]} [_ room-id]]
    (doseq [att (get-in db [:drafts room-id :attachments] [])]
      (when (:preview-url att)
-       (js/URL.revokeObjectURL (:preview-url att))))
+       (js/URL.revokeObjectURL (:preview-url att)))
+     (when (:file-id att)
+       (unregister-file! (:file-id att))))
    {:db (-> db
             (assoc-in [:drafts room-id :attachments] [])
             (assoc-in [:composer room-id] {:text ""
@@ -99,8 +101,6 @@
                                            :loaded-text ""
                                            :uploading? false}))
     :dispatch [:composer/persist-draft room-id]}))
-
-
 
 (re-frame/reg-event-fx
  :composer/persist-draft
@@ -110,14 +110,23 @@
 
      (if-let [pool @state/!engine-pool]
        (go
-         (let [res (<! (main/do-with-pool! pool {:handler :persist-draft
-                                                 :arguments {:room-id room-id
-                                                             :text (or text "")
-                                                             :html (or html "")
-                                                             :attachments attachments}}))]
-           (when (= (:status res) "error")
-             (log/error "Draft Persist failed:" (:msg res)))))
-       (log/error "No engine pool for draft auto-save"))
+         (try
+           (let [worker-atts
+                 (<p! (p/all (map (fn [att]
+                                    (p/let [f (get-file (:file-id att))
+                                            ab (file->array-buffer f)]
+                                      (assoc att :buffer ab)))
+                                  attachments)))
+                 res (<! (main/do-with-pool! pool {:handler :persist-draft
+                                                   :arguments {:room-id room-id
+                                                               :text (or text "")
+                                                               :html (or html "")
+                                                               :attachments worker-atts}}))]
+             (when (= (:status res) "error")
+               (log/error "Persist failed:" (:msg res))))
+           (catch :default e
+             (log/error "Exception in persist-draft:" (str e)))))
+       (log/warn "No engine pool for draft auto-save"))
      {})))
 
 
@@ -158,7 +167,9 @@
  (fn [{:keys [db]} [_ room-id index]]
    (let [attachment (get-in db [:drafts room-id :attachments index])]
      (when (:preview-url attachment)
-       (js/URL.revokeObjectURL (:preview-url attachment))))
+       (js/URL.revokeObjectURL (:preview-url attachment)))
+     (when (:file-id attachment)
+       (unregister-file! (:file-id attachment))))
    {:db (update-in db [:drafts room-id :attachments]
                    (fn [atts] (vec (concat (take index atts) (drop (inc index) atts)))))
     :dispatch [:composer/persist-draft room-id]}))
@@ -184,11 +195,14 @@
          raw-atts   (:attachments draft)
          restored-atts
          (mapv (fn [att]
-                 (let [raw-bytes (js/Uint8Array. (:buffer att))
-                       mime      (or (:mimetype att) (:mime att) "application/octet-stream")
-                       blob      (js/Blob. #js [raw-bytes] #js {:type mime})
-                       url       (js/URL.createObjectURL blob)]
-                   (assoc att :preview-url url :buffer raw-bytes :mimetype mime :mime mime)))
+                 (let [buffer (:buffer att)
+                       mime (or (:mimetype att) (:mime att) "application/octet-stream")
+                       blob (js/Blob. #js [buffer] #js {:type mime})
+                       url  (js/URL.createObjectURL blob)
+                       fid  (register-file! blob)]
+                   (-> att
+                       (assoc :preview-url url :file-id fid :mimetype mime :mime mime)
+                       (dissoc :buffer))))
                raw-atts)]
      {:db (-> db
               (assoc-in [:composer room-id :loaded-text] (or html-text plain-text))
