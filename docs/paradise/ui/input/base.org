@@ -37,8 +37,14 @@ too much detail it is headless, so we can theme and customize it without much fr
 #+end_src
 
 
+**** Handle Files
 
-**** Upload Reframe Event
+Originally, we were going to handle the files via SAB and then use references
+to just use the app-db to move them around... but Android Webview do not
+support Shared Array Buffers.
+I will mention this likely many more times.
+So instead we need to make a clean handling mechanism. It can be polished up
+more when I go and add other upload places.
 
 We'll need a way to generically upload to Matrix for anything from updating avatars, to sticker packs, or to files.
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
