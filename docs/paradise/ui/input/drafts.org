@@ -20,6 +20,7 @@ away.
             [clojure.string :as str]
             [paradise.shared.utils.macros :refer [defui]]
             [paradise.shared.utils.svg :as icons]
+            [paradise.shared.utils.helpers :refer [unregister-file! file->array-buffer register-file! get-file truncate-name extract-metadata]]
             [cljs.core.async.interop :refer-macros [<p!]]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
