@@ -435,8 +435,15 @@ Ideally, we should break this apart more later.
                               (re-frame/dispatch [:composer/on-change active-id text html]))
                   :onSend submit-message!
                   :onFiles (fn [files]
-                             (let [file-array (js/Array.from files)]
-                               (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))
+                             (let [file-array (reduce (fn [acc i]
+                                                        (if-let [f (aget files i)]
+                                                          (conj acc f)
+                                                          acc))
+                                                      []
+                                                      (range (or (.-length files) 0)))]
+                               (when (seq file-array)
+                                 (handle-files! active-id file-array))
+                               ))
                   :placeholder (tr [:composer/placeholder])
                   :onEditorReady #(reset! !editor %)
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
@@ -450,6 +457,7 @@ Ideally, we should break this apart more later.
            [timeline-send-button {:submit-message! submit-message!
                                   :editor @!editor
                                   :attachments attachments}]]]]))))
+
 
 
 #+end_src
