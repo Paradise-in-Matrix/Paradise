@@ -60,48 +60,9 @@ more when I go and add other upload places.
                      (log/error "[Base] Promise Rejection in drop handler metadata:" e)))))))
 #+end_src
 
+***** Re-frame Event
 
-
-
-In order to send images or videos appropriately, we need to ensure we're providing
-the info section. Now while spec doesn't explicitly require this, it does ease
-viewing for other clients. However, even if we don't clients will natively handle
-it.
-Important to note we must do this here as this is when the browser is loading the
-buffer of data so we can actually check the data associated and pass it on.
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
-(defn extract-metadata [raw-file]
-  (p/create
-   (fn [resolve-fn _]
-     (let [mime      (.-type raw-file)
-           is-image? (str/starts-with? mime "image/")
-           is-video? (str/starts-with? mime "video/")
-           reader    (js/FileReader.)]
-       (set! (.-onload reader)
-             (fn [e]
-               (let [buffer      (.. e -target -result)
-                     base-att    {:buffer      buffer
-                                  :mime        mime
-                                  :filename    (.-name raw-file)
-                                  :size        (.-size raw-file)
-                                  :preview-url (js/URL.createObjectURL raw-file)}]
-                 (if (or is-image? is-video?)
-                   (let [el  (if is-image? (js/Image.) (js/document.createElement "video"))
-                         url (js/URL.createObjectURL raw-file)]
-                     (if is-image?
-                       (set! (.-onload el)
-                             (fn []
-                               (js/URL.revokeObjectURL url)
-                               (resolve-fn (assoc base-att :width (.-width el) :height (.-height el)))))
-                       (set! (.-onloadedmetadata el)
-                             (fn []
-                               (js/URL.revokeObjectURL url)
-                               (resolve-fn (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
-                     (set! (.-src el) url))
-                   (resolve-fn base-att)))))
-       (.readAsArrayBuffer reader raw-file)))))
-
-
 (re-frame/reg-event-fx
  :sdk/handle-file-drop
  (fn [_ [_ room-id files]]
