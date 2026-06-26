@@ -312,14 +312,23 @@ For now this is just exploratory.
 
      (if-let [pool @state/!engine-pool]
        (go
-         (let [res (<! (main/do-with-pool! pool {:handler :persist-draft
-                                                 :arguments {:room-id room-id
-                                                             :text (or text "")
-                                                             :html (or html "")
-                                                             :attachments attachments}}))]
-           (when (= (:status res) "error")
-             (log/error "Draft Persist failed:" (:msg res)))))
-       (log/error "No engine pool for draft auto-save"))
+         (try
+           (let [worker-atts
+                 (<p! (p/all (map (fn [att]
+                                    (p/let [f (get-file (:file-id att))
+                                            ab (file->array-buffer f)]
+                                      (assoc att :buffer ab)))
+                                  attachments)))
+                 res (<! (main/do-with-pool! pool {:handler :persist-draft
+                                                   :arguments {:room-id room-id
+                                                               :text (or text "")
+                                                               :html (or html "")
+                                                               :attachments worker-atts}}))]
+             (when (= (:status res) "error")
+               (log/error "Persist failed:" (:msg res))))
+           (catch :default e
+             (log/error "Exception in persist-draft:" (str e)))))
+       (log/warn "No engine pool for draft auto-save"))
      {})))
 
 
