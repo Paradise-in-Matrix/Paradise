@@ -71,6 +71,31 @@ more when I go and add other upload places.
 #+end_src
 
 
+**** Upload Reframe Event
+
+We'll need a way to generically upload to Matrix for anything from updating avatars, to sticker packs, or to files.
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
+(re-frame/reg-event-fx
+ :sdk/upload-media
+ (fn [{:keys [db]} [_ file on-success-event]]
+   (if file
+     (let [mime (.-type file)]
+       (if-let [pool @state/!engine-pool]
+         (go
+           (try
+             (let [ab  (<p! (file->array-buffer file))
+                   res (<! (main/do-with-pool! pool {:handler :upload-media
+                                                     :arguments {:mime mime :buffer ab}}))]
+               (if (= (:status res) "success")
+                 (do
+                   (re-frame/dispatch (conj on-success-event (:url res))))
+                 (log/error "Worker upload failed:" (:msg res))))
+             (catch :default e
+               (log/error "Exception generating arrayBuffer or worker:" (str e)))))
+         (log/error "No engine pool for upload"))
+       {:db (assoc db :uploading-files? true)})
+     (do (log/warn "Missing file for upload") {}))))
+#+end_src
 
 
 **** Message Submit
