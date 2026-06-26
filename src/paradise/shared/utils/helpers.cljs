@@ -218,43 +218,83 @@
         (assoc :raw e))))
 
 
+(defonce !file-registry (atom {}))
+
+(defn register-file! [file]
+  (let [id (str (random-uuid))]
+    (log/info "Registering native File in memory registry. ID:" id "Name:" (.-name file))
+    (swap! !file-registry assoc id file)
+    id))
+
+(defn get-file [id]
+  (let [f (get @!file-registry id)]
+    (log/info "Fetching file from registry. ID:" id "Found? ->" (some? f))
+    f))
+
+(defn unregister-file! [id]
+  (log/info "Unregistering file from memory registry. ID:" id)
+  (swap! !file-registry dissoc id))
+
+(defn file->array-buffer [f]
+  (p/create
+   (fn [resolve-fn reject]
+     (try
+       (if-not f
+         (resolve-fn (js/ArrayBuffer. 0))
+         (if (.-arrayBuffer f)
+           (-> (.arrayBuffer f) (.then resolve-fn) (.catch reject))
+           (let [reader (js/FileReader.)]
+             (set! (.-onload reader) #(resolve-fn (.-result reader)))
+             (set! (.-onerror reader) #(reject (.-error reader)))
+             (.readAsArrayBuffer reader f))))
+       (catch :default e
+         (reject e))))))
+
+
 (defn extract-metadata [raw-file]
   (p/create
    (fn [resolve-fn _]
-     (let [mime      (.-type raw-file)
-           is-image? (str/starts-with? mime "image/")
-           is-video? (str/starts-with? mime "video/")
-           reader    (js/FileReader.)
-           att-id    (str (random-uuid))]
-       (set! (.-onload reader)
-             (fn [e]
-               (let [raw-ab    (.. e -target -result)
-                     ab-size   (.-byteLength raw-ab)
-                     sab       (mesh/register-buffer! att-id ab-size)
-                     sab-view  (js/Uint8Array. sab)
-                     temp-view (js/Uint8Array. raw-ab)
-                     _         (.set sab-view temp-view)
-                     base-att  {:id          att-id
-                                :buffer      {:mesh/buffer-id att-id}
-                                :mime        mime
-                                :filename    (.-name raw-file)
-                                :size        (.-size raw-file)
-                                :preview-url (js/URL.createObjectURL raw-file)}]
-                 (if (or is-image? is-video?)
-                   (let [el  (if is-image? (js/Image.) (js/document.createElement "video"))
-                         url (js/URL.createObjectURL raw-file)]
-                     (if is-image?
-                       (set! (.-onload el)
-                             (fn []
-                               (js/URL.revokeObjectURL url)
-                               (resolve-fn (assoc base-att :width (.-width el) :height (.-height el)))))
-                       (set! (.-onloadedmetadata el)
-                             (fn []
-                               (js/URL.revokeObjectURL url)
-                               (resolve-fn (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
-                     (set! (.-src el) url))
-                   (resolve-fn base-att)))))
-       (.readAsArrayBuffer reader raw-file)))))
+     (try
+       (if-not raw-file
+         (do
+           (log/warn "Extract-metadata received an empty or undefined file object. Bailing.")
+           (resolve-fn nil))
+         (let [mime      (or (.-type raw-file) "application/octet-stream")
+               filename  (or (.-name raw-file) (str "upload-" (random-uuid)))
+               size      (or (.-size raw-file) 0)
+               is-image? (str/starts-with? mime "image/")
+               is-video? (str/starts-with? mime "video/")]
+           (log/info "Safe extract-metadata -> Name:" filename "Mime:" mime "Size:" size)
+           (let [fid       (register-file! raw-file)
+                 preview   (try (js/URL.createObjectURL raw-file)
+                                (catch :default e
+                                  (log/warn "Failed to create object URL" e)
+                                  nil))
+                 base-att  {:file-id     fid
+                            :mime        mime
+                            :filename    filename
+                            :size        size
+                            :preview-url preview}]
+             (if (and preview (or is-image? is-video?))
+               (let [el (if is-image? (js/Image.) (js/document.createElement "video"))]
+                 (set! (.-onerror el)
+                       (fn [e]
+                         (log/warn "Failed to load media to extract dimensions." e)
+                         (resolve-fn base-att)))
+                 (if is-image?
+                   (set! (.-onload el)
+                         (fn []
+                           (resolve-fn (assoc base-att :width (.-width el) :height (.-height el)))))
+                   (do
+                     (set! (.-preload el) "metadata")
+                     (set! (.-onloadedmetadata el)
+                           (fn []
+                             (resolve-fn (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el)))))))
+                 (set! (.-src el) preview))
+               (resolve-fn base-att)))))
+       (catch :default e
+         (log/error "Catastrophic error in extract-metadata:" e)
+         (resolve-fn nil))))))
 
 (defonce relative-formatter
   (js/Intl.RelativeTimeFormat. js/undefined #js {:numeric "auto"}))
