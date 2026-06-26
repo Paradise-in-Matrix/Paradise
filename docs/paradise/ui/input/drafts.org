@@ -16,9 +16,11 @@ away.
 (ns paradise.ui.input.drafts
   (:require [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
+            [promesa.core :as p]
             [clojure.string :as str]
             [paradise.shared.utils.macros :refer [defui]]
             [paradise.shared.utils.svg :as icons]
+            [cljs.core.async.interop :refer-macros [<p!]]
             [cljs.core.async :refer [go <!]]
             [cljs-workers.core :as main]
             [paradise.shared.client.state :as state]
