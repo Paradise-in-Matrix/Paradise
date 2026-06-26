@@ -188,6 +188,26 @@ It makes it easy to add new ones though.
 https://tiptap.dev/docs/editor/core-concepts/extensions
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/composer.cljs
+(defn safe-extract-files [event]
+  (let [dt (.-dataTransfer event)
+        cd (.-clipboardData event)
+        source (or dt cd)
+        arr (js/Array.)]
+    (when source
+      (let [files (.-files source)
+            items (.-items source)]
+        (if (and items (pos? (.-length items)))
+          (doseq [i (range (.-length items))]
+            (let [item (aget items i)]
+              (when (= (.-kind item) "file")
+                (when-let [f (.getAsFile item)]
+                  (.push arr f)))))
+          (when (and files (pos? (.-length files)))
+            (doseq [i (range (.-length files))]
+              (when-let [f (aget files i)]
+                (.push arr f)))))))
+    arr))
+
 (def file-drop-extension
   (.create Extension
     #js {:name "fileDropHandler"
