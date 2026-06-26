@@ -5,6 +5,7 @@
      [paradise.shared.utils.macros :refer [defui]]
      [paradise.ui.input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
      ["react" :as react]
+     [taoensso.timbre :as log]
      [reagent.core :as r]
      ["@tiptap/react" :refer [useEditor EditorContent ReactNodeViewRenderer NodeViewWrapper]]
      ["@tiptap/starter-kit" :default StarterKit]
@@ -136,6 +137,26 @@
                                                                (.getAttribute node "title"))})}])
         :renderHTML renderHtml}))
 
+(defn safe-extract-files [event]
+  (let [dt (.-dataTransfer event)
+        cd (.-clipboardData event)
+        source (or dt cd)
+        arr (js/Array.)]
+    (when source
+      (let [files (.-files source)
+            items (.-items source)]
+        (if (and items (pos? (.-length items)))
+          (doseq [i (range (.-length items))]
+            (let [item (aget items i)]
+              (when (= (.-kind item) "file")
+                (when-let [f (.getAsFile item)]
+                  (.push arr f)))))
+          (when (and files (pos? (.-length files)))
+            (doseq [i (range (.-length files))]
+              (when-let [f (aget files i)]
+                (.push arr f)))))))
+    arr))
+
 (def file-drop-extension
   (.create Extension
     #js {:name "fileDropHandler"
@@ -147,25 +168,31 @@
                        #js {:key (new PluginKey "fileDropHandler")
                             :props #js {:handleDOMEvents
                                         #js {:drop (fn [view event]
-                                                     (let [dt (.-dataTransfer event)
-                                                           files (when dt (.-files dt))]
-                                                       (if (and files (pos? (.-length files)))
-                                                         (do
-                                                           (.preventDefault event)
-                                                           (when-let [on-files (.. this -options -onFiles)]
-                                                             (on-files files))
-                                                           true)
+                                                     (try
+                                                       (let [files (safe-extract-files event)]
+                                                         (if (pos? (.-length files))
+                                                           (do
+                                                             (.preventDefault event)
+                                                             (when-let [on-files (.. this -options -onFiles)]
+                                                               (on-files files))
+                                                             true)
+                                                           false))
+                                                       (catch :default e
+                                                         (log/error "Error processing drop event:" e)
                                                          false)))
                                              :paste (fn [view event]
-                                                      (let [cd (.-clipboardData event)
-                                                            files (when cd (.-files cd))]
-                                                        (if (and files (pos? (.-length files)))
-                                                          (do
-                                                            (.preventDefault event)
-                                                            (.focus view)
-                                                            (when-let [on-files (.. this -options -onFiles)]
-                                                              (on-files files))
-                                                            true)
+                                                      (try
+                                                        (let [files (safe-extract-files event)]
+                                                          (if (pos? (.-length files))
+                                                            (do
+                                                              (.preventDefault event)
+                                                              (.focus view)
+                                                              (when-let [on-files (.. this -options -onFiles)]
+                                                                (on-files files))
+                                                              true)
+                                                            false))
+                                                        (catch :default e
+                                                          (log/error "Error processing paste event:" e)
                                                           false)))}}})]))}))
 
 (def submit-extension
