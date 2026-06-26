@@ -295,7 +295,9 @@ For now this is just exploratory.
  (fn [{:keys [db]} [_ room-id]]
    (doseq [att (get-in db [:drafts room-id :attachments] [])]
      (when (:preview-url att)
-       (js/URL.revokeObjectURL (:preview-url att))))
+       (js/URL.revokeObjectURL (:preview-url att)))
+     (when (:file-id att)
+       (unregister-file! (:file-id att))))
    {:db (-> db
             (assoc-in [:drafts room-id :attachments] [])
             (assoc-in [:composer room-id] {:text ""
@@ -369,7 +371,9 @@ For now this is just exploratory.
  (fn [{:keys [db]} [_ room-id index]]
    (let [attachment (get-in db [:drafts room-id :attachments index])]
      (when (:preview-url attachment)
-       (js/URL.revokeObjectURL (:preview-url attachment))))
+       (js/URL.revokeObjectURL (:preview-url attachment)))
+     (when (:file-id attachment)
+       (unregister-file! (:file-id attachment))))
    {:db (update-in db [:drafts room-id :attachments]
                    (fn [atts] (vec (concat (take index atts) (drop (inc index) atts)))))
     :dispatch [:composer/persist-draft room-id]}))
@@ -395,11 +399,14 @@ For now this is just exploratory.
          raw-atts   (:attachments draft)
          restored-atts
          (mapv (fn [att]
-                 (let [raw-bytes (js/Uint8Array. (:buffer att))
-                       mime      (or (:mimetype att) (:mime att) "application/octet-stream")
-                       blob      (js/Blob. #js [raw-bytes] #js {:type mime})
-                       url       (js/URL.createObjectURL blob)]
-                   (assoc att :preview-url url :buffer raw-bytes :mimetype mime :mime mime)))
+                 (let [buffer (:buffer att)
+                       mime (or (:mimetype att) (:mime att) "application/octet-stream")
+                       blob (js/Blob. #js [buffer] #js {:type mime})
+                       url  (js/URL.createObjectURL blob)
+                       fid  (register-file! blob)]
+                   (-> att
+                       (assoc :preview-url url :file-id fid :mimetype mime :mime mime)
+                       (dissoc :buffer))))
                raw-atts)]
      {:db (-> db
               (assoc-in [:composer room-id :loaded-text] (or html-text plain-text))
