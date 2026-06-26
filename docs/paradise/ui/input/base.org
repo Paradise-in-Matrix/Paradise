@@ -414,10 +414,15 @@ Ideally, we should break this apart more later.
                      :multiple true
                      :style {:display "none"}
                      :on-change (fn [e]
-                                  (let [files      (.. e -target -files)
-                                        file-array (js/Array.from files)]
+                                  (let [files (.. e -target -files)
+                                        file-array (reduce (fn [acc i]
+                                                             (if-let [f (aget files i)]
+                                                               (conj acc f)
+                                                               acc))
+                                                           []
+                                                           (range (or (.-length files) 0)))]
                                     (when (seq file-array)
-                                      (re-frame/dispatch [:sdk/handle-file-drop active-id file-array]))
+                                      (handle-files! active-id file-array))
                                     (set! (.-value (.-target e)) "")))}]
             [icons/plus]]
            [:div.timeline-editor-container
