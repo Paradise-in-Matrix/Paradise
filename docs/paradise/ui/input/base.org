@@ -16,6 +16,7 @@ too much detail it is headless, so we can theme and customize it without much fr
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 (ns paradise.ui.input.base
   (:require [promesa.core :as p]
+            [cljs.core.async.interop :refer-macros [<p!]]
             [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
@@ -26,7 +27,7 @@ too much detail it is headless, so we can theme and customize it without much fr
             [paradise.ui.global :refer [request-item-redraw! !active-popover]]
             [reagent.core :as r]
             [paradise.media.component :refer [mxc->url]]
-            [paradise.shared.utils.helpers :refer [truncate-name]]
+            [paradise.shared.utils.helpers :refer [unregister-file! file->array-buffer register-file! get-file truncate-name extract-metadata]]
             [paradise.shared.utils.svg :as icons]
             [paradise.shared.utils.macros :refer [defui]]
             [cljs.core.async :refer [go <!]]
