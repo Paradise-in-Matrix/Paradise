@@ -201,9 +201,7 @@ For now this is just exploratory.
 (defui attachment-preview [room-id attachment index]
   [:div.attachment-preview
    (let [{:keys [mimetype mime preview-url filename]} attachment
-         resolved-mime (or mime mimetype "application/octet-stream")
-         _ (log/error attachment)
-         ]
+         resolved-mime (or mime mimetype "application/octet-stream")]
      (cond
        (str/starts-with? resolved-mime "image/")
        [:img.preview-image {:src preview-url}]
