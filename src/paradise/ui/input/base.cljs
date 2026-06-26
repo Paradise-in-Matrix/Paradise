@@ -1,5 +1,6 @@
 (ns paradise.ui.input.base
   (:require [promesa.core :as p]
+            [cljs.core.async.interop :refer-macros [<p!]]
             [re-frame.core :as re-frame]
             [taoensso.timbre :as log]
             [clojure.string :as str]
@@ -10,7 +11,7 @@
             [paradise.ui.global :refer [request-item-redraw! !active-popover]]
             [reagent.core :as r]
             [paradise.media.component :refer [mxc->url]]
-            [paradise.shared.utils.helpers :refer [truncate-name]]
+            [paradise.shared.utils.helpers :refer [unregister-file! file->array-buffer register-file! get-file truncate-name extract-metadata]]
             [paradise.shared.utils.svg :as icons]
             [paradise.shared.utils.macros :refer [defui]]
             [cljs.core.async :refer [go <!]]
@@ -18,69 +19,42 @@
             [paradise.shared.client.state :as state]
             [paradise.shared.plugins :as plugins]))
 
-(re-frame/reg-event-fx
- :sdk/upload-media
- (fn [_ [_ file on-success-event]]
-   (let [reader (js/FileReader.)]
-     (if file
-       (do
-         (set! (.-onload reader)
-               (fn [e]
-                 (let [buffer (.. e -target -result)
-                       mime   (.-type file)]
-                   (if-let [pool @state/!engine-pool]
-                     (go
-                       (let [res (<! (main/do-with-pool! pool {:handler :upload-media
-                                                               :arguments {:mime mime :buffer buffer}}))]
-                         (if (= (:status res) "success")
-                           (re-frame/dispatch (conj on-success-event (:url res)))
-                           (log/error "Upload failed:" (:msg res)))))
-                     (log/error "No engine pool for upload")))))
-         (.readAsArrayBuffer reader file)
-         {:db (assoc (re-frame/db) :uploading-files? true)})
-       (do (log/warn "Missing file for upload") {})))))
-
-(defn extract-metadata [raw-file]
-  (p/create
-   (fn [resolve-fn _]
-     (let [mime      (.-type raw-file)
-           is-image? (str/starts-with? mime "image/")
-           is-video? (str/starts-with? mime "video/")
-           reader    (js/FileReader.)]
-       (set! (.-onload reader)
-             (fn [e]
-               (let [buffer      (.. e -target -result)
-                     base-att    {:buffer      buffer
-                                  :mime        mime
-                                  :filename    (.-name raw-file)
-                                  :size        (.-size raw-file)
-                                  :preview-url (js/URL.createObjectURL raw-file)}]
-                 (if (or is-image? is-video?)
-                   (let [el  (if is-image? (js/Image.) (js/document.createElement "video"))
-                         url (js/URL.createObjectURL raw-file)]
-                     (if is-image?
-                       (set! (.-onload el)
-                             (fn []
-                               (js/URL.revokeObjectURL url)
-                               (resolve-fn (assoc base-att :width (.-width el) :height (.-height el)))))
-                       (set! (.-onloadedmetadata el)
-                             (fn []
-                               (js/URL.revokeObjectURL url)
-                               (resolve-fn (assoc base-att :width (.-videoWidth el) :height (.-videoHeight el))))))
-                     (set! (.-src el) url))
-                   (resolve-fn base-att)))))
-       (.readAsArrayBuffer reader raw-file)))))
-
+(defn handle-files! [room-id files]
+  (doseq [raw-file files]
+    (when raw-file
+      (-> (extract-metadata raw-file)
+          (p/then (fn [attachment]
+                    (when attachment
+                      (re-frame/dispatch [:composer/add-attachment room-id attachment]))))
+          (p/catch (fn [e]
+                     (log/error "Promise Rejection in drop handler metadata:" e)))))))
 
 (re-frame/reg-event-fx
  :sdk/handle-file-drop
  (fn [_ [_ room-id files]]
-   (doseq [raw-file files]
-     (-> (extract-metadata raw-file)
-         (p/then (fn [attachment]
-                   (re-frame/dispatch [:composer/add-attachment room-id attachment])))))
+   (handle-files! room-id files)
    {}))
 
+(re-frame/reg-event-fx
+ :sdk/upload-media
+ (fn [{:keys [db]} [_ file on-success-event]]
+   (if file
+     (let [mime (.-type file)]
+       (if-let [pool @state/!engine-pool]
+         (go
+           (try
+             (let [ab  (<p! (file->array-buffer file))
+                   res (<! (main/do-with-pool! pool {:handler :upload-media
+                                                     :arguments {:mime mime :buffer ab}}))]
+               (if (= (:status res) "success")
+                 (do
+                   (re-frame/dispatch (conj on-success-event (:url res))))
+                 (log/error "Worker upload failed:" (:msg res))))
+             (catch :default e
+               (log/error "Exception generating arrayBuffer or worker:" (str e)))))
+         (log/error "No engine pool for upload"))
+       {:db (assoc db :uploading-files? true)})
+     (do (log/warn "Missing file for upload") {}))))
 
 
 (re-frame/reg-event-fx
@@ -94,33 +68,48 @@
                            :msg-tag     (get-in raw-context [:target :content :inner :tag])
                            :ffi-content (get-in raw-context [:target :content :inner :content :ffi-content])})
          pool        @state/!engine-pool]
+
      (if (seq attachments)
        (go
-         (let [res (<! (main/do-with-pool! pool {:handler :send-attachments
-                                                 :arguments {:room-id room-id
-                                                             :attachments attachments
-                                                             :text text
-                                                             :html html}}))]
-           (when-not (#{"success" :success} (:status res))
-             (log/error "Failed to send attachments:" (:msg res)))))
-       (go
-         (let [res (<! (main/do-with-pool! pool {:handler :send-message
-                                                 :arguments {:room-id room-id
+         (try
+           (let [worker-atts
+                 (<p! (p/all (map (fn [att]
+                                    (p/let [f (get-file (:file-id att))
+                                            ab (if f (file->array-buffer f) (js/Promise.resolve (js/ArrayBuffer. 0)))]
+                                      (assoc att :buffer ab)))
+                                  attachments)))]
+             (doseq [att attachments]
+               (when (:preview-url att) (js/URL.revokeObjectURL (:preview-url att)))
+               (when (:file-id att) (unregister-file! (:file-id att))))
+             (let [res (<! (main/do-with-pool! pool {:handler :send-attachments
+                                                     :arguments {:room-id room-id
+                                                                 :attachments worker-atts
                                                                  :text text
-                                                                 :html html
-                                                                 :context worker-context}}))]
-           (when-not (#{"success" :success} (:status res))
-             (log/error "Failed to send message:" (:msg res))))))
-
-     (doseq [att attachments]
-       (when (:preview-url att)
-         (js/URL.revokeObjectURL (:preview-url att))))
+                                                                 :html html}}))]
+               (when-not (#{"success" :success} (:status res))
+                 (log/error "Failed to send attachments:" (:msg res)))))
+           (catch :default e
+             (log/error "Exception in send-attachments Go block:" (str e)))))
+       (go
+         (try
+           (log/info "Dispatching standard :send-message to worker...")
+           (let [res (<! (main/do-with-pool! pool {:handler :send-message
+                                                   :arguments {:room-id room-id
+                                                               :text text
+                                                               :html html
+                                                               :context worker-context}}))]
+             (log/info "Worker :send-message returned:" res)
+             (when-not (#{"success" :success} (:status res))
+               (log/error "Failed to send message:" (:msg res))))
+           (catch :default e
+             (log/error "Exception in send-message Go block:" (str e))))))
 
      {:db (-> db
               (assoc-in [:composer room-id] {:text "" :html "" :loaded-text "" :uploading? false})
               (assoc-in [:drafts room-id :attachments] [])
               (update :input-context dissoc room-id))
       :dispatch [:composer/persist-draft room-id]})))
+
 
 (re-frame/reg-event-fx
  :sdk/send-sticker
@@ -285,8 +274,7 @@
                                           :attrs #js {:shortcode shortcode
                                                       :src (mxc->url url)
                                                       :mxc url}})
-                     .run))
-               )}])
+                     .run)))}])
          (when (and context (= (:mode context) :reply))
            (let [sender-name (truncate-name (-> context :target :sender-name) 32)]
              [:div.input-context-banner
@@ -318,10 +306,15 @@
                      :multiple true
                      :style {:display "none"}
                      :on-change (fn [e]
-                                  (let [files      (.. e -target -files)
-                                        file-array (js/Array.from files)]
+                                  (let [files (.. e -target -files)
+                                        file-array (reduce (fn [acc i]
+                                                             (if-let [f (aget files i)]
+                                                               (conj acc f)
+                                                               acc))
+                                                           []
+                                                           (range (or (.-length files) 0)))]
                                     (when (seq file-array)
-                                      (re-frame/dispatch [:sdk/handle-file-drop active-id file-array]))
+                                      (handle-files! active-id file-array))
                                     (set! (.-value (.-target e)) "")))}]
             [icons/plus]]
            [:div.timeline-editor-container
@@ -334,8 +327,15 @@
                               (re-frame/dispatch [:composer/on-change active-id text html]))
                   :onSend submit-message!
                   :onFiles (fn [files]
-                             (let [file-array (js/Array.from files)]
-                               (re-frame/dispatch [:sdk/handle-file-drop active-id file-array])))
+                             (let [file-array (reduce (fn [acc i]
+                                                        (if-let [f (aget files i)]
+                                                          (conj acc f)
+                                                          acc))
+                                                      []
+                                                      (range (or (.-length files) 0)))]
+                               (when (seq file-array)
+                                 (handle-files! active-id file-array))
+                               ))
                   :placeholder (tr [:composer/placeholder])
                   :onEditorReady #(reset! !editor %)
                   :onSuggestionStart (fn [cmd] (reset! !sug-command cmd))
@@ -349,4 +349,5 @@
            [timeline-send-button {:submit-message! submit-message!
                                   :editor @!editor
                                   :attachments attachments}]]]]))))
+
 
