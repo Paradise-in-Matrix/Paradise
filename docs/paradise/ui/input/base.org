@@ -101,7 +101,6 @@ We'll need a way to generically upload to Matrix for anything from updating avat
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 
-
 (re-frame/reg-event-fx
  :composer/submit
  (fn [{:keys [db]} [_ room-id text html]]
@@ -113,27 +112,41 @@ We'll need a way to generically upload to Matrix for anything from updating avat
                            :msg-tag     (get-in raw-context [:target :content :inner :tag])
                            :ffi-content (get-in raw-context [:target :content :inner :content :ffi-content])})
          pool        @state/!engine-pool]
+
      (if (seq attachments)
        (go
-         (let [res (<! (main/do-with-pool! pool {:handler :send-attachments
-                                                 :arguments {:room-id room-id
-                                                             :attachments attachments
-                                                             :text text
-                                                             :html html}}))]
-           (when-not (#{"success" :success} (:status res))
-             (log/error "Failed to send attachments:" (:msg res)))))
-       (go
-         (let [res (<! (main/do-with-pool! pool {:handler :send-message
-                                                 :arguments {:room-id room-id
+         (try
+           (let [worker-atts
+                 (<p! (p/all (map (fn [att]
+                                    (p/let [f (get-file (:file-id att))
+                                            ab (if f (file->array-buffer f) (js/Promise.resolve (js/ArrayBuffer. 0)))]
+                                      (assoc att :buffer ab)))
+                                  attachments)))]
+             (doseq [att attachments]
+               (when (:preview-url att) (js/URL.revokeObjectURL (:preview-url att)))
+               (when (:file-id att) (unregister-file! (:file-id att))))
+             (let [res (<! (main/do-with-pool! pool {:handler :send-attachments
+                                                     :arguments {:room-id room-id
+                                                                 :attachments worker-atts
                                                                  :text text
-                                                                 :html html
-                                                                 :context worker-context}}))]
-           (when-not (#{"success" :success} (:status res))
-             (log/error "Failed to send message:" (:msg res))))))
-
-     (doseq [att attachments]
-       (when (:preview-url att)
-         (js/URL.revokeObjectURL (:preview-url att))))
+                                                                 :html html}}))]
+               (when-not (#{"success" :success} (:status res))
+                 (log/error "Failed to send attachments:" (:msg res)))))
+           (catch :default e
+             (log/error "Exception in send-attachments Go block:" (str e)))))
+       (go
+         (try
+           (log/info "Dispatching standard :send-message to worker...")
+           (let [res (<! (main/do-with-pool! pool {:handler :send-message
+                                                   :arguments {:room-id room-id
+                                                               :text text
+                                                               :html html
+                                                               :context worker-context}}))]
+             (log/info "Worker :send-message returned:" res)
+             (when-not (#{"success" :success} (:status res))
+               (log/error "Failed to send message:" (:msg res))))
+           (catch :default e
+             (log/error "Exception in send-message Go block:" (str e))))))
 
      {:db (-> db
               (assoc-in [:composer room-id] {:text "" :html "" :loaded-text "" :uploading? false})
