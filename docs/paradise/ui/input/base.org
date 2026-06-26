@@ -153,6 +153,7 @@ We'll need a way to generically upload to Matrix for anything from updating avat
               (assoc-in [:drafts room-id :attachments] [])
               (update :input-context dissoc room-id))
       :dispatch [:composer/persist-draft room-id]})))
+
 #+end_src
 
 
@@ -381,8 +382,7 @@ Ideally, we should break this apart more later.
                                           :attrs #js {:shortcode shortcode
                                                       :src (mxc->url url)
                                                       :mxc url}})
-                     .run))
-               )}])
+                     .run)))}])
          (when (and context (= (:mode context) :reply))
            (let [sender-name (truncate-name (-> context :target :sender-name) 32)]
              [:div.input-context-banner
