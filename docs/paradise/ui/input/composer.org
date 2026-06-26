@@ -219,25 +219,31 @@ https://tiptap.dev/docs/editor/core-concepts/extensions
                        #js {:key (new PluginKey "fileDropHandler")
                             :props #js {:handleDOMEvents
                                         #js {:drop (fn [view event]
-                                                     (let [dt (.-dataTransfer event)
-                                                           files (when dt (.-files dt))]
-                                                       (if (and files (pos? (.-length files)))
-                                                         (do
-                                                           (.preventDefault event)
-                                                           (when-let [on-files (.. this -options -onFiles)]
-                                                             (on-files files))
-                                                           true)
+                                                     (try
+                                                       (let [files (safe-extract-files event)]
+                                                         (if (pos? (.-length files))
+                                                           (do
+                                                             (.preventDefault event)
+                                                             (when-let [on-files (.. this -options -onFiles)]
+                                                               (on-files files))
+                                                             true)
+                                                           false))
+                                                       (catch :default e
+                                                         (log/error "Error processing drop event:" e)
                                                          false)))
                                              :paste (fn [view event]
-                                                      (let [cd (.-clipboardData event)
-                                                            files (when cd (.-files cd))]
-                                                        (if (and files (pos? (.-length files)))
-                                                          (do
-                                                            (.preventDefault event)
-                                                            (.focus view)
-                                                            (when-let [on-files (.. this -options -onFiles)]
-                                                              (on-files files))
-                                                            true)
+                                                      (try
+                                                        (let [files (safe-extract-files event)]
+                                                          (if (pos? (.-length files))
+                                                            (do
+                                                              (.preventDefault event)
+                                                              (.focus view)
+                                                              (when-let [on-files (.. this -options -onFiles)]
+                                                                (on-files files))
+                                                              true)
+                                                            false))
+                                                        (catch :default e
+                                                          (log/error "Error processing paste event:" e)
                                                           false)))}}})]))}))
 #+end_src
 
