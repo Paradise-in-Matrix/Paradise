@@ -48,16 +48,14 @@ more when I go and add other upload places.
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/base.cljs
 (defn handle-files! [room-id files]
-  (log/info "[Base] Handling file drop. Total files passed:" (count files))
   (doseq [raw-file files]
     (when raw-file
       (-> (extract-metadata raw-file)
           (p/then (fn [attachment]
                     (when attachment
-                      (log/info "[Base] Extracted metadata completed. Adding attachment...")
                       (re-frame/dispatch [:composer/add-attachment room-id attachment]))))
           (p/catch (fn [e]
-                     (log/error "[Base] Promise Rejection in drop handler metadata:" e)))))))
+                     (log/error "Promise Rejection in drop handler metadata:" e)))))))
 #+end_src
 
 ***** Re-frame Event
