@@ -262,6 +262,20 @@ of approaches for passing the SAB were written...
 For now, we'll make sure the coercions are obvious
 
 
+The following note was from before we moved this code:
+
+In order to send images or videos appropriately, we need to ensure we're providing
+the info section. Now while spec doesn't explicitly require this, it does ease
+viewing for other clients. However, even if we don't clients will natively handle
+it.
+Important to note we must do this here as this is when the browser is loading the
+buffer of data so we can actually check the data associated and pass it on.
+
+***** Attachment/File Registry
+Buffers don't play well with being in the app-db, so we need to create a
+spot for them to live and be utilized neatly outside of it.
+
+
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/utils/helpers.cljs
 (defn extract-metadata [raw-file]
