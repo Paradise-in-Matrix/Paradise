@@ -14,11 +14,17 @@
     (go
       (try
         (if-let [client @state/!client]
-          (let [mxc-url (<p! (.uploadMedia client mime buffer js/undefined))]
+          (let [bytes   (js/Uint8Array. buffer)
+                mxc-url (<p! (.uploadMedia client mime bytes js/undefined))]
             {:status :success :url mxc-url})
-          {:status :error :msg "No active client"})
+          (do
+            (js/console.error "Failed - No active client")
+            {:status :error :msg "No active client"}))
         (catch :default e
+          (js/console.error "Caught exception:" e)
           {:status :error :msg (str e)})))))
+
+
 
 (worker/register :send-message
   (fn [{:keys [room-id text html context]}]
@@ -67,27 +73,29 @@
         (if-let [timeline (get-in @!active-timelines [room-id :live :timeline])]
           (let [total (count attachments)]
             (loop [idx 0]
-              (when (< idx total)
-                (let [att      (nth attachments idx)
-                      mime     (or (:mime att) "application/octet-stream")
-                      is-last? (= idx (dec total))
-                      source   (.new (.-Data UploadSource) #js {:bytes (:buffer att) :filename (:filename att)})
-                      raw-size (:size att)
+              (if (< idx total)
+                (let [att       (nth attachments idx)
+                      mime      (or (:mime att) "application/octet-stream")
+                      is-last?  (= idx (dec total))
+                      ab        (:buffer att)
+                      bytes     (js/Uint8Array. ab)
+                      source    (.new (.-Data UploadSource) #js {:bytes bytes :filename (:filename att)})
+                      raw-size  (:size att)
                       safe-size (if (and raw-size (not (undefined? raw-size)))
                                   (js/BigInt (js/Math.round raw-size))
                                   js/undefined)
-                      info     #js {:mimetype mime
-                                    :size safe-size
-                                    :thumbnailInfo js/undefined
-                                    :thumbnailSource js/undefined}
-                      caption  (if is-last? (or text js/undefined) (:filename att))
-                      format   (if (and is-last? (not (str/blank? html)))
-                                 #js {:format (.new (.-Html MessageFormat)) :body html}
-                                 js/undefined)
-                      params   (.create UploadParameters
-                                        #js {:source source
-                                             :caption (or caption js/undefined)
-                                             :formattedCaption (or format js/undefined)})]
+                      info      #js {:mimetype mime
+                                     :size safe-size
+                                     :thumbnailInfo js/undefined
+                                     :thumbnailSource js/undefined}
+                      caption   (if is-last? (or text js/undefined) (:filename att))
+                      format    (if (and is-last? (not (str/blank? html)))
+                                  #js {:format (.new (.-Html MessageFormat)) :body html}
+                                  js/undefined)
+                      params    (.create UploadParameters
+                                         #js {:source source
+                                              :caption (or caption js/undefined)
+                                              :formattedCaption (or format js/undefined)})]
                   (.sendFile timeline params info)
                   (<p! (p/delay 100))
                   (recur (inc idx)))))
@@ -110,9 +118,9 @@
                            :url  mxc
                            :info (clj->js (merge {:mimetype "image/png"} info))}]
           (let [resp (<p! (net/fetch url #js {:method "PUT"
-                                             :headers #js {"Authorization" (str "Bearer " token)
-                                                           "Content-Type" "application/json"}
-                                             :body (js/JSON.stringify payload)}))]
+                                              :headers #js {"Authorization" (str "Bearer " token)
+                                                            "Content-Type" "application/json"}
+                                              :body (js/JSON.stringify payload)}))]
             (if (.-ok resp)
               {:status :success}
               {:status :error :msg (.-status resp)})))
@@ -128,6 +136,7 @@
                   draft-atts (clj->js
                               (map (fn [att]
                                      (let [mime (or (:mime att) "application/octet-stream")
+                                           bytes (js/Uint8Array. (:buffer att))
                                            file-info #js {:mime mime
                                                           :size (js/BigInt (or (:size att) 0))
                                                           :height (js/BigInt (or (:height att) 0))
@@ -135,7 +144,7 @@
                                                           :thumbnailInfo js/undefined
                                                           :thumbnailSource js/undefined}
                                            source (.new (.-Data (.-UploadSource sdk))
-                                                        #js {:bytes (:buffer att)
+                                                        #js {:bytes bytes
                                                              :filename (:filename att)})]
                                        (cond
                                          (str/starts-with? mime "image/")
@@ -162,6 +171,8 @@
           {:status :error :msg "No active client"})
         (catch :default e
           {:status :error :msg (str e)})))))
+
+
 
 (worker/register :load-draft
   (fn [{:keys [room-id]}]
@@ -193,8 +204,9 @@
                                                        (str/ends-with? lower-name ".webp") "image/webp"
                                                        (str/ends-with? lower-name ".mp4") "video/mp4"
                                                        (str/ends-with? lower-name ".webm") "video/webm"
-                                                       :else "application/octet-stream")))]
-                                {:buffer buffer
+                                                       :else "application/octet-stream")))
+                                    bytes      (if buffer (js/Uint8Array. buffer) (js/Uint8Array. 0))]
+                                {:buffer bytes
                                  :mimetype mime
                                  :filename filename})
                               (catch :default _ nil)))
