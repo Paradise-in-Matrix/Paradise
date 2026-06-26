@@ -290,7 +290,6 @@ For now this is just exploratory.
 
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/drafts.cljs
-
 (re-frame/reg-event-fx
  :composer/clear-after-submit
  (fn [{:keys [db]} [_ room-id]]
@@ -304,8 +303,6 @@ For now this is just exploratory.
                                            :loaded-text ""
                                            :uploading? false}))
     :dispatch [:composer/persist-draft room-id]}))
-
-
 
 (re-frame/reg-event-fx
  :composer/persist-draft
