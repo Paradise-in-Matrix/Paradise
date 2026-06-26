@@ -18,6 +18,7 @@ just keep this to defining the look and feel itself.
      [paradise.shared.utils.macros :refer [defui]]
      [paradise.ui.input.autocomplete :refer [user-mention-options emoji-suggestion-options]]
      ["react" :as react]
+     [taoensso.timbre :as log]
      [reagent.core :as r]
      ["@tiptap/react" :refer [useEditor EditorContent ReactNodeViewRenderer NodeViewWrapper]]
      ["@tiptap/starter-kit" :default StarterKit]
