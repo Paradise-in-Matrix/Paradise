@@ -425,7 +425,6 @@ got tired of guessing which one it was... last sdk version it was .cancel haha
 #+begin_src clojurescript :tangle ../../../src/paradise/engine/timeline.cljs
 
 
-;; we should probably check why event-id is coming as a clojure map...
 (worker/register :toggle-reaction
                  (fn [{:keys [room-id event-id emoji]}]
                    (go
