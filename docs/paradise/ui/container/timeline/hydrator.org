@@ -300,7 +300,7 @@ that include actual JS objects.
                             raw-k)
                   kebab-k (fast-camel->kebab clean-k)
                   val     (fast-js->clj-dmp (goog.object/get x raw-k))]
-              (recur (inc i) (assoc! m (fast-keyword kebab-k) val)))
+              (recur (inc i) (assoc! m (fast-keyword raw-k) #_(fast-keyword kebab-k) val)))
             (persistent! m))))
 
       (vector? x)
