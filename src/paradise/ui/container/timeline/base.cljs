@@ -281,7 +281,6 @@
        (:users data)
        []))))
 
-
 (re-frame/reg-sub
  :timeline/latest-readers
  (fn [[_ room-id _]]
@@ -289,12 +288,11 @@
     (re-frame/subscribe [:sdk/profile])])
  (fn [[events profile] _]
    (let [my-id         (:user-id profile)
-         actual-events (filter #(= (:type %) :event) events)
+         actual-events (filter #(not= (:type %) :virtual) events)
          latest-event  (last actual-events)
-         read-by       (or (:read-by latest-event) [])
+         read-by       (or (:read-by (js->clj latest-event)) [])
          others        (remove #(= % my-id) read-by)]
      others)))
-
 
 (defn status-indicator [active-room]
   (let [tr            @(re-frame/subscribe [:i18n/tr])
