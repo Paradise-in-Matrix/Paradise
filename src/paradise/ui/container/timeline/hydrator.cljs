@@ -217,7 +217,7 @@
                             raw-k)
                   kebab-k (fast-camel->kebab clean-k)
                   val     (fast-js->clj-dmp (goog.object/get x raw-k))]
-              (recur (inc i) (assoc! m (fast-keyword kebab-k) val)))
+              (recur (inc i) (assoc! m (fast-keyword raw-k) #_(fast-keyword kebab-k) val)))
             (persistent! m))))
 
       (vector? x)
@@ -319,6 +319,7 @@
                                     :bottom      (goog.object/get layout-node "bottom")
                                     :height      (goog.object/get layout-node "height")
                                     :unread?     (goog.object/get layout-node "unread?")
+                                    :read-by     (goog.object/get layout-node "read-by")
                                     :worker-data pojo}]
                        (aset cache id #js {:rawNode layout-node :wrapped wrapped})
                        wrapped))]
