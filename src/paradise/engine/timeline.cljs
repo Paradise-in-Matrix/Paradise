@@ -312,15 +312,13 @@
 
 
 
-;; we should probably check why event-id is coming as a clojure map...
 (worker/register :toggle-reaction
                  (fn [{:keys [room-id event-id emoji]}]
                    (go
                      (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
                        (try
                          (log/error event-id)
-                         (log/error (.toggleReaction tl (clj->js event-id) emoji))
-                         (<p! (.toggleReaction tl event-id emoji))
+                         (<p! (.toggleReaction tl (clj->js event-id) emoji))
                          {:status :success}
                          (catch :default e {:status :error :msg (str e)}))
                        {:status :error :msg "Timeline not found"}))))
@@ -331,9 +329,9 @@
     (go
       (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
         (try
-          (let [was-pinned? (<p! (.pinEvent tl msg-id))]
+          (let [was-pinned? (<p! (.pinEvent tl (clj->js msg-id)))]
             (when-not was-pinned?
-              (<p! (.unpinEvent tl msg-id))))
+              (<p! (.unpinEvent tl (clj->js msg-id)))))
           {:status :success}
           (catch :default e {:status :error :msg (str e)}))
         {:status :error :msg "Timeline not found"}))))
@@ -344,7 +342,7 @@
     (go
       (if-let [room (.getRoom @state/!client room-id)]
         (try
-          (<p! (.sendReadReceipt room event-id "m.read"))
+          (<p! (.sendReadReceipt room (clj->js event-id) "m.read"))
           {:status :success}
           (catch :default e {:status :error :msg (str e)}))
         {:status :error :msg "Room not found"}))))
@@ -356,7 +354,7 @@
         (try
           (if (str/starts-with? event-id "$")
             (do
-              (<p! (.sendReadReceipt tl (.-Read ReceiptType) event-id))
+              (<p! (.sendReadReceipt tl (.-Read ReceiptType) (clj->js event-id)))
               {:status :success})
             {:status :error :msg "Invalid event ID format sent to worker"})
           (catch :default e
@@ -369,7 +367,7 @@
     (go
       (if-let [tl (get-in @!active-timelines [room-id :live :timeline])]
         (try
-          (<p! (.redactEvent tl msg-id))
+          (<p! (.redactEvent tl (clj->js msg-id)))
           {:status :success}
           (catch :default e
             {:status :error :msg (str e)}))
