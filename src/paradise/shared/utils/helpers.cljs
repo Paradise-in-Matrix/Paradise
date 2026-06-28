@@ -346,8 +346,8 @@
 (defn get-status-string [tr type names]
   (let [cnt (count names)
         base-path (if (= type :typing)
-                    "paradise.ui.container.timeline.status.typing"
-                    "paradise.ui.container.timeline.status.reading")]
+                    "container.timeline.status.typing"
+                    "container.timeline.status.reading")]
     (case cnt
       0 ""
       1 (tr [(keyword base-path "one")] [(truncate-name (first names) 16)])
