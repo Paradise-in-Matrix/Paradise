@@ -16,6 +16,7 @@ populated based on DMs to give the user a familiar UI.
    [re-frame.core :as re-frame]
    [reagent.core :as r]
    [clojure.string :as str]
+   [paradise.shared.utils.helpers :refer [truncate-name]]
    [paradise.shared.utils.macros :refer [defui]]
    [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 #+end_src
