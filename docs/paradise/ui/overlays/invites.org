@@ -17,7 +17,6 @@ populated based on DMs to give the user a familiar UI.
    [reagent.core :as r]
    [clojure.string :as str]
    [paradise.shared.utils.helpers :refer [truncate-name]]
-   [paradise.shared.utils.macros :refer [defui]]
    [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 #+end_src
 
@@ -27,7 +26,7 @@ populated based on DMs to give the user a familiar UI.
 **** Component
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/invites.cljs
-(defui invite-menu-content [{:keys [target-room-id]}]
+(defn ^:ui invite-menu-content [{:keys [target-room-id]}]
   (let [tr        @(re-frame/subscribe [:i18n/tr])
         rooms-map @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
         dm-rooms  (->> (vals rooms-map)
@@ -114,7 +113,7 @@ populated based on DMs to give the user a familiar UI.
 
 
 
-(defui invite-room-content [{:keys [target-space-id]}]
+(defn ^:ui invite-room-content [{:keys [target-space-id]}]
   (let [tr        @(re-frame/subscribe [:i18n/tr])
         rooms-map @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
         eligible-rooms (->> (vals rooms-map)
