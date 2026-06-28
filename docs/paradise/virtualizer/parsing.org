@@ -37,25 +37,34 @@ the real DOM.
 (set! js/globalThis.DOMParser
       (fn []
         (this-as this
-          (let [real-parser (new (.-DOMParser xmldom))]
+          (let [options     #js {:onError (fn [& _] nil)}
+                real-parser (new (.-DOMParser xmldom) options)]
             (set! (.-parseFromString this)
                   (fn [html mime-type]
                     (let [safe-html (if (and (string? html) (not (str/includes? html "<body")))
                                       (str "<html><body>" html "</body></html>")
-                                      (or html ""))
-                          doc (.parseFromString real-parser safe-html mime-type)
-                          body (aget (.getElementsByTagName doc "body") 0)]
-                      (set! (.-body doc) body)
-                      doc)))
+                                      (or html ""))]
+                      (try
+                        (let [doc (.parseFromString real-parser safe-html mime-type)
+                              body (aget (.getElementsByTagName doc "body") 0)]
+                          (set! (.-body doc) body)
+                          doc)
+                        (catch :default e
+                          (log/error "xmldom parse failure:" (ex-message e))
+                          (let [fallback-doc (.parseFromString real-parser "<html><body></body></html>" mime-type)
+                                fallback-body (aget (.getElementsByTagName fallback-doc "body") 0)]
+                            (set! (.-body fallback-doc) fallback-body)
+                            fallback-doc))))))
             this))))
 
 (set! js/globalThis.document
       #js {:createElement (fn [tag]
                             (if (= tag "canvas")
                               (js/OffscreenCanvas. 1 1)
-                              (.createElement (.parseFromString (new (.-DOMParser xmldom)) "<html/>" "text/xml") tag)))
+                              (.createElement (.parseFromString
+                                               (new (.-DOMParser xmldom) #js {:onError (fn [& _] nil)})
+                                               "<html/>" "text/xml") tag)))
            :body #js {:childNodes #js []}})
-
 #+end_src
 
 
