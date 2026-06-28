@@ -441,11 +441,13 @@ We also don't want to list our own name, so we remove that too.
 
 (def default-metrics {:font "16px sans-serif" :line-height 22.8})
 
-
 (defn pretext-timeline [room-id]
   (let [on-load-older   #(re-frame/dispatch [:sdk/back-paginate room-id])
         on-load-newer   #(re-frame/dispatch [:sdk/forward-paginate room-id])
         on-jump-live    #(re-frame/dispatch [:room/jump-to-live-bottom room-id])
+        on-scroll-state #(mesh/do-with-thread! :virtualizer-pool
+                                               {:handler :set-scrolling-state
+                                                :arguments {:scrolling? %}})
         render-empty    (fn [] [timeline-empty-state room-id])
         render-loading  (fn [] [timeline-loading-overlay])
         render-sticks   (fn [ruler-ref-fn] [timeline-measuring-sticks ruler-ref-fn])
@@ -469,6 +471,7 @@ We also don't want to list our own name, so we remove that too.
           :on-load-older            on-load-older
           :on-load-newer            on-load-newer
           :on-jump-live             on-jump-live
+          :on-scroll-state-change   on-scroll-state
           :on-layout-context-change (fn [w t m] (re-frame/dispatch [:sdk/update-layout-context room-id w t m]))
           :extract-metrics-fn       extract-timeline-metrics
           :default-theme-metrics    default-metrics
@@ -479,8 +482,6 @@ We also don't want to list our own name, so we remove that too.
           :render-jump-button       render-jump
           :render-loading-overlay   render-loading
           :render-measuring-sticks  render-sticks}]))))
-
-
 
 #+end_src
 
