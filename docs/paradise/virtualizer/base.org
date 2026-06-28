@@ -145,6 +145,8 @@ Web worker threads have no DOM and so Re-frame will complaining
 (def !layout-context (atom {}))
 (def !room-events (atom {}))
 (defonce !applying-remote-patch? (atom false))
+(defonce !is-scrolling? (atom false))
+(defonce !pending-defer-check? (atom false))
 #+end_src
 
 
