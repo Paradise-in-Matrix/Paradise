@@ -9,21 +9,22 @@
         reagent/reagent {:mvn/version "2.0.1"}
         com.taoensso/tempura {:mvn/version "1.5.4"}
         re-frame/re-frame {:mvn/version "1.4.4"}
+        eve/eve {:git/url "https://github.com/Paradise-in-Matrix/eve"
+               :git/sha "1809878e5265e34fc65bba2a00feabd3065340d4"}
+        ;;eve/eve {:local/root "../eve"}
 ;;        paradise/virtualizer {:local/root "../Virtualizer"}
         paradise/virtualizer {:git/url "https://github.com/Paradise-in-Matrix/Virtualizer.git"
-                              :git/sha "c581ff42ad40e7aecbe3652e687c5259644c00b4"
+                              :git/sha "58daf931860b73ac8d2a11c5a7dd858aa3648dbe"
         }
+
+        ;;jtk-dvlp/cljs-workers {:local/root "../cljs-workers"}
         jtk-dvlp/cljs-workers {:git/url "https://github.com/Paradise-in-Matrix/cljs-workers.git"
-                               :git/sha "0ee7acd86aca1f9b32e566408ba43f901491f2b9"}
-        eve/eve {:git/url "https://github.com/SeniorCareMarket/eve"
-                 :git/sha "10760f1c67d491d1a1ac3b6156a6801809292e81"}
-        ;;eve/eve {:git/url "https://github.com/SeniorCareMarket/eve"
-          ;;       :git/sha "10760f1c67d491d1a1ac3b6156a6801809292e81"}
-        eve/eve {:local/root "../eve"}
+                               :git/sha "93c29055b3e3ba45a8f4cbcf55698bcf6bf1c3f5"}
         org.babashka/sci {:mvn/version "0.12.51"}
         org.babashka/sci.configs {:git/url "https://github.com/babashka/sci.configs"
-                     :git/sha "a785be2090991bf99ddc1c8cb4923a7217f6e098"}
+                                  :git/sha "a785be2090991bf99ddc1c8cb4923a7217f6e098"}
         org.clj-commons/hickory {:mvn/version "0.7.7"}
         funcool/promesa {:mvn/version "11.0.678"}}}
+
 
 
