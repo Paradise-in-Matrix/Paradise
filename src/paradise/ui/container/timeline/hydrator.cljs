@@ -154,45 +154,6 @@
             (persistent! m))))
       :else x)))
 
-#_(defn fast-js->clj-dmp [x]
-  (if-not x x
-    (cond
-      (or (string? x) (number? x) (boolean? x) (fn? x) (keyword? x) (symbol? x) (instance? js/Date x)) x
-
-      (array? x)
-      (let [len (.-length x) arr (js/Array. len)]
-        (loop [i 0]
-          (if (< i len)
-            (do (aset arr i (fast-js->clj-dmp (aget x i))) (recur (inc i)))
-            (vec arr))))
-
-      (and (identical? (js* "typeof ~{}" x) "object")
-           (not (coll? x))
-           (not (array? x)))
-      (let [keys-arr (js/Object.keys x) len (.-length keys-arr)]
-        (loop [i 0, m (transient {})]
-          (if (< i len)
-            (let [raw-k   (aget keys-arr i)
-                  clean-k (if (string? raw-k)
-                            (.replace raw-k #"^(?:\uFDD0'|:)+" "")
-                            raw-k)
-                  kebab-k (fast-camel->kebab clean-k)
-                  val     (fast-js->clj-dmp (goog.object/get x raw-k))]
-              (recur (inc i) (assoc! m (fast-keyword kebab-k) val)))
-            (persistent! m))))
-
-      (vector? x)
-      (mapv fast-js->clj-dmp x)
-
-      (map? x)
-      (reduce-kv (fn [m k v] (assoc m k (fast-js->clj-dmp v))) {} x)
-
-      (coll? x)
-      (map fast-js->clj-dmp x)
-
-      :else x)))
-
-
 (defn fast-js->clj-dmp [x]
   (if-not x x
     (cond
@@ -260,38 +221,40 @@
       (or (string? node) (number? node) (boolean? node)) node
       (js/Array.isArray node)
       (let [len (.-length node) arr (js/Array. len)]
-        (loop [i 0] (when (< i len) (aset arr i (pojo->react (aget node i))) (recur (inc i)))) arr)
+        (loop [i 0]
+          (when (< i len)
+            (aset arr i (pojo->react (aget node i)))
+            (recur (inc i))))
+        arr)
+
       (object? node)
       (let [type-val   (goog.object/get node "type")
             raw-props  (goog.object/get node "props")
             kids       (goog.object/get node "children")
-            react-type (resolve-react-type type-val)
-            react-kids (when kids
-                         (if (js/Array.isArray kids)
-                           (let [len (.-length kids) arr (js/Array. len)]
-                             (loop [i 0] (when (< i len) (aset arr i (pojo->react (aget kids i))) (recur (inc i)))) arr)
-                           (pojo->react kids)))]
+            react-type (resolve-react-type type-val)]
 
         (if (fn? react-type)
-          (let [
-                clj-props (when raw-props (fast-js->clj raw-props))
-                hiccup    (let [base (transient (if clj-props [react-type clj-props] [react-type]))]
-                            (when react-kids
-                              (if (js/Array.isArray react-kids)
-                                (loop [i 0 len (.-length react-kids)]
-                                  (when (< i len) (conj! base (aget react-kids i)) (recur (inc i) len)))
-                                (conj! base react-kids)))
-                            (persistent! base))]
-            (reagent.core/as-element hiccup))
+          (let [clj-props (when raw-props (fast-js->clj raw-props))
+                base-arr  (js/Array. react-type)]
+            (when clj-props (.push base-arr clj-props))
+            (when kids
+              (if (js/Array.isArray kids)
+                (loop [i 0 len (.-length kids)]
+                  (when (< i len)
+                    (.push base-arr (pojo->react (aget kids i)))
+                    (recur (inc i) len)))
+                (.push base-arr (pojo->react kids))))
+            (reagent.core/as-element (vec base-arr)))
 
-          (if (and react-kids (not (goog.object/get !void-elements (if (string? react-type) react-type ""))))
-            (let [args #js [react-type raw-props]]
-              (if (js/Array.isArray react-kids)
-                (loop [i 0 len (.-length react-kids)]
-                  (when (< i len) (.push args (aget react-kids i)) (recur (inc i) len)))
-                (.push args react-kids))
-              (.apply react/createElement nil args))
-            (react/createElement react-type raw-props))))
+          (let [args #js [react-type raw-props]]
+            (when (and kids (not (goog.object/get !void-elements (if (string? react-type) react-type ""))))
+              (if (js/Array.isArray kids)
+                (loop [i 0 len (.-length kids)]
+                  (when (< i len)
+                    (.push args (pojo->react (aget kids i)))
+                    (recur (inc i) len)))
+                (.push args (pojo->react kids))))
+            (.apply react/createElement nil args))))
       :else node)))
 
 (re-frame/reg-event-fx
@@ -333,14 +296,13 @@
      {:db db}))))
 
 (defn get-cached-react-tree [id pojo]
-  (let [pojo-str    (js/JSON.stringify pojo)
-        cache       (or !react-tree-cache #js {})
+  (let [cache       (or !react-tree-cache #js {})
         cache-entry (aget cache id)
-        ]
+        ast-version (goog.object/get pojo "ast-version")]
 
-    (if (and cache-entry (identical? pojo-str (.-pojoStr cache-entry)))
+    (if (and cache-entry (identical? ast-version (.-version cache-entry)))
       (.-tree cache-entry)
 
       (let [new-tree (pojo->react pojo)]
-        (aset cache id #js {:pojoStr pojo-str :tree new-tree})
+        (aset cache id #js {:version ast-version :tree new-tree})
         new-tree))))
