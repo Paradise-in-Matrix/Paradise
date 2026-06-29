@@ -4,6 +4,7 @@
             [clojure.string :as str]
             [re-frame.db :as db]
             [cljs-workers.core :as main]
+            [cljs-workers.mesh :as mesh]
             [cljs.core.async :refer [go <!]]
             [reagent.core :as r]
             [eve.atom :as ea]
@@ -335,11 +336,16 @@
 
 (def default-metrics {:font "16px sans-serif" :line-height 22.8})
 
-
 (defn pretext-timeline [room-id]
   (let [on-load-older   #(re-frame/dispatch [:sdk/back-paginate room-id])
         on-load-newer   #(re-frame/dispatch [:sdk/forward-paginate room-id])
         on-jump-live    #(re-frame/dispatch [:room/jump-to-live-bottom room-id])
+        on-viewport-change #(mesh/do-with-thread! :virtualizer-pool
+                                                  {:handler :set-viewport
+                                                   :arguments {:visible-ids %}})
+        on-scroll-state #(mesh/do-with-thread! :virtualizer-pool
+                                               {:handler :set-scrolling-state
+                                                :arguments {:scrolling? %}})
         render-empty    (fn [] [timeline-empty-state room-id])
         render-loading  (fn [] [timeline-loading-overlay])
         render-sticks   (fn [ruler-ref-fn] [timeline-measuring-sticks ruler-ref-fn])
@@ -363,6 +369,8 @@
           :on-load-older            on-load-older
           :on-load-newer            on-load-newer
           :on-jump-live             on-jump-live
+          :on-viewport-change       on-viewport-change
+          :on-scroll-state-change   on-scroll-state
           :on-layout-context-change (fn [w t m] (re-frame/dispatch [:sdk/update-layout-context room-id w t m]))
           :extract-metrics-fn       extract-timeline-metrics
           :default-theme-metrics    default-metrics
@@ -373,8 +381,6 @@
           :render-jump-button       render-jump
           :render-loading-overlay   render-loading
           :render-measuring-sticks  render-sticks}]))))
-
-
 
 
 (defn timeline [& {:keys [compact? hide-header?]}]
