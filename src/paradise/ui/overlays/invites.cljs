@@ -4,10 +4,10 @@
    [re-frame.core :as re-frame]
    [reagent.core :as r]
    [clojure.string :as str]
-   [paradise.shared.utils.macros :refer [defui]]
+   [paradise.shared.utils.helpers :refer [truncate-name]]
    [paradise.ui.overlays.base :refer [modal-component popover-component]]))
 
-(defui invite-menu-content [{:keys [target-room-id]}]
+(defn ^:ui invite-menu-content [{:keys [target-room-id]}]
   (let [tr        @(re-frame/subscribe [:i18n/tr])
         rooms-map @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
         dm-rooms  (->> (vals rooms-map)
@@ -78,9 +78,9 @@
                                                           (remove #(= (:user-id %) my-id))
                                                           first))
                                       final-avatar (or (:avatarUrl item) (:avatar item) (:avatar-url other))
-                                      final-name   (if (and other (or (nil? (:name item)) (= (:name item) (tr [:invites/loading]))))
+                                      final-name   (truncate-name (if (and other (or (nil? (:name item)) (= (:name item) (tr [:invites/loading]))))
                                                      (:display-name other)
-                                                     (:name item))]
+                                                     (:name item)) 16)]
                                   [:div.invite-user-row
                                    [avatar {:id    room-id
                                             :name  (or final-name "?")
@@ -94,7 +94,7 @@
 
 
 
-(defui invite-room-content [{:keys [target-space-id]}]
+(defn ^:ui invite-room-content [{:keys [target-space-id]}]
   (let [tr        @(re-frame/subscribe [:i18n/tr])
         rooms-map @(re-frame/subscribe [:rooms/unfiltered-indexed-map])
         eligible-rooms (->> (vals rooms-map)
@@ -157,7 +157,7 @@
                                   [:span.sub-name (:room-id item)]]]
                                 (let [room-id   (or (:id item) (:roomId item))
                                       is-space? (or (:isSpace item) (:is-space? item))
-                                      name      (or (:name item) (tr [:invites/loading]))
+                                      name      (truncate-name (or (:name item) (tr [:invites/loading])) 16)
                                       avatar-url (or (:avatarUrl item) (:avatar item))]
                                   [:div.invite-user-row
                                    [avatar {:id    room-id
