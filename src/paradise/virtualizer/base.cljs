@@ -59,6 +59,19 @@
           "lambda-paths" lambda-paths}
      true)))
 
+(defn trigger-defer-check! []
+  (re-frame/clear-subscription-cache!)
+  (js/setTimeout
+   (fn []
+     (let [changed-ids (parsing/check-deferred-components!)]
+       (when (seq changed-ids)
+         (swap! parsing/!ast-node-cache #(apply dissoc % changed-ids))
+         (swap! parsing/!deferred-component-cache #(apply dissoc % changed-ids))
+         (doseq [r-id (keys @!room-events) src (keys (get @!room-events r-id))]
+           (recalculate-and-stream! r-id src)))))
+   0))
+
+
 (defn process-timeline-redraw! []
   (parsing/flush-ast-cache!)
   (doseq [room-id (keys @!room-events)
@@ -150,7 +163,6 @@
             (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
             {:status :db-bound-sab}))))))
 
-
 (worker/register :recalculate-timeline
                  (fn [{:keys [room-id]}]
                    (let [sources (keys (get @!room-events room-id))]
@@ -158,6 +170,16 @@
                        (recalculate-and-stream! room-id source))
                      {:status :success})))
 
+
+(worker/register :set-scrolling-state
+                 (fn [{:keys [scrolling?]}]
+                   (reset! !is-scrolling? scrolling?)
+
+                   (when (and (not scrolling?) @!pending-defer-check?)
+                     (reset! !pending-defer-check? false)
+                     (trigger-defer-check!))
+
+                   {:status :success}))
 
 ;; still using old call form
 ;; need to globally update all to use mesh form
