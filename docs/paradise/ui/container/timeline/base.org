@@ -446,6 +446,9 @@ We also don't want to list our own name, so we remove that too.
   (let [on-load-older   #(re-frame/dispatch [:sdk/back-paginate room-id])
         on-load-newer   #(re-frame/dispatch [:sdk/forward-paginate room-id])
         on-jump-live    #(re-frame/dispatch [:room/jump-to-live-bottom room-id])
+        on-viewport-change #(mesh/do-with-thread! :virtualizer-pool
+                                                  {:handler :set-viewport
+                                                   :arguments {:visible-ids %}})
         on-scroll-state #(mesh/do-with-thread! :virtualizer-pool
                                                {:handler :set-scrolling-state
                                                 :arguments {:scrolling? %}})
