@@ -184,8 +184,10 @@ export default defineConfig(({ mode }) => {
             host: true,
             allowedHosts: true,
             headers: {
-                "Cross-Origin-Opener-Policy": "same-origin",
-                "Cross-Origin-Embedder-Policy": "credentialless",
+                "Cross-Origin-Opener-Policy": "unsafe-none",
+                "Cross-Origin-Embedder-Policy": "unsafe-none",
+                //"Cross-Origin-Opener-Policy": "same-origin",
+                //"Cross-Origin-Embedder-Policy": "credentialless",
             },
             fs: {
                 allow: [
