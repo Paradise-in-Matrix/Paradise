@@ -75,6 +75,9 @@ We need to cache the AST or we'll be re-rendering every single time.
 (defonce !ast-node-cache (atom {}))
 (defonce !deferred-component-cache (atom {}))
 (defonce !current-event-id (atom nil))
+(defonce !visible-active-ids (atom #{}))
+(defonce !is-scrolling? (atom false))
+(defonce !pending-defer-check? (atom false))
 
 (defn flush-ast-cache! []
   (reset! !ast-node-cache {})
