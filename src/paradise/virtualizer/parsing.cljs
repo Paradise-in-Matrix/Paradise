@@ -12,29 +12,41 @@
 (set! js/globalThis.DOMParser
       (fn []
         (this-as this
-          (let [real-parser (new (.-DOMParser xmldom))]
+          (let [options     #js {:onError (fn [& _] nil)}
+                real-parser (new (.-DOMParser xmldom) options)]
             (set! (.-parseFromString this)
                   (fn [html mime-type]
                     (let [safe-html (if (and (string? html) (not (str/includes? html "<body")))
                                       (str "<html><body>" html "</body></html>")
-                                      (or html ""))
-                          doc (.parseFromString real-parser safe-html mime-type)
-                          body (aget (.getElementsByTagName doc "body") 0)]
-                      (set! (.-body doc) body)
-                      doc)))
+                                      (or html ""))]
+                      (try
+                        (let [doc (.parseFromString real-parser safe-html mime-type)
+                              body (aget (.getElementsByTagName doc "body") 0)]
+                          (set! (.-body doc) body)
+                          doc)
+                        (catch :default e
+                          (log/error "xmldom parse failure:" (ex-message e))
+                          (let [fallback-doc (.parseFromString real-parser "<html><body></body></html>" mime-type)
+                                fallback-body (aget (.getElementsByTagName fallback-doc "body") 0)]
+                            (set! (.-body fallback-doc) fallback-body)
+                            fallback-doc))))))
             this))))
 
 (set! js/globalThis.document
       #js {:createElement (fn [tag]
                             (if (= tag "canvas")
                               (js/OffscreenCanvas. 1 1)
-                              (.createElement (.parseFromString (new (.-DOMParser xmldom)) "<html/>" "text/xml") tag)))
+                              (.createElement (.parseFromString
+                                               (new (.-DOMParser xmldom) #js {:onError (fn [& _] nil)})
+                                               "<html/>" "text/xml") tag)))
            :body #js {:childNodes #js []}})
-
 
 (defonce !ast-node-cache (atom {}))
 (defonce !deferred-component-cache (atom {}))
 (defonce !current-event-id (atom nil))
+(defonce !visible-active-ids (atom #{}))
+(defonce !is-scrolling? (atom false))
+(defonce !pending-defer-check? (atom false))
 
 (defn flush-ast-cache! []
   (reset! !ast-node-cache {})
@@ -338,15 +350,20 @@
                                        (outer-res item nil false nil nil)
                                        outer-res)
                           expanded   (expand-hiccup hiccup-ast)
-                          pojo       (hiccup->pojo expanded)]
+                          pojo       (hiccup->pojo expanded)
+                          versioned-pojo (doto pojo (goog.object/set "ast-version" cache-key))]
                       (swap! !ast-node-cache (fn [m]
-                                               (let [m' (assoc m id {:cache-key cache-key :pojo pojo})]
+                                               (let [m' (assoc m id {:cache-key cache-key :pojo versioned-pojo})]
                                                  (if (> (count m') 2000)
-                                                   (let [evicted-id (first (keys m'))]
-                                                     (swap! !deferred-component-cache dissoc evicted-id)
-                                                     (dissoc m' evicted-id))
+                                                   (let [evictable  (remove @!visible-active-ids (keys m'))
+                                                         evicted-id (first evictable)]
+                                                     (if evicted-id
+                                                       (do
+                                                         (swap! !deferred-component-cache dissoc evicted-id)
+                                                         (dissoc m' evicted-id))
+                                                       m'))
                                                    m'))))
-                      (assoc item :worker-data pojo))))))
+                      (assoc item :worker-data versioned-pojo))))))
             laid-out)
       (do
         (log/error "FATAL: event-tile-render NOT FOUND registry!")
