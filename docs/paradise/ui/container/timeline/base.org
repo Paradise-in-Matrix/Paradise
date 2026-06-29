@@ -19,6 +19,7 @@ we've made interop with the WASM bindings.
             [clojure.string :as str]
             [re-frame.db :as db]
             [cljs-workers.core :as main]
+            [cljs-workers.mesh :as mesh]
             [cljs.core.async :refer [go <!]]
             [reagent.core :as r]
             [eve.atom :as ea]
