@@ -331,38 +331,40 @@ And lastly the conversion itself which just walks the nodes and hydrates.
       (or (string? node) (number? node) (boolean? node)) node
       (js/Array.isArray node)
       (let [len (.-length node) arr (js/Array. len)]
-        (loop [i 0] (when (< i len) (aset arr i (pojo->react (aget node i))) (recur (inc i)))) arr)
+        (loop [i 0]
+          (when (< i len)
+            (aset arr i (pojo->react (aget node i)))
+            (recur (inc i))))
+        arr)
+
       (object? node)
       (let [type-val   (goog.object/get node "type")
             raw-props  (goog.object/get node "props")
             kids       (goog.object/get node "children")
-            react-type (resolve-react-type type-val)
-            react-kids (when kids
-                         (if (js/Array.isArray kids)
-                           (let [len (.-length kids) arr (js/Array. len)]
-                             (loop [i 0] (when (< i len) (aset arr i (pojo->react (aget kids i))) (recur (inc i)))) arr)
-                           (pojo->react kids)))]
+            react-type (resolve-react-type type-val)]
 
         (if (fn? react-type)
-          (let [
-                clj-props (when raw-props (fast-js->clj raw-props))
-                hiccup    (let [base (transient (if clj-props [react-type clj-props] [react-type]))]
-                            (when react-kids
-                              (if (js/Array.isArray react-kids)
-                                (loop [i 0 len (.-length react-kids)]
-                                  (when (< i len) (conj! base (aget react-kids i)) (recur (inc i) len)))
-                                (conj! base react-kids)))
-                            (persistent! base))]
-            (reagent.core/as-element hiccup))
+          (let [clj-props (when raw-props (fast-js->clj raw-props))
+                base-arr  (js/Array. react-type)]
+            (when clj-props (.push base-arr clj-props))
+            (when kids
+              (if (js/Array.isArray kids)
+                (loop [i 0 len (.-length kids)]
+                  (when (< i len)
+                    (.push base-arr (pojo->react (aget kids i)))
+                    (recur (inc i) len)))
+                (.push base-arr (pojo->react kids))))
+            (reagent.core/as-element (vec base-arr)))
 
-          (if (and react-kids (not (goog.object/get !void-elements (if (string? react-type) react-type ""))))
-            (let [args #js [react-type raw-props]]
-              (if (js/Array.isArray react-kids)
-                (loop [i 0 len (.-length react-kids)]
-                  (when (< i len) (.push args (aget react-kids i)) (recur (inc i) len)))
-                (.push args react-kids))
-              (.apply react/createElement nil args))
-            (react/createElement react-type raw-props))))
+          (let [args #js [react-type raw-props]]
+            (when (and kids (not (goog.object/get !void-elements (if (string? react-type) react-type ""))))
+              (if (js/Array.isArray kids)
+                (loop [i 0 len (.-length kids)]
+                  (when (< i len)
+                    (.push args (pojo->react (aget kids i)))
+                    (recur (inc i) len)))
+                (.push args (pojo->react kids))))
+            (.apply react/createElement nil args))))
       :else node)))
 #+end_src
 
