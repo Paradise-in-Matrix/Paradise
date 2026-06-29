@@ -237,45 +237,6 @@ It's less efficient for general use and our rehydration doesn't really 'need' th
 It's only for code that need to actually execute something after being sent back over
 that include actual JS objects.
 #+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/hydrator.cljs
-#_(defn fast-js->clj-dmp [x]
-  (if-not x x
-    (cond
-      (or (string? x) (number? x) (boolean? x) (fn? x) (keyword? x) (symbol? x) (instance? js/Date x)) x
-
-      (array? x)
-      (let [len (.-length x) arr (js/Array. len)]
-        (loop [i 0]
-          (if (< i len)
-            (do (aset arr i (fast-js->clj-dmp (aget x i))) (recur (inc i)))
-            (vec arr))))
-
-      (and (identical? (js* "typeof ~{}" x) "object")
-           (not (coll? x))
-           (not (array? x)))
-      (let [keys-arr (js/Object.keys x) len (.-length keys-arr)]
-        (loop [i 0, m (transient {})]
-          (if (< i len)
-            (let [raw-k   (aget keys-arr i)
-                  clean-k (if (string? raw-k)
-                            (.replace raw-k #"^(?:\uFDD0'|:)+" "")
-                            raw-k)
-                  kebab-k (fast-camel->kebab clean-k)
-                  val     (fast-js->clj-dmp (goog.object/get x raw-k))]
-              (recur (inc i) (assoc! m (fast-keyword kebab-k) val)))
-            (persistent! m))))
-
-      (vector? x)
-      (mapv fast-js->clj-dmp x)
-
-      (map? x)
-      (reduce-kv (fn [m k v] (assoc m k (fast-js->clj-dmp v))) {} x)
-
-      (coll? x)
-      (map fast-js->clj-dmp x)
-
-      :else x)))
-
-
 (defn fast-js->clj-dmp [x]
   (if-not x x
     (cond
