@@ -426,16 +426,15 @@ ever evaluates an item ONCE unless it has actually changed.
 
 #+begin_src clojurescript :tangle ../../../../../src/paradise/ui/container/timeline/hydrator.cljs
 (defn get-cached-react-tree [id pojo]
-  (let [pojo-str    (js/JSON.stringify pojo)
-        cache       (or !react-tree-cache #js {})
+  (let [cache       (or !react-tree-cache #js {})
         cache-entry (aget cache id)
-        ]
+        ast-version (goog.object/get pojo "ast-version")]
 
-    (if (and cache-entry (identical? pojo-str (.-pojoStr cache-entry)))
+    (if (and cache-entry (identical? ast-version (.-version cache-entry)))
       (.-tree cache-entry)
 
       (let [new-tree (pojo->react pojo)]
-        (aset cache id #js {:pojoStr pojo-str :tree new-tree})
+        (aset cache id #js {:version ast-version :tree new-tree})
         new-tree))))
 #+end_src
 
