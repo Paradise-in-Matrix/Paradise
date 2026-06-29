@@ -439,15 +439,20 @@ Doing this extract makes the rehydration algorithmically rather efficient.
                                        (outer-res item nil false nil nil)
                                        outer-res)
                           expanded   (expand-hiccup hiccup-ast)
-                          pojo       (hiccup->pojo expanded)]
+                          pojo       (hiccup->pojo expanded)
+                          versioned-pojo (doto pojo (goog.object/set "ast-version" cache-key))]
                       (swap! !ast-node-cache (fn [m]
-                                               (let [m' (assoc m id {:cache-key cache-key :pojo pojo})]
+                                               (let [m' (assoc m id {:cache-key cache-key :pojo versioned-pojo})]
                                                  (if (> (count m') 2000)
-                                                   (let [evicted-id (first (keys m'))]
-                                                     (swap! !deferred-component-cache dissoc evicted-id)
-                                                     (dissoc m' evicted-id))
+                                                   (let [evictable  (remove @!visible-active-ids (keys m'))
+                                                         evicted-id (first evictable)]
+                                                     (if evicted-id
+                                                       (do
+                                                         (swap! !deferred-component-cache dissoc evicted-id)
+                                                         (dissoc m' evicted-id))
+                                                       m'))
                                                    m'))))
-                      (assoc item :worker-data pojo))))))
+                      (assoc item :worker-data versioned-pojo))))))
             laid-out)
       (do
         (log/error "FATAL: event-tile-render NOT FOUND registry!")
