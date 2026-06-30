@@ -1,0 +1,251 @@
+(ns lambda-lifter
+  (:require [rewrite-clj.zip :as z]
+            [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.walk :as walk]
+            [clojure.pprint :as pprint]))
+
+(defn read-cljs [s]
+  (binding [*data-readers* {}
+            *default-data-reader-fn* tagged-literal]
+    (read-string s)))
+
+(defn clean-meta [form]
+  (walk/postwalk
+   (fn [x]
+     (if (instance? clojure.lang.IObj x)
+       (if-let [m (meta x)]
+         (with-meta x (dissoc m :line :column :end-line :end-column :file :source :name :ns))
+         x)
+       x))
+   form))
+
+(defn inject-requires [ns-form requires-list]
+  (if (empty? requires-list)
+    ns-form
+    (let [ns-name (second ns-form)
+          valid-reqs (remove (fn [req]
+                               (let [req-name (if (coll? req) (first req) req)]
+                                 (= req-name ns-name)))
+                             requires-list)]
+      (if (empty? valid-reqs)
+        ns-form
+        (let [clauses (drop 2 ns-form)
+              has-req? (some #(and (seq? %) (= (first %) :require)) clauses)
+              missing-reqs (remove (fn [req]
+                                     (let [req-name (if (coll? req) (first req) req)]
+                                       (some (fn [clause]
+                                               (and (seq? clause)
+                                                    (= (first clause) :require)
+                                                    (some #(= (if (coll? %) (first %) %) req-name) (rest clause))))
+                                             clauses)))
+                                   valid-reqs)]
+          (if (empty? missing-reqs)
+            ns-form
+            (let [new-clauses (if has-req?
+                                (map (fn [clause]
+                                       (if (and (seq? clause) (= (first clause) :require))
+                                         (concat clause missing-reqs)
+                                         clause))
+                                     clauses)
+                                (concat clauses (list (concat '(:require) missing-reqs))))]
+              (with-meta (apply list 'ns ns-name new-clauses) (meta ns-form)))))))))
+
+(defn generate-registry-code [registry]
+  (if (empty? registry)
+    ""
+    (let [swaps (map (fn [[hash-kw {:keys [code free]}]]
+                       (let [free-syms (map #(name %) free)
+                             bind-str  (if (empty? free-syms)
+                                         "_"
+                                         (str "{:keys [" (str/join " " free-syms) "]}"))]
+                         (str "(clojure.core/swap! paradise.shared.client.registry/!anon-fns clojure.core/assoc " hash-kw "\n"
+                              "  (fn [" bind-str "]\n"
+                              "    " code "))")))
+                     registry)]
+      (str "\n" (str/join "\n" swaps) "\n"))))
+
+(defn instrument-host-file [ast-form extra-requires]
+  (let [current-ns (atom "user")
+        skip-instrument? (atom false)]
+    (cons 'do
+          (map (fn [x]
+                 (if (seq? x)
+                   (cond
+                     (= (first x) 'ns)
+                     (let [ns-name (second x)
+                           reqs (if (#{'paradise.shared.client.registry 'paradise.shared.client.state 're-frame.db 'paradise.shared.client.core 'paradise.shared.utils.macros} ns-name)
+                                  (do (reset! skip-instrument? true) extra-requires)
+                                  (do (reset! skip-instrument? false) (conj extra-requires '[paradise.shared.client.registry])))]
+                       (reset! current-ns ns-name)
+                       (inject-requires x reqs))
+                     (and (= (first x) 'defn) (not @skip-instrument?))
+                     (let [fn-name      (second x)
+                           meta-map     (meta fn-name)
+                           is-ui?       (:ui meta-map)
+                           is-react?    (:react meta-map)
+                           is-defer?    (:defer meta-map)
+                           is-ui-bound? (or is-ui? is-react? is-defer?)
+                           fqn          (keyword (str @current-ns) (str fn-name))
+                           comp-str     (str "comp:" (str @current-ns) "/" (str fn-name))
+                           default-name (symbol (str fn-name "-default"))
+                           registry     (if is-ui-bound? 'paradise.shared.client.registry/!components 'paradise.shared.client.registry/!pure-fns)
+                           default-defn (cons 'defn (cons default-name (drop 2 x)))
+                           args-sym     (gensym "args")
+                           override-sym (gensym "override")
+                           live-fn-sym  (gensym "live-fn")]
+                       `(do
+                          ~default-defn
+                          (clojure.core/aset ~default-name "$fn_ptr" ~fqn)
+                          ~(when is-react?
+                             `(clojure.core/aset ~default-name "$react_boundary" ~comp-str))
+                          ~(when is-defer?
+                             `(clojure.core/aset ~default-name "$defer_boundary" true))
+
+                          (swap! ~registry #(if (contains? % ~fqn) % (assoc % ~fqn ~default-name)))
+                          (defn ~fn-name [& ~args-sym]
+                            (let [~override-sym (get @paradise.shared.client.registry/!active-overrides ~fqn)
+                                  ~live-fn-sym  (if ~override-sym
+                                                  (:fn ~override-sym)
+                                                  (get @~registry ~fqn))]
+                              ~(if is-ui-bound?
+                                 `(into [~live-fn-sym] ~args-sym)
+                                 `(apply ~live-fn-sym ~args-sym))))
+                          (clojure.core/aset ~fn-name "$fn_ptr" ~fqn)
+                          ~(when is-react?
+                             `(clojure.core/aset ~fn-name "$react_boundary" ~comp-str))
+                          ~(when is-defer?
+                             `(clojure.core/aset ~fn-name "$defer_boundary" true))))
+                     :else x)
+                   x))
+               (rest ast-form)))))
+
+
+(defn get-top-level-defs [zloc]
+  (let [defs (atom #{})]
+    (loop [loc (z/down zloc)]
+      (when loc
+        (when (= :list (z/tag loc))
+          (let [fst (z/string (z/down loc))]
+            (when (#{"def" "defn" "defonce" "defui" "defmacro"} fst)
+              (let [sym-loc (-> loc z/down z/right)]
+                (when (= :token (z/tag sym-loc))
+                  (let [v (z/sexpr sym-loc)]
+                    (when (symbol? v)
+                      (swap! defs conj (name v)))))))))
+        (recur (z/right loc))))
+    @defs))
+
+(defn extract-free-vars [zloc top-level-defs]
+  (let [syms (atom #{})]
+    (z/postwalk
+     zloc
+     (fn [loc]
+       (when (= :token (z/tag loc))
+         (let [v (z/sexpr loc)]
+           (when (symbol? v)
+             (let [s (name v)]
+               (when-not (or (str/includes? s ".")
+                             (str/includes? s "/")
+                             (str/starts-with? s "-")
+                             (str/starts-with? s "?")
+                             (top-level-defs s)
+                             (ns-resolve 'clojure.core (symbol s)))
+                 (swap! syms conj s))))))
+       loc))
+       @syms))
+
+(defn rewrite-lambdas [code]
+  (let [zloc (z/of-string code {:track-position? true})
+        root-zloc (or (z/up zloc) zloc)
+        top-level-defs (get-top-level-defs root-zloc)
+        match? (fn [loc]
+                 (let [tag (z/tag loc)]
+                   (or (= tag :fn)
+                       (and (= tag :list)
+                            (let [fst (z/down loc)]
+                              (and fst (= :token (z/tag fst)) (#{"fn" "fn*"} (z/string fst))))))))
+        registry (atom {})
+        mod-zloc (z/postwalk
+                  root-zloc
+                  match?
+                  (fn [loc]
+                    (let [form-str (z/string loc)
+                          free-vars (extract-free-vars loc top-level-defs)
+                          fn-hash (keyword "fn" (str "h" (hash form-str)))]
+                      (swap! registry assoc fn-hash {:code form-str :free free-vars})
+                      (let [env-map (into {} (map (fn [s] [(keyword s) (symbol s)]) free-vars))
+                            replacement-str (str "(clojure.core/let [f# " form-str "]\n"
+                                                 "  (clojure.core/aset f# \"$fn_ptr\" " fn-hash ")\n"
+                                                 "  (clojure.core/aset f# \"$env\" (paradise.shared.client.registry/dehydrate " (pr-str env-map) "))\n"
+                                                 "  f#)")]
+                        (z/replace loc (z/node (z/of-string replacement-str)))))))]
+    {:new-source (z/root-string mod-zloc)
+     :registry @registry}))
+
+(defn skip-file? [code]
+  (re-find #"\(ns\s+(paradise\.shared\.utils\.macros|paradise\.shared\.client\.registry|paradise\.shared\.client\.state|paradise\.shared\.client\.core|re-frame\.db|net|paradise\.virtualizer\.parsing)" code))
+
+(defn process-file [file out-file]
+  (let [raw-code (slurp file)]
+    (if (skip-file? raw-code)
+      (do (io/make-parents out-file) (spit out-file raw-code))
+      (let [{:keys [new-source registry]} (rewrite-lambdas raw-code)
+            registry-code (generate-registry-code registry)
+            lifted-code   (if (empty? registry) new-source (str new-source "\n\n" registry-code))
+            wrapped-text  (str "(do\n" lifted-code "\n)")
+            ast-form      (read-cljs wrapped-text)
+            instrumented  (instrument-host-file ast-form [])]
+        (io/make-parents out-file)
+        (with-open [w (io/writer out-file)]
+          (binding [*out* w
+                    *print-meta* true
+                    pprint/*print-right-margin* 100]
+            (doseq [form (rest instrumented)]
+              (pprint/write (clean-meta form) :dispatch pprint/code-dispatch)
+              (.write w "\n\n"))))))))
+
+(defn process-directory [src-dir out-dir]
+  (let [dir (io/file src-dir)
+        out-dir-file (io/file out-dir)
+        files (if (.exists dir) (filter #(.isFile %) (file-seq dir)) [])
+        out-files (if (.exists out-dir-file) (filter #(.isFile %) (file-seq out-dir-file)) [])
+        src-paths (set (map #(subs (.getPath %) (inc (count (.getPath dir)))) files))
+        stats (atom {:processed 0 :copied 0 :skipped 0 :deleted 0})]
+    (doseq [out-file out-files]
+      (let [rel-path (subs (.getPath out-file) (inc (count (.getPath out-dir-file))))]
+        (when-not (contains? src-paths rel-path)
+          (io/delete-file out-file true)
+          (swap! stats update :deleted inc))))
+
+    (doseq [f files]
+      (let [rel-path (subs (.getPath f) (inc (count (.getPath dir))))
+            out-file (io/file out-dir rel-path)
+            filename (.getName f)]
+        (if (or (not (.exists out-file))
+                (> (.lastModified f) (.lastModified out-file)))
+          (try
+            (if (str/ends-with? filename ".cljs")
+              (do
+                (process-file f out-file)
+                (swap! stats update :processed inc))
+              (do
+                (io/make-parents out-file)
+                (io/copy f out-file)
+                (swap! stats update :copied inc)))
+            (catch Throwable e
+              (when (.exists out-file)
+                (io/delete-file out-file true))
+              (throw e)))
+          (swap! stats update :skipped inc))))
+    (let [{:keys [processed copied skipped deleted]} @stats]
+      (when (or (pos? processed) (pos? copied) (pos? deleted))
+        (println (format "AST Extraction: %d processed, %d copied, %d skipped, %d deleted."
+                         processed copied skipped deleted))))))
+
+(defn hook
+  {:shadow.build/stage :configure}
+  [build-state & _args]
+  (println "Running Pure AST Closure Extraction")
+  (process-directory "src" "src-gen")
+  build-state)
