@@ -107,7 +107,7 @@ and the tab completion.
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
 (defonce !active-command (atom nil))
 
-(defui handle-suggestion-keydown [^js props type]
+(defn handle-suggestion-keydown [^js props type]
   (let [e       (.-event props)
         room-id @(re-frame/subscribe [:rooms/active-id])
         state   @(re-frame/subscribe [:suggestion/state])
@@ -128,9 +128,10 @@ and the tab completion.
 
 **** Option Loaders
 
+****** Note: these return a JS obj and can't be def ^:ui
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
-(defui emoji-suggestion-options []
+(defn emoji-suggestion-options []
   #js {:char ":"
        :command (fn [^js props]
                   (let [ed (.-editor props)
@@ -155,7 +156,7 @@ and the tab completion.
                                 (reset! !active-command nil)
                                 (re-frame/dispatch [:suggestion/close-menu]))})})
 
-(defui user-mention-options [on-start on-exit]
+(defn user-mention-options [on-start on-exit]
   #js {:char "@"
        :command (fn [^js props]
                   (let [ed (.-editor props)
@@ -191,7 +192,7 @@ and the tab completion.
 ***** Component
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/input/autocomplete.cljs
-(defui suggestion-menu []
+(defn suggestion-menu []
   (let [{:keys [active? type rect index] :as state} @(re-frame/subscribe [:suggestion/state])
         room-id @(re-frame/subscribe [:rooms/active-id])
         emojis  @(re-frame/subscribe [:emoji/filtered-suggestions])
