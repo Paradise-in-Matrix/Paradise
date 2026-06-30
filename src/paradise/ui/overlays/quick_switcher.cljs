@@ -28,7 +28,7 @@
  :quick-switcher/select-room
  (fn [{:keys [db]} [_ room]]
    (let [room-id  (or (:id room) (:roomId room))
-         space-id (navigation.rooms.room-list/safe-get room "first-parent-id" :first-parent-id)]
+         space-id (paradise.ui.navigation.rooms.room-list/safe-get room "first-parent-id" :first-parent-id)]
      {:db (assoc db :quick-switcher-open? false)
       :dispatch-n (remove nil?
                           [[:space/select space-id]
