@@ -5,13 +5,19 @@ RUN apt-get update && apt-get install -y \
     curl \
     bash \
     git \
+    python3 \
+    build-essential \
     && curl -L https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh | bash \
     && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable
 
 WORKDIR /app
 
 COPY . .
-RUN npm i
+
+RUN yarn install --frozen-lockfile
+RUN mkdir -p src-gen
 RUN npm run release
 
 FROM nginx:stable-alpine
