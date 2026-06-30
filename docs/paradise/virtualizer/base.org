@@ -327,6 +327,12 @@ sure we actually document the behavior and what it is for future discoverers.
                      {:status :success})))
 
 
+(worker/register :set-viewport
+                 (fn [{:keys [visible-ids]}]
+                   (reset! parsing/!visible-active-ids (set visible-ids))
+                   (trigger-defer-check!)
+                   {:status :success}))
+
 (worker/register :set-scrolling-state
                  (fn [{:keys [scrolling?]}]
                    (reset! !is-scrolling? scrolling?)
