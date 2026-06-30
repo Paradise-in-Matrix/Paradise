@@ -171,14 +171,18 @@
                      {:status :success})))
 
 
+(worker/register :set-viewport
+                 (fn [{:keys [visible-ids]}]
+                   (reset! parsing/!visible-active-ids (set visible-ids))
+                   (trigger-defer-check!)
+                   {:status :success}))
+
 (worker/register :set-scrolling-state
                  (fn [{:keys [scrolling?]}]
-                   (reset! !is-scrolling? scrolling?)
-
-                   (when (and (not scrolling?) @!pending-defer-check?)
-                     (reset! !pending-defer-check? false)
+                   (reset! parsing/!is-scrolling? scrolling?)
+                   (when (and (not scrolling?) @parsing/!pending-defer-check?)
+                     (reset! parsing/!pending-defer-check? false)
                      (trigger-defer-check!))
-
                    {:status :success}))
 
 ;; still using old call form
