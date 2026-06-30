@@ -133,6 +133,8 @@ export default defineConfig(({ mode }) => {
             rollupOptions: {
                 input: {
                     main: path.resolve(__dirname, "build/index.html"),
+                    base: path.resolve(__dirname, "build/base.js"),
+                    eve_shared: path.resolve(__dirname, "build/eve-shared.js"),
                     engine: path.resolve(__dirname, "build/engine.js"),
                     virtualizer: path.resolve(
                         __dirname,
@@ -143,7 +145,9 @@ export default defineConfig(({ mode }) => {
                 output: {
                     entryFileNames: (chunkInfo) => {
                         if (
+                            chunkInfo.name === "base" ||
                             chunkInfo.name === "engine" ||
+                            chunkInfo.name === "eve-shared" ||
                             chunkInfo.name === "virtualizer" ||
                             chunkInfo.name === "media"
                         ) {
@@ -162,6 +166,11 @@ export default defineConfig(({ mode }) => {
                     __dirname,
                     "./node_modules/ffi-bindings/src/index.web.js"
                 ),
+                "ffi-bindings": path.resolve(
+                    __dirname,
+                    "./node_modules/ffi-bindings/src/index.web.js"
+                ),
+
                 react: path.resolve(__dirname, "./node_modules/react"),
                 "react-dom": path.resolve(
                     __dirname,
