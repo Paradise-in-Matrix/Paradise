@@ -47,6 +47,7 @@
 (defonce !visible-active-ids (atom #{}))
 (defonce !is-scrolling? (atom false))
 (defonce !pending-defer-check? (atom false))
+(defonce !item-revisions (atom {}))
 
 (defn flush-ast-cache! []
   (reset! !ast-node-cache {})
@@ -339,7 +340,7 @@
     (if render-fn
       (mapv (fn [item]
               (let [id (:id item)
-                    cache-key (hash [(:raw item) (:unread? item) (:reactions item) (:merge-with-prev? item)])
+                    cache-key (hash [(:raw item) (:unread? item) (:reactions item) (:merge-with-prev? item) (get @!item-revisions id 0)])
                     cached-entry (get @!ast-node-cache id)]
                 (if (and cached-entry (= (:cache-key cached-entry) cache-key))
                   (assoc item :worker-data (:pojo cached-entry))
