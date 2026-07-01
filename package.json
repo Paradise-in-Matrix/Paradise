@@ -35,12 +35,12 @@
 
     "dependencies": {
         "@capacitor-community/electron": "^5.0.1",
-        "@capacitor/android": "^8.3.0",
+        "@capacitor/android": "^8.4.1",
         "@capacitor/app": "^8.1.0",
         "@capacitor/browser": "^8.0.3",
-        "@capacitor/cli": "^8.3.0",
-        "@capacitor/core": "^8.3.0",
-        "@capacitor/ios": "^8.3.0",
+        "@capacitor/cli": "^8.4.1",
+        "@capacitor/core": "^8.4.1",
+        "@capacitor/ios": "^8.4.1",
         "@capacitor/keyboard": "^8.0.3",
         "@capacitor/push-notifications": "^8.0.3",
         "@chenglou/pretext": "^0.0.4",
