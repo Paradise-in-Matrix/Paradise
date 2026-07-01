@@ -16,7 +16,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN yarn install --frozen-lockfile
+RUN npm install
 RUN mkdir -p src-gen
 RUN npm run release
 
