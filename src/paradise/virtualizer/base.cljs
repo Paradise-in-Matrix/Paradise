@@ -212,6 +212,7 @@
 (worker/register :recalculate-items
                  (fn [{:keys [room-id item-ids]}]
                    (doseq [id item-ids]
+                     (swap! parsing/!item-revisions update id (fnil inc 0))
                      (swap! parsing/!ast-node-cache dissoc id)
                      (swap! parsing/!deferred-component-cache dissoc id))
                    (doseq [src (keys (get @!room-events room-id))]
