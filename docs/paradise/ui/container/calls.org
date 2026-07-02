@@ -282,7 +282,7 @@ this is not a smooth experience for the user.
                   (js/setTimeout check-dom 400)))))]
     (check-dom)))
 
-(defui persistent-call-container []
+(defn ^:ui persistent-call-container []
   (let [call-state   @(rf/subscribe [:call/state])
         tr           @(rf/subscribe [:i18n/tr])
         primary?     (get call-state :primary-iframe? true)
