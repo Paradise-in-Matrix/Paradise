@@ -249,3 +249,24 @@
   (println "Running Pure AST Closure Extraction")
   (process-directory "src" "src-gen")
   build-state)
+
+(defn find-library-root []
+  (when-let [res (clojure.java.io/resource "lambda_lifter.clj")]
+    (when (= "file" (.getProtocol res))
+      (let [f (clojure.java.io/file res)
+            root-dir (-> f .getParentFile .getParentFile)]
+        (when root-dir
+          (.getPath root-dir))))))
+
+(defn run-remote-extraction! []
+  (println "Checking remote library AST generation...")
+  (if-let [root (find-library-root)]
+    (let [src-dir (str root "/src")
+          out-dir (str root "/src-gen")]
+      (println "Running extraction from" src-dir "to" out-dir)
+      (process-directory src-dir out-dir))
+    (println "Core library running from JAR or unresolvable location, skipping extraction.")))
+
+
+(defn -main [& _args]
+  (run-remote-extraction!))
