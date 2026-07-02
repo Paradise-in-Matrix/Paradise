@@ -2,6 +2,7 @@
   (:require
    [re-frame.core :as re-frame]
    [reagent.core :as r]
+   [cljs.reader :as reader]
    ["react-virtuoso" :refer [Virtuoso]]
    [cljs-workers.core :as main]
    [paradise.shared.client.state :as state]
