@@ -2,11 +2,10 @@
   (:require [reagent.core :as r]
             [re-frame.core :as rf]
             [goog.functions :as gf]
-            [paradise.shared.utils.macros :refer [defui]]
             [paradise.ui.container.reusable :refer [room-header]]
             [paradise.ui.container.call.call-container :refer [host-rect]]))
 
-(defui call-view [room-id]
+(defn ^:ui call-view [room-id]
   (let [host-ref    (r/atom nil)
         observer    (r/atom nil)
         room-meta @(rf/subscribe [:rooms/active-metadata])
@@ -55,19 +54,5 @@
                    :width "100%"
                    :background "#000"
                    :pointer-events "none"}}]])
-
-      #_:reagent-render
-      #_(fn [room-id]
-        [room-header {:display-name display-name
-                      :active-id    room-id
-                      :compact?     true}]
-        [:div.call-view-host
-         {:ref #(reset! host-ref %)
-          :style {:width "100%"
-                  :height "100%"
-                  :position "relative"
-                  :pointer-events "none"}}])
-
-
       })
     ))
