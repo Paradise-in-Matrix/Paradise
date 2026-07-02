@@ -11,7 +11,7 @@
 (defonce !worker-overrides (atom {}))
 
 (def worker-namespaces
-  {'worker.state {'register-handler state/register-handler
+  {'paradise.engine.state {'register-handler state/register-handler
                   '!client state/!client
                   '!media-cache state/!media-cache}
    'net {'fetch net/fetch}
