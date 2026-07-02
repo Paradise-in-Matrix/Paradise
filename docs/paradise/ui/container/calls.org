@@ -234,7 +234,6 @@ this is not a smooth experience for the user.
             [re-frame.core :as rf]
             [re-frame.db :as rf-db]
             [paradise.shared.client.state :as state]
-            [paradise.shared.utils.macros :refer [defui]]
             ))
 
 (defonce primary-iframe-ref (r/atom nil))
@@ -260,8 +259,15 @@ this is not a smooth experience for the user.
                     (do
                       (let [media-observer (js/MutationObserver.
                                             (fn [_]
-                                              (let [deafened? (get-in @rf-db/app-db [:call :deafened?] false)]
-                                                (when deafened?
+                                              (let [db @rf-db/app-db
+                                                    deafened? (get-in db [:call :deafened?] false)
+                                                    active-iframe (get-in db [:call :active-iframe])
+                                                    is-primary-ref? (= iframe-ref primary-iframe-ref)
+                                                    is-active? (if active-iframe
+                                                                 (= active-iframe (if is-primary-ref? :primary :backup))
+                                                                 (= (get-in db [:call :visible-iframe] :primary) (if is-primary-ref? :primary :backup)))]
+                                                (if is-active?
+                                                  (apply-iframe-sound-state! iframe-ref (not deafened?))
                                                   (apply-iframe-sound-state! iframe-ref false)))))]
                         (.observe media-observer (.-body doc) #js {:childList true :subtree true}))
                       (if-let [share-btn (.querySelector doc "[data-testid='incall_screenshare']")]
