@@ -19,4 +19,4 @@
         org.babashka/sci.configs {:git/url "https://github.com/babashka/sci.configs"
                                   :git/sha "a785be2090991bf99ddc1c8cb4923a7217f6e098"}
         org.clj-commons/hickory {:mvn/version "0.7.7"}
-        funcool/promesa {:mvn/version "11.0.678"}}
+        funcool/promesa {:mvn/version "11.0.678"}}}
