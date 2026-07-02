@@ -36,6 +36,7 @@
    "fuse@2"
    "atk"
    "pulseaudio"
+   "pipewire"
    "cups"
    "libxcomposite"
    "libxdamage"
