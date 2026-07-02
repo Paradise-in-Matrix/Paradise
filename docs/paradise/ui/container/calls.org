@@ -18,6 +18,7 @@ magnitudes simpler.
   (:require [re-frame.core :as rf]
             [taoensso.timbre :as log]
             [cljs-workers.core :as main]
+            [clojure.string :as str]
             [paradise.shared.client.state :as state]
             [paradise.ui.container.call.call-container :refer [primary-iframe-ref backup-iframe-ref apply-iframe-sound-state!]]))
 #+end_src
