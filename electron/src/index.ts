@@ -75,12 +75,31 @@ if (electronIsDev) {
 })();
 
 // When the dock icon is clicked.
-app.on('activate', async function () {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (myCapacitorApp.getMainWindow().isDestroyed()) {
-    await myCapacitorApp.init();
-  }
+app.on("activate", async function () {
+    // On OS X it's common to re-create a window in the app when the
+    // dock icon is clicked and there are no other windows open.
+    if (myCapacitorApp.getMainWindow().isDestroyed()) {
+        await myCapacitorApp.init();
+    }
 });
 
 // Place all ipc or other electron api calls and custom functionality under this line
+
+autoUpdater.on("update-downloaded", (info) => {
+    const win = myCapacitorApp.getMainWindow();
+    dialog
+        .showMessageBox(win, {
+            type: "info",
+            title: "Update Ready",
+            message:
+                "A new version of Paradise has been downloaded. Restart the application to apply the updates.",
+            buttons: ["Restart Now", "Later"],
+        })
+        .then((result) => {
+            if (result.response === 0) {
+                isQuitting = true;
+                autoUpdater.quitAndInstall();
+            }
+        });
+});
+
