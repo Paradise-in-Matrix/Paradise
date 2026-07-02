@@ -4,7 +4,16 @@ import {
     setupElectronDeepLinking,
 } from "@capacitor-community/electron";
 import type { MenuItemConstructorOptions } from "electron";
-import { app, MenuItem, Tray, Menu, nativeImage, dialog } from "electron";
+import {
+    app,
+    MenuItem,
+    Tray,
+    Menu,
+    nativeImage,
+    dialog,
+    session,
+    desktopCapturer,
+} from "electron";
 import electronIsDev from "electron-is-dev";
 import unhandled from "electron-unhandled";
 import { autoUpdater } from "electron-updater";
@@ -16,7 +25,12 @@ import {
     setupReloadWatcher,
 } from "./setup";
 
-// Graceful handling of unhandled errors.
+app.commandLine.appendSwitch("ozone-platform-hint", "auto");
+app.commandLine.appendSwitch(
+    "enable-features",
+    "WaylandWindowDecorations,WebRTCPipeWireCapturer,WebRtcAllowInputVolumeAdjustment"
+);
+
 unhandled();
 
 // Define our menu templates (these are optional)
@@ -52,9 +66,46 @@ if (electronIsDev) {
     setupReloadWatcher(myCapacitorApp);
 }
 
-// Run Application
 (async () => {
     await app.whenReady();
+    session.defaultSession.setDisplayMediaRequestHandler(
+        (request, callback) => {
+            desktopCapturer
+                .getSources({ types: ["screen", "window"] })
+                .then((sources) => {
+                    if (process.platform === "linux" && sources.length === 1) {
+                        callback({ video: sources[0] });
+                        return;
+                    }
+
+                    const template = sources.map((source) => ({
+                        label: source.name,
+                        click: () => {
+                            if (process.platform === "linux") {
+                                callback({ video: source });
+                            } else {
+                                callback({ video: source, audio: "loopback" });
+                            }
+                        },
+                    }));
+
+                    template.push({ type: "separator" } as any);
+                    template.push({
+                        label: "Cancel",
+                        click: () => callback(null),
+                    });
+
+                    const menu = Menu.buildFromTemplate(template);
+                    menu.popup();
+                })
+                .catch((err) => {
+                    console.error("Failed to fetch capture sources:", err);
+                    callback(null);
+                });
+        },
+        { useSystemPicker: true }
+    );
+
     setupContentSecurityPolicy(myCapacitorApp.getCustomURLScheme());
     await myCapacitorApp.init();
 
