@@ -48,6 +48,29 @@ modules:
 npm run electron:make
 #+end_src
 
+#+begin_src
+guix shell -C -F -N -P \
+  --preserve='^DISPLAY$' \
+  --expose=/tmp/.X11-unix \
+  --preserve='^XAUTHORITY$' \
+  --expose=${XAUTHORITY:-$HOME/.Xauthority} \
+  --preserve='^DBUS_SESSION_BUS_ADDRESS$' \
+  --expose=/var/run/dbus \
+  --preserve='^XDG_RUNTIME_DIR$' \
+  --expose=$XDG_RUNTIME_DIR \
+  --expose=/sys/dev \
+  --expose=/sys/devices \
+  --expose=/dev/dri \
+  --expose=/etc/machine-id \
+  --expose=/dev/snd \
+  --share=/dev/shm \
+  -m manifest.scm
+
+./Paradise-1.0.0.AppImage --appimage-extract
+
+
+
+#+end_src
 
 
 
