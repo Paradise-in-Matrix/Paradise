@@ -103,3 +103,55 @@ autoUpdater.on("update-downloaded", (info) => {
         });
 });
 
+let customTray: Tray | null = null;
+let isQuitting = false;
+
+app.whenReady().then(() => {
+    const iconPath = join(__dirname, "../../assets/appIcon.png");
+    const trayIcon = nativeImage.createFromPath(iconPath);
+
+    customTray = new Tray(trayIcon);
+
+    const contextMenu = Menu.buildFromTemplate([
+        {
+            label: "Open Paradise",
+            click: () => {
+                const win = myCapacitorApp.getMainWindow();
+                if (win) {
+                    win.show();
+                    win.focus();
+                }
+            },
+        },
+        { type: "separator" },
+        {
+            label: "Quit",
+            click: () => {
+                isQuitting = true;
+                app.quit();
+            },
+        },
+    ]);
+
+    customTray.setToolTip("Paradise");
+    customTray.setContextMenu(contextMenu);
+
+    customTray.on("double-click", () => {
+        const win = myCapacitorApp.getMainWindow();
+        if (win) {
+            win.show();
+            win.focus();
+        }
+    });
+    customTray.on("click", () => {
+        const win = myCapacitorApp.getMainWindow();
+        if (win) {
+            if (win.isVisible()) {
+                win.hide();
+            } else {
+                win.show();
+                win.focus();
+            }
+        }
+    });
+});
