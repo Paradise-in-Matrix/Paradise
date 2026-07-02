@@ -405,20 +405,6 @@ this is not a smooth experience for the user.
                    :width "100%"
                    :background "#000"
                    :pointer-events "none"}}]])
-
-      #_:reagent-render
-      #_(fn [room-id]
-        [room-header {:display-name display-name
-                      :active-id    room-id
-                      :compact?     true}]
-        [:div.call-view-host
-         {:ref #(reset! host-ref %)
-          :style {:width "100%"
-                  :height "100%"
-                  :position "relative"
-                  :pointer-events "none"}}])
-
-
       })
     ))
 #+end_src
