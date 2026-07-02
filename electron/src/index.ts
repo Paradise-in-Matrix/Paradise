@@ -54,24 +54,25 @@ if (electronIsDev) {
 
 // Run Application
 (async () => {
-  // Wait for electron app to be ready.
-  await app.whenReady();
-  // Security - Set Content-Security-Policy based on whether or not we are in dev mode.
-  setupContentSecurityPolicy(myCapacitorApp.getCustomURLScheme());
-  // Initialize our app, build windows, and load content.
-  await myCapacitorApp.init();
-  // Check for updates if we are in a packaged app.
-  autoUpdater.checkForUpdatesAndNotify();
-})();
+    await app.whenReady();
+    setupContentSecurityPolicy(myCapacitorApp.getCustomURLScheme());
+    await myCapacitorApp.init();
 
-// Handle when all of our windows are close (platforms have their own expectations).
-app.on('window-all-closed', function () {
-  // On OS X it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+    const mainWindow = myCapacitorApp.getMainWindow();
+    if (mainWindow) {
+        mainWindow.on("close", (event) => {
+            if (!isQuitting) {
+                event.preventDefault();
+                mainWindow.hide();
+                if (process.platform === "darwin") {
+                    app.hide();
+                }
+            }
+        });
+    }
+
+    autoUpdater.checkForUpdatesAndNotify();
+})();
 
 // When the dock icon is clicked.
 app.on('activate', async function () {
