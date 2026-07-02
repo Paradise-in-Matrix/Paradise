@@ -40,9 +40,11 @@ const myCapacitorApp = new ElectronCapacitorApp(
 
 // If deeplinking is enabled then we will set it up here.
 if (capacitorFileConfig.electron?.deepLinkingEnabled) {
-  setupElectronDeepLinking(myCapacitorApp, {
-    customProtocol: capacitorFileConfig.electron.deepLinkingCustomProtocol ?? 'mycapacitorapp',
-  });
+    setupElectronDeepLinking(myCapacitorApp, {
+        customProtocol:
+            capacitorFileConfig.electron.deepLinkingCustomProtocol ??
+            "mycapacitorapp",
+    });
 }
 
 // If we are in Dev mode, use the file watcher components.
