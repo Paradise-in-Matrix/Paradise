@@ -1,12 +1,20 @@
-import type { CapacitorElectronConfig } from '@capacitor-community/electron';
-import { getCapacitorElectronConfig, setupElectronDeepLinking } from '@capacitor-community/electron';
-import type { MenuItemConstructorOptions } from 'electron';
-import { app, MenuItem } from 'electron';
-import electronIsDev from 'electron-is-dev';
-import unhandled from 'electron-unhandled';
-import { autoUpdater } from 'electron-updater';
+import type { CapacitorElectronConfig } from "@capacitor-community/electron";
+import {
+    getCapacitorElectronConfig,
+    setupElectronDeepLinking,
+} from "@capacitor-community/electron";
+import type { MenuItemConstructorOptions } from "electron";
+import { app, MenuItem, Tray, Menu, nativeImage, dialog } from "electron";
+import electronIsDev from "electron-is-dev";
+import unhandled from "electron-unhandled";
+import { autoUpdater } from "electron-updater";
+import { join } from "path";
 
-import { ElectronCapacitorApp, setupContentSecurityPolicy, setupReloadWatcher } from './setup';
+import {
+    ElectronCapacitorApp,
+    setupContentSecurityPolicy,
+    setupReloadWatcher,
+} from "./setup";
 
 // Graceful handling of unhandled errors.
 unhandled();
