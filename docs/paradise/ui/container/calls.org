@@ -26,6 +26,16 @@ magnitudes simpler.
 
 ***** Reframe bits
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/events.cljs
+(defn get-active-iframe-ref [db]
+  (let [active-iframe (get-in db [:call :active-iframe])
+        visible-iframe (get-in db [:call :visible-iframe] :primary)
+        target (or active-iframe visible-iframe)]
+    (if (= target :primary) primary-iframe-ref backup-iframe-ref)))
+
+(defn get-visible-iframe-ref [db]
+  (let [visible-iframe (get-in db [:call :visible-iframe] :primary)]
+    (if (= visible-iframe :primary) primary-iframe-ref backup-iframe-ref)))
+
 (defn click-iframe-button! [iframe-ref test-id]
   (when-let [iframe @iframe-ref]
     (let [doc (or (.-contentDocument iframe)
