@@ -49,7 +49,7 @@ if (capacitorFileConfig.electron?.deepLinkingEnabled) {
 
 // If we are in Dev mode, use the file watcher components.
 if (electronIsDev) {
-  setupReloadWatcher(myCapacitorApp);
+    setupReloadWatcher(myCapacitorApp);
 }
 
 // Run Application
