@@ -69,19 +69,39 @@ magnitudes simpler.
             (catch :default e (log/error "Failed to pipe worker message to iframe:" e)))))
    {}))
 
+
 (rf/reg-event-fx
  :call/hangup
  (fn [{:keys [db]} [_ opts]]
-   (log/info "Call: Sending hangup action to widget...")
-   (let [wipe?       (get opts :wipe-state? true)
-         is-primary? (get-in db [:call :primary-iframe?] true)
-         iframe-ref  (if is-primary? primary-iframe-ref backup-iframe-ref)]
-     (send-widget-action! db "im.vector.hangup" {})
-     (when-let [iframe @iframe-ref]
-       (set! (.-src iframe) "about:blank"))
+   (let [wipe?          (get opts :wipe-state? true)
+         target-room-id (or (:room-id opts) (get-in db [:call :active-room-id]))
+         iframes        (get-in db [:call :iframes])
+         iframe-key     (cond
+                          (= (:primary iframes) target-room-id) :primary
+                          (= (:backup iframes) target-room-id) :backup
+                          :else nil)
+         iframe-ref     (cond
+                          (= iframe-key :primary) primary-iframe-ref
+                          (= iframe-key :backup)  backup-iframe-ref
+                          :else nil)]
+     (when iframe-ref
+       (click-iframe-button! iframe-ref "incall_leave")
+       (when-let [iframe @iframe-ref]
+         (let [widget-id (str "element-call-" target-room-id)
+               req-id    (str "io.element.hangup-" (.now js/Date))
+               msg       #js {:api "toWidget" :action "io.element.hangup" :widgetId widget-id :requestId req-id :data #js {}}]
+           (try (.postMessage (.-contentWindow iframe) msg "*") (catch :default _)))))
      (if wipe?
-       {:dispatch [:call/teardown]}
-       {}))))
+       {:db (-> db
+                (assoc-in [:call :active-room-id] nil)
+                (assoc-in [:call :active-iframe] nil)
+                (assoc-in [:call :iframes] {:primary nil :backup nil})
+                (assoc-in [:call :is-active?] false))
+        :dispatch [:call/teardown]}
+       (let [new-db (cond-> db
+                      iframe-key (assoc-in [:call :iframes iframe-key] nil)
+                      true       (assoc-in [:call :active-room-id] nil))]
+         {:db new-db})))))
 
 (rf/reg-event-fx
  :call/toggle-audio
