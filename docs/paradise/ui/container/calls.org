@@ -557,11 +557,18 @@ facilitates the iframe and the widget in the rust-sdk.
 
              (when (= action "io.element.device_mute")
                (let [d (.-data raw-data)]
-                 (rf/dispatch [:call/update-media-state
-                               {:audio (.-audio_enabled d)
-                                :video (.-video_enabled d)}])))
+                 (rf/dispatch [:call/update-media-state {:audio (.-audio_enabled d) :video (.-video_enabled d)}])))
 
-             (when (str/starts-with? action "io.element.")
+             (when (or (= action "io.element.join")
+                       (and (= action "io.element.call.state")
+                            (let [st (.-state (.-data raw-data))] (or (= st "joined") (= st "connected")))))
+               (rf/dispatch [:call/widget-joined widget-id]))
+
+             (when (= action "im.vector.hangup")
+               (rf/dispatch [:call/handle-widget-hangup widget-id]))
+
+             (when (or (str/starts-with? action "io.element.")
+                       (str/starts-with? action "im.vector."))
                (let [ack #js {:api       "toWidget"
                               :action    action
                               :requestId req-id
