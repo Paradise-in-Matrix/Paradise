@@ -433,65 +433,110 @@ facilitates the iframe and the widget in the rust-sdk.
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/core.cljs
 (defonce window-listener-attached? (atom false))
 
-
 (rf/reg-event-fx
  :call/finalize-init
- (fn [{:keys [db]} [_ room-id new-primary? is-encrypted? final-url]]
-   {:db (-> db
-            (assoc-in [:call :active-room-id] room-id)
-            (assoc-in [:call :widget-url] final-url)
-            (assoc-in [:call :primary-iframe?] new-primary?)
-            (assoc-in [:call :encrypted?] is-encrypted?)
-            (assoc-in [:call :loading?] false))
-    :dispatch [:call/attach-window-listener]}))
-
-
+ (fn [{:keys [db]} [_ room-id target-iframe-key is-encrypted? final-url join-directly?]]
+   (let [base-call (-> (:call db)
+                       (assoc :widget-url final-url)
+                       (assoc :visible-iframe target-iframe-key)
+                       (assoc-in [:iframes target-iframe-key] room-id)
+                       (assoc :encrypted? is-encrypted?)
+                       (assoc :loading? false))]
+     (if (or join-directly? (nil? (:active-room-id base-call)))
+       {:db (assoc db :call (-> base-call
+                                (assoc :active-room-id room-id)
+                                (assoc :active-iframe target-iframe-key)
+                                (assoc :is-active? true)))
+        :dispatch [:call/attach-window-listener]}
+       {:db (assoc db :call base-call)
+        :dispatch [:call/attach-window-listener]}))))
 #+end_src
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/container/call/core.cljs
 (rf/reg-event-fx
  :call/init-widget
  (fn [{:keys [db]} [_ room-id opts]]
-   (let [current-primary? (get-in db [:call :primary-iframe?] true)
-         new-primary?     (not current-primary?)
-         target-iframe    (if new-primary? @primary-iframe-ref @backup-iframe-ref)
-         join-directly?   (:join-directly? opts true)
-         local-url        (str (.. js/window -location -origin) "/element-call/index.html")
-         pool             @state/!engine-pool]
+   (let [active-iframe   (get-in db [:call :active-iframe])
+         visible-iframe  (get-in db [:call :visible-iframe] :primary)
+         iframes         (get-in db [:call :iframes] {:primary nil :backup nil})
+         join-directly?  (:join-directly? opts true)
+         existing-iframe (cond
+                           (= (:primary iframes) room-id) :primary
+                           (= (:backup iframes) room-id) :backup
+                           :else nil)]
 
-     (if-not pool
-       (do (log/error "Cannot init widget: No worker pool") {})
-       (go
-         (let [res (<! (main/do-with-pool! pool {:handler :init-call-widget
-                                                 :arguments {:room-id        room-id
-                                                             :join-directly? join-directly?
-                                                             :local-url      local-url}}))]
-           (if (= (:status res) "success")
-             (let [raw-url        (:raw-url res)
-                   is-encrypted?  (:is-encrypted? res)
-                   client-user-id (:user-id res)
-                   device-id      (:device-id res)
-                   hs-url         (get db :homeserver-url)
-                   actual-id      (str "element-call-" room-id)
-                   base           (str/replace raw-url #"\?.*$|\#.*$" "")
-                   intent-str     (if join-directly? "start_call" "join_existing")
-                   skip-lobby-str (if join-directly? "true" "false")
-                   widget-query   (str "?widgetId=" (js/encodeURIComponent actual-id)
-                                       "&parentUrl=" (js/encodeURIComponent (.. js/window -location -origin))
-                                       "&userId=" (js/encodeURIComponent client-user-id)
-                                       "&deviceId=" (js/encodeURIComponent device-id)
-                                       "&baseUrl=" (js/encodeURIComponent hs-url))
-                   app-fragment   (str "#/?intent=" intent-str
-                                       "&skipLobby=" skip-lobby-str
-                                       "&roomId=" (js/encodeURIComponent room-id)
-                                       "&perParticipantE2EE=" (if is-encrypted? "true" "false")
-                                       "&theme=dark&lang=en")
-                   final-url      (str base widget-query app-fragment)]
+     (if existing-iframe
+       {:db (-> db
+                (assoc-in [:call :visible-iframe] existing-iframe)
+                (assoc-in [:call :loading?] false)
+                (cond-> join-directly? (assoc-in [:call :active-room-id] room-id)))}
+       (let [target-iframe-key (if active-iframe
+                                 (if (= active-iframe :primary) :backup :primary)
+                                 (if (= visible-iframe :primary) :backup :primary))
+             target-iframe     (if (= target-iframe-key :primary) @primary-iframe-ref @backup-iframe-ref)
+             local-url         (str (.. js/window -location -origin) "/element-call/index.html")
+             pool              @state/!engine-pool]
 
-               (set! (.-src target-iframe) final-url)
-               (rf/dispatch [:call/finalize-init room-id new-primary? is-encrypted? final-url]))
-             (log/error "Worker failed to init widget:" (:msg res))))))
-     {:db (assoc-in db [:call :loading?] true)})))
+         (if-not pool
+           (do (log/error "Cannot init widget: No worker pool") {})
+           (go
+             (let [res (<! (main/do-with-pool! pool {:handler :init-call-widget
+                                                     :arguments {:room-id        room-id
+                                                                 :join-directly? join-directly?
+                                                                 :local-url      local-url}}))]
+               (if (= (:status res) "success")
+                 (let [raw-url        (:raw-url res)
+                       is-encrypted?  (:is-encrypted? res)
+                       actual-id      (str "element-call-" room-id)
+                       base           (str/replace raw-url #"\?.*$|\#.*$" "")
+                       intent-str     (if join-directly? "start_call" "join_existing")
+                       skip-lobby-str (if join-directly? "true" "false")
+                       widget-query   (str "?widgetId=" (js/encodeURIComponent actual-id)
+                                           "&parentUrl=" (js/encodeURIComponent (.. js/window -location -origin))
+                                           "&userId=" (js/encodeURIComponent (:user-id res))
+                                           "&deviceId=" (js/encodeURIComponent (:device-id res))
+                                           "&baseUrl=" (js/encodeURIComponent (get db :homeserver-url))
+                                           "&_t=" (.now js/Date))
+                       app-fragment   (str "#/?intent=" intent-str
+                                           "&skipLobby=" skip-lobby-str
+                                           "&roomId=" (js/encodeURIComponent room-id)
+                                           "&perParticipantE2EE=" (if is-encrypted? "true" "false")
+                                           "&theme=dark&lang=en")
+                       final-url      (str base widget-query app-fragment)]
+                   (set! (.-src target-iframe) "about:blank")
+                   (js/setTimeout #(set! (.-src target-iframe) final-url) 10)
+                   (rf/dispatch [:call/finalize-init room-id target-iframe-key is-encrypted? final-url join-directly?]))
+                 (log/error "Worker failed to init widget:" (:msg res))))))
+         {:db (assoc-in db [:call :loading?] true)})))))
+
+
+(rf/reg-event-fx
+ :call/widget-joined
+ (fn [{:keys [db]} [_ widget-id]]
+   (let [room-id        (str/replace widget-id #"^element-call-" "")
+         active-call-id (get-in db [:call :active-room-id])
+         iframes        (get-in db [:call :iframes])
+         joined-iframe  (if (= (:primary iframes) room-id) :primary :backup)
+         active-iframe  (get-in db [:call :active-iframe])]
+
+     (if (and active-call-id (not= active-call-id room-id))
+       (let [old-iframe-ref (if (= active-iframe :primary) primary-iframe-ref backup-iframe-ref)]
+         (when-let [iframe @old-iframe-ref]
+           (let [req-id (str "im.vector.hangup-" (.now js/Date))
+                 msg #js {:api "toWidget" :action "im.vector.hangup" :widgetId (str "element-call-" active-call-id) :requestId req-id :data #js {}}]
+             (try (.postMessage (.-contentWindow iframe) msg "*") (catch :default _)))
+           (set! (.-src iframe) "about:blank"))
+         {:db (-> db
+                  (assoc-in [:call :active-room-id] room-id)
+                  (assoc-in [:call :active-iframe] joined-iframe)
+                  (assoc-in [:call :visible-iframe] joined-iframe)
+                  (assoc-in [:call :iframes (if (= active-iframe :primary) :primary :backup)] nil)
+                  (assoc-in [:call :is-active?] true))})
+       {:db (-> db
+                (assoc-in [:call :active-room-id] room-id)
+                (assoc-in [:call :active-iframe] joined-iframe)
+                (assoc-in [:call :visible-iframe] joined-iframe)
+                (assoc-in [:call :is-active?] true))}))))
 #+end_src
 
 
