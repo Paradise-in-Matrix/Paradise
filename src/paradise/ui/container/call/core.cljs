@@ -138,9 +138,12 @@
                             (let [st (.-state (.-data raw-data))] (or (= st "joined") (= st "connected")))))
                (rf/dispatch [:call/widget-joined widget-id]))
 
-             (when (= action "im.vector.hangup")
+             (when (or (= action "io.element.close")
+                       (= action "im.vector.hangup")
+                       (and (= action "io.element.call.state")
+                            (let [st (.-state (.-data raw-data))]
+                              (or (= st "ended") (= st "left") (= st "disconnected")))))
                (rf/dispatch [:call/handle-widget-hangup widget-id]))
-
              (when (or (str/starts-with? action "io.element.")
                        (str/starts-with? action "im.vector."))
                (let [ack #js {:api       "toWidget"
@@ -152,7 +155,6 @@
                  (.postMessage (.-source event) ack "*")))
 
              (if-let [pool @state/!engine-pool]
-               (main/do-with-pool! pool {:handler :send-widget-message
-                                         :arguments {:msg-string msg-string}})
+               (main/do-with-pool! pool {:handler :send-widget-message :arguments {:msg-string msg-string}})
                (log/error "No worker pool to route iframe message!")))))))
    {}))
