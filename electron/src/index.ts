@@ -74,18 +74,14 @@ if (electronIsDev) {
                 .getSources({ types: ["screen", "window"] })
                 .then((sources) => {
                     if (process.platform === "linux" && sources.length === 1) {
-                        callback({ video: sources[0] });
+                        callback({ video: sources[0], audio: "loopback" });
                         return;
                     }
 
                     const template = sources.map((source) => ({
                         label: source.name,
                         click: () => {
-                            if (process.platform === "linux") {
-                                callback({ video: source });
-                            } else {
-                                callback({ video: source, audio: "loopback" });
-                            }
+                            callback({ video: source, audio: "loopback" });
                         },
                     }));
 
