@@ -47,5 +47,14 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>audio</string>
+    <string>voip</string>
+  </array>
+  <key>NSCameraUsageDescription</key>
+  <string>Paradise requires camera access for video calls.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Paradise requires microphone access for voice and video calls.</string>
 </dict>
 </plist>
