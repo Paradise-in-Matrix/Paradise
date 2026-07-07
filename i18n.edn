@@ -209,6 +209,14 @@
    {:set-status "Set Status"
     :copy-id "Copy ID"
     :logout "Log Out"}
+   :credits {
+             :art-label
+             "Art"
+             "All early supporters. Shiro and Dark Wizard. My wife, Claudea.
+The Guix project for inspiration. Similarly, Clojure. Emacs for showing that
+code can be truly modular and that the user should own and control their
+environment."
+             }
    :advanced {
               :description  "Install custom modifications. Proceed with caution."
               :title "Plugins & Themes"
