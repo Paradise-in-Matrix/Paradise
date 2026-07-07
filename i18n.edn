@@ -212,6 +212,9 @@
    :credits {
              :art-label
              "Art"
+             :special-label
+             "Special Thanks"
+             :special-thanks
              "All early supporters. Shiro and Dark Wizard. My wife, Claudea.
 The Guix project for inspiration. Similarly, Clojure. Emacs for showing that
 code can be truly modular and that the user should own and control their
