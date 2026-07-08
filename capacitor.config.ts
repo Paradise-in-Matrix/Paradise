@@ -10,8 +10,6 @@ const config: CapacitorConfig = {
         //        cleartext: true,
         androidScheme: "http",
     },
-    android: {
-        adjustMarginsForEdgeToEdge: "force",
     },
     plugins: {
         SystemBars: {
