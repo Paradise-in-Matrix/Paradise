@@ -1,0 +1,13 @@
+
+** Settings for Navigation components
+
+
+**** Preface
+
+So rooms and spaces will collectively need a way to manage the
+settings and permissions of the room or space.
+These should exist alongside the app / profile settings
+(whose file we should likely rename soon)
+
+**** Imports
+
