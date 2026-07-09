@@ -11,3 +11,15 @@ These should exist alongside the app / profile settings
 
 **** Imports
 
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/navigation_settings.cljs
+
+#+end_src
+
+
+**** Sauce
+
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/ui/overlays/navigation_settings.cljs
+
+#+end_src
+
