@@ -212,6 +212,8 @@
    :credits {
              :art-label
              "Art"
+             :code-label
+             "Code"
              :special-label
              "Special Thanks"
              :special-thanks
