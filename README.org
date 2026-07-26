@@ -48,9 +48,13 @@ We are trapped in an artificial space station that is non-free, corporate-owned 
 as analogous to Babel. So we must make our way to Paradise. Many individuals have set out on creating
 or finding Paradise, but the goal for this project is to provide people perhaps a small slice of paradise.
 
+A goal for Paradise is modularity on any device you choice to use. As an extra, I'd like the core to be modular
+as well so that it isn't inherently locked to being a Matrix client. Instead it should be agnostic of
+protocol.
+
 
 ***** Set-up
-The WASM package is extracted from the repo for cleanliness. So the set-up is rather simple on
+The Matrix Rust SDK WASM package is extracted from the repo for cleanliness. So the set-up is rather simple on
 most platforms.
 
 #+NAME: build-scripts
