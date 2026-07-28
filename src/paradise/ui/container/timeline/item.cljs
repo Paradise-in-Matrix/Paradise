@@ -527,9 +527,9 @@
   (let [tr               @(re-frame/subscribe [:i18n/tr])]
     (cond
       (= content-tag "RoomMembership")
-      [system-event-view (tr [:container.timeline.status/membership] [sender-name])]
+      [system-event-view (tr [:container.timeline.status/membership] [(truncate-name sender-name 16)])]
       (= content-tag "ProfileChange")
-      [system-event-view (tr [:container.timeline.status/profile] [sender-name])]
+      [system-event-view (tr [:container.timeline.status/profile] [(truncate-name sender-name 16)])]
       (= content-tag "State")
       [state-event-view item]
       :else
