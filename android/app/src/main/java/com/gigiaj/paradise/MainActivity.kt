@@ -1,4 +1,4 @@
-package com.gigiaj.paradise;
+package com.gigiaj.paradise
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
