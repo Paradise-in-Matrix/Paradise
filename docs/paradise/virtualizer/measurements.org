@@ -206,6 +206,7 @@ This is more or less how we transmit the results of our measuring back to be use
                              (get measured (str id))
                              (when (keyword? id) (get measured (name id))))
 
+              ;; Tracking which messages were mismeasured here
               _ (when measured-h
                   (js/console.log "[WORKER MATH] Used real DOM height for:" id "->" measured-h))
 
