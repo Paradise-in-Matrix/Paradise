@@ -319,7 +319,6 @@ sure we actually document the behavior and what it is for future discoverers.
 (worker/register :set-viewport
                  (fn [{:keys [visible-ids]}]
                    (reset! parsing/!visible-active-ids (set visible-ids))
-                   (trigger-defer-check!)
                    {:status :success}))
 
 (worker/register :set-scrolling-state
@@ -327,7 +326,7 @@ sure we actually document the behavior and what it is for future discoverers.
                    (reset! parsing/!is-scrolling? scrolling?)
                    (when (and (not scrolling?) @parsing/!pending-defer-check?)
                      (reset! parsing/!pending-defer-check? false)
-                     (trigger-defer-check!))
+                     (queue-defer-check!))
                    {:status :success}))
 
 ;; still using old call form
