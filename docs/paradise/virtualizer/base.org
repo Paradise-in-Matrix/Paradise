@@ -330,9 +330,10 @@ sure we actually document the behavior and what it is for future discoverers.
                    {:status :success}))
 
 (worker/register :update-layout-context
-                 (fn [{:keys [arguments]}]
-                   (let [{:keys [room-id width theme measured]} arguments
-                         old-ctx (get @!layout-context room-id)]
+                 (fn [{:keys [room-id width theme measured]}]
+                   (let  [old-ctx (get @!layout-context room-id)]
+
+      (js/console.log "[WORKER] Received layout context update. Total measured items:" (count measured))
                      (when (or (not= width (:width old-ctx)) (not= theme (:theme old-ctx)))
                        (reset! measurements/!pretext-cache {}))
 
@@ -350,6 +351,7 @@ sure we actually document the behavior and what it is for future discoverers.
                      (swap! !room-events assoc-in [room-id source] enriched-events)
                      (recalculate-and-stream! room-id source)
                      {:status :success})))
+
 
 (worker/register :recalculate-items
                  (fn [{:keys [room-id item-ids]}]
