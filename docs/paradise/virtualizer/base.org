@@ -329,8 +329,6 @@ sure we actually document the behavior and what it is for future discoverers.
                      (queue-defer-check!))
                    {:status :success}))
 
-;; still using old call form
-;; need to globally update all to use mesh form
 (worker/register :update-layout-context
                  (fn [{:keys [arguments]}]
                    (let [{:keys [room-id width theme measured]} arguments
