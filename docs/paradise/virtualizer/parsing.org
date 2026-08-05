@@ -101,18 +101,27 @@ and then automatically send the main thread the updated render.
 
 #+begin_src clojurescript :tangle ../../../src/paradise/virtualizer/parsing.cljs
 (defn check-deferred-components! []
-  (let [changed-ids (transient #{})]
-    (doseq [[e-id deferreds] @!deferred-component-cache]
-      (doseq [{:keys [comp-fn args last-result]} deferreds]
-        (try
-          (let [raw-res    (apply comp-fn args)
-                new-result (if (fn? raw-res) (apply raw-res args) raw-res)
-                stripped   (strip-fns new-result)]
-            (when (not= stripped last-result)
-              (conj! changed-ids e-id)))
-          (catch :default e
-            (log/warn "Error evaluating deferred component:" e)))))
-    (persistent! changed-ids)))
+  (if @!is-scrolling?
+    (do
+      (reset! !pending-defer-check? true)
+      #{})
+    (let [changed-ids (transient #{})
+          active-ids  @!visible-active-ids]
+      (doseq [[e-id deferreds] @!deferred-component-cache]
+        (when (or (empty? active-ids) (contains? active-ids e-id))
+          (doseq [{:keys [comp-fn args last-result]} deferreds]
+            (try
+              (let [raw-res    (apply comp-fn args)
+                    new-result (if (fn? raw-res) (apply raw-res args) raw-res)
+                    stripped   (strip-fns new-result)]
+                (when (not= stripped last-result)
+                  (conj! changed-ids e-id)))
+              (catch :default e
+                (log/warn "Error evaluating deferred component:" e))))))
+      (let [final-changes (persistent! changed-ids)]
+        (doseq [id final-changes]
+          (swap! !item-revisions update id (fnil inc 0)))
+        final-changes))))
 #+end_src
 
 
