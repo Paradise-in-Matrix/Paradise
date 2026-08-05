@@ -200,8 +200,8 @@ later.
         (let [args         (rest node)
               raw-res      (apply comp-fn args)
               final-result (if (fn? raw-res) (apply raw-res args) raw-res)]
-          (when (and defer-boundary !current-event-id)
-            (swap! !deferred-component-cache update !current-event-id
+          (when (and defer-boundary @!current-event-id)
+            (swap! !deferred-component-cache update @!current-event-id
                    (fnil conj [])
                    {:comp-fn comp-fn :args args :last-result (strip-fns final-result)}))
           (expand-hiccup final-result))))
