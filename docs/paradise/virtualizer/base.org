@@ -182,6 +182,9 @@ React object that will be hydrated on the other end.
           "lambda-paths" lambda-paths}
      true)))
 
+
+(defonce !sync-timer (atom nil))
+
 (defn queue-defer-check! []
   (when-let [t @!sync-timer]
     (js/cancelAnimationFrame t))
