@@ -8,66 +8,33 @@
    [re-frame.db :as db]
    [reagent.core :as r]
    [promesa.core :as p]
+   [paradise.binding.core :as binding]
+   [paradise.binding.streams :as streams]
    [paradise.shared.client.state :as state]
    [paradise.shared.client.config :refer [eve-enabled?]]
    [paradise.shared.client.session-store :as store]
    [cljs-workers.core :as main]
    [cljs-workers.mesh :as mesh]
+   [cljs.core.async.interop :refer-macros [<p!]]
    [cljs.core.async :refer [go <!]]
    [taoensso.timbre :as log]))
-
-(defn handle-worker-stream! [data]
-  (let [is-map?  (map? data)
-        msg-type (if is-map? (:type data) (goog.object/get data "type"))
-        get-val  (fn [k-str k-kw]
-                   (if is-map? (get data k-kw) (goog.object/get data k-str)))]
-    (case msg-type
-      "home-rooms-diff"        (re-frame/dispatch [:room-list/set-home-rooms-sync (get-val "rooms" :rooms)])
-      "bg-rooms-diff"          (re-frame/dispatch [:room-list/set-bg-rooms-sync (get-val "rooms" :rooms)])
-      "global-spaces-diff"     (re-frame/dispatch [:sdk/set-spaces-list-sync (get-val "spaces" :spaces)])
-      "space-rooms-diff"       (re-frame/dispatch [:sdk/update-space-view (get-val "space-id" :space-id) (get-val "rooms" :rooms)])
-      "room-parent-resolved"   (re-frame/dispatch [:rooms/apply-parent-resolution (get-val "room-id" :room-id) (get-val "first-parent-id" :first-parent-id)])
-      "room-preview-resolved"  (re-frame/dispatch [:rooms/set-preview (get-val "room-id" :room-id) (get-val "preview" :preview)])
-
-      "timeline-ready"
-      (let [source-str (get-val "source" :source)
-            room-id    (get-val "room-id" :room-id)
-            ast-nodes  (get-val "ast-nodes" :ast-nodes)
-            paths      (get-val "lambda-paths" :lambda-paths)]
-
-        (swap! state/!ast-handoff assoc room-id {:ast-nodes ast-nodes :paths paths})
-
-        (re-frame/dispatch [:timeline/process-virtualized-data room-id source-str])
-        (re-frame/dispatch [:app/worker-redraw-ping]))
-
-      "widget-message"         (re-frame/dispatch [:call/recv-widget-message (get-val "data" :data)])
-      "recovery-state-update"  (re-frame/dispatch [:sdk/handle-recovery-stream (keyword (get-val "state" :state))])
-      "timeline-loading"       (re-frame/dispatch [:timeline/set-loading (get-val "room-id" :room-id) (get-val "loading?" :loading?)])
-      "typing-update"          (re-frame/dispatch [:sdk/update-typing-users (get-val "room-id" :room-id) (get-val "users" :users)])
-
-      "pagination-status"      (re-frame/dispatch [:sdk/update-pagination-status (get-val "room-id" :room-id) (get-val "status" :status)])
-      "media-preview-config"   (re-frame/dispatch [:settings/receive-media-preview-config (keyword (get-val "policy" :policy))])
-
-      "pins-sync"              (re-frame/dispatch [:room/sync-pinned-ids (get-val "room-id" :room-id) (get-val "pinned-ids" :pinned-ids)])
-      "pin-update"             (re-frame/dispatch [:room/update-pinned-event (get-val "room-id" :room-id) (get-val "event" :event)])
-
-      nil)))
 
 (defn init-worker! []
   (when-not @state/!engine-pool
     (reset! state/!engine-pool
             (main/create-pool 1 "engine.js"
                               {:worker-opts #js {:type "module"}
-                               :on-stream handle-worker-stream!})))
+                               :on-stream binding/handle-worker-stream!})))
   (when-not @state/!media-pool
     (reset! state/!media-pool
             (main/create-pool 3 "media.js"
                               {:worker-opts #js {:type "module"}})))
+
   (when-not @state/!virtualizer-pool
     (reset! state/!virtualizer-pool
             (main/create-pool 1 "virtualizer.js"
                               {:worker-opts #js {:type "module"}
-                               :on-stream handle-worker-stream!}))))
+                               :on-stream binding/handle-worker-stream!}))))
 
 (defn bind-workers! [engine-pool media-pool virtualizer-pool app-db-payload]
   (let [ev-chan  (js/MessageChannel.)
@@ -90,7 +57,10 @@
         me-port2 (.-port2 me-chan)
         db-chan  (js/MessageChannel.)
         db-port1 (.-port1 db-chan)
-        db-port2 (.-port2 db-chan)]
+        db-port2 (.-port2 db-chan)
+        ee-chan  (js/MessageChannel.)
+        ee-port1 (.-port1 ee-chan)
+        ee-port2 (.-port2 ee-chan)]
 
     (if eve-enabled?
       (main/do-with-pool! virtualizer-pool
@@ -150,9 +120,16 @@
     (main/do-with-pool! virtualizer-pool
                         {:handler   :register-port
                          :arguments {:identity-id :virtualizer-loopback :port vv-port2}
+                         :transfer  [:port]})
+
+    (main/do-with-pool! engine-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :engine-pool :port ee-port1}
+                         :transfer  [:port]})
+    (main/do-with-pool! engine-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :engine-loopback :port ee-port2}
                          :transfer  [:port]})))
-
-
 
 (extend-type eve.vec/EveVector
   IReversible
@@ -194,18 +171,34 @@
 
 (re-frame/reg-event-fx
  :app/bootstrap
- (fn [_ [_ target-user-id]]
-   (log/debug "Bootstrapping:" target-user-id)
+ (fn [_ [_ target-user-id engine-id]]
    (go
-       (let [init-res (<! (mesh/do-with-thread! :engine-pool {:handler :init-wasm}))]
-         (if (= (:status init-res) "success")
-           (let [boot-res (<! (mesh/do-with-thread! :engine-pool {:handler :bootstrap
-                                                               :arguments {:target-user-id target-user-id}}))]
-             (case (:status boot-res)
-               "success" (re-frame/dispatch [:auth/login-success boot-res])
-               "empty"   (re-frame/dispatch [:auth/set-status :logged-out])
-               "error"   (log/error "Bootstrap failed:" (:msg boot-res))))
-           (log/error "WASM failed to load!" (:msg init-res)))))
+       (try
+         (let [boot-res  (<! (mesh/do-with-thread! :engine-pool
+                                                 {:handler :bootstrap
+                                                  :arguments {:target-user-id target-user-id}}))
+               status-kw (keyword (:status boot-res))]
+           (case status-kw
+             :success (re-frame/dispatch [:auth/login-success (assoc boot-res :engine-id engine-id)])
+             :empty   (re-frame/dispatch [:auth/set-status :logged-out])
+             :error   (log/error "Bootstrap failed:" (or (:msg boot-res) (:message boot-res) boot-res))))
+         (catch :default e
+           (log/error "Fatal bootstrap error:" e))))
+   {}))
+
+(defn register-engine [protocol-str]
+  (go
+    (let [res (<! (mesh/do-with-thread! :engine-pool
+                                        {:handler :register-engine
+                                         :arguments {:engine-id protocol-str}}))]
+      (if (= "success" (:status res))
+        (js/console.log "Engine loaded successfully:" protocol-str)
+        (js/console.error "Failed to load engine:" (:msg res))))))
+
+(re-frame/reg-event-fx
+ :engine/load-protocol
+ (fn [_ [_ protocol-str]]
+   (register-engine protocol-str)
    {}))
 
 (re-frame/reg-event-fx
@@ -215,8 +208,28 @@
      (let [pool @state/!engine-pool
            res  (<! (main/do-with-pool! pool {:handler :start-sync}))]
        (if (= (:status res) "success")
-         (log/info "Matrix sync loop started successfully.")
+         (log/info "Main sync loop started successfully.")
          (log/error "Failed to start sync:" (:msg res)))))
+   {}))
+
+(re-frame/reg-event-fx
+ :app/cold-boot
+ (fn [_ [_ target-user-id requested-engine]]
+   (go
+     (let [saved-engine (<p! (store/get-setting "last-active-engine"))
+           engine-id    (when-let [e (or requested-engine saved-engine)]
+                          (keyword e))]
+
+       (when engine-id
+         (<! (register-engine engine-id))
+         (binding/set-active-engine! engine-id)
+         (streams/init-engine-streams! engine-id))
+
+       (log/info "Cold boot sequence initiated. Targeting engine:" engine-id)
+
+       (if (and target-user-id engine-id)
+         (re-frame/dispatch [:app/bootstrap target-user-id engine-id])
+         (re-frame/dispatch [:auth/set-status :logged-out]))))
    {}))
 
 (re-frame/reg-event-fx
@@ -227,6 +240,7 @@
          [:dispatch [:sdk/fetch-all-emotes]]]}))
 
 (defn ^:export init []
+  (binding/init-middleware!)
   (init-worker!)
   (app/init)
   (logger/init!)
