@@ -54,6 +54,7 @@
  :call/hangup
  (fn [{:keys [db]} [_ opts]]
    (let [wipe?          (get opts :wipe-state? true)
+         skip-native?   (get opts :skip-native? false)
          target-room-id (or (:room-id opts) (get-in db [:call :active-room-id]))
          iframes        (get-in db [:call :iframes])
          iframe-key     (cond
@@ -64,6 +65,8 @@
                           (= iframe-key :primary) primary-iframe-ref
                           (= iframe-key :backup)  backup-iframe-ref
                           :else nil)]
+     (when (and target-room-id (not skip-native?))
+       (paradise.ui.container.call.native/end-call! target-room-id))
      (when iframe-ref
        (click-iframe-button! iframe-ref "incall_leave")
        (when-let [iframe @iframe-ref]
@@ -143,6 +146,8 @@
  (fn [{:keys [db]} [_ widget-id]]
    (let [target-room-id (when widget-id (str/replace widget-id #"^element-call-" ""))
          active-room-id (get-in db [:call :active-room-id])]
+     (when target-room-id (paradise.ui.container.call.native/end-call! target-room-id))
+
      (if (and active-room-id (= target-room-id active-room-id))
        {:dispatch [:call/teardown]}
        {}))))
