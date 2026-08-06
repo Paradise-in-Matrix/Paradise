@@ -161,7 +161,16 @@
       (if (seq evs)
         (let [msg (first evs)
               id  (:id msg)
-              h   (or (get measured id)
+              measured-h (or (get measured id)
+                             (get measured (keyword id))
+                             (get measured (str id))
+                             (when (keyword? id) (get measured (name id))))
+
+              ;; Tracking which messages were mismeasured here
+              _ (when measured-h
+                  (js/console.log "[WORKER MATH] Used real DOM height for:" id "->" measured-h))
+
+              h   (or measured-h
                       (calc-item-height msg width theme))]
           (recur (next evs)
                  (+ total h)
