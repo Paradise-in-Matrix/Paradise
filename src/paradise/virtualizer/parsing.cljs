@@ -63,18 +63,27 @@
 
 
 (defn check-deferred-components! []
-  (let [changed-ids (transient #{})]
-    (doseq [[e-id deferreds] @!deferred-component-cache]
-      (doseq [{:keys [comp-fn args last-result]} deferreds]
-        (try
-          (let [raw-res    (apply comp-fn args)
-                new-result (if (fn? raw-res) (apply raw-res args) raw-res)
-                stripped   (strip-fns new-result)]
-            (when (not= stripped last-result)
-              (conj! changed-ids e-id)))
-          (catch :default e
-            (log/warn "Error evaluating deferred component:" e)))))
-    (persistent! changed-ids)))
+  (if @!is-scrolling?
+    (do
+      (reset! !pending-defer-check? true)
+      #{})
+    (let [changed-ids (transient #{})
+          active-ids  @!visible-active-ids]
+      (doseq [[e-id deferreds] @!deferred-component-cache]
+        (when (or (empty? active-ids) (contains? active-ids e-id))
+          (doseq [{:keys [comp-fn args last-result]} deferreds]
+            (try
+              (let [raw-res    (apply comp-fn args)
+                    new-result (if (fn? raw-res) (apply raw-res args) raw-res)
+                    stripped   (strip-fns new-result)]
+                (when (not= stripped last-result)
+                  (conj! changed-ids e-id)))
+              (catch :default e
+                (log/warn "Error evaluating deferred component:" e))))))
+      (let [final-changes (persistent! changed-ids)]
+        (doseq [id final-changes]
+          (swap! !item-revisions update id (fnil inc 0)))
+        final-changes))))
 
 (defn extract-first-url [text]
   (when text
@@ -137,8 +146,8 @@
         (let [args         (rest node)
               raw-res      (apply comp-fn args)
               final-result (if (fn? raw-res) (apply raw-res args) raw-res)]
-          (when (and defer-boundary !current-event-id)
-            (swap! !deferred-component-cache update !current-event-id
+          (when (and defer-boundary @!current-event-id)
+            (swap! !deferred-component-cache update @!current-event-id
                    (fnil conj [])
                    {:comp-fn comp-fn :args args :last-result (strip-fns final-result)}))
           (expand-hiccup final-result))))
@@ -344,27 +353,31 @@
                     cached-entry (get @!ast-node-cache id)]
                 (if (and cached-entry (= (:cache-key cached-entry) cache-key))
                   (assoc item :worker-data (:pojo cached-entry))
-                  (binding [!current-event-id id]
-                    (swap! !deferred-component-cache dissoc id)
-                    (let [outer-res  (render-fn item nil false nil nil)
-                          hiccup-ast (if (fn? outer-res)
-                                       (outer-res item nil false nil nil)
-                                       outer-res)
-                          expanded   (expand-hiccup hiccup-ast)
-                          pojo       (hiccup->pojo expanded)
-                          versioned-pojo (doto pojo (goog.object/set "ast-version" cache-key))]
-                      (swap! !ast-node-cache (fn [m]
-                                               (let [m' (assoc m id {:cache-key cache-key :pojo versioned-pojo})]
-                                                 (if (> (count m') 2000)
-                                                   (let [evictable  (remove @!visible-active-ids (keys m'))
-                                                         evicted-id (first evictable)]
-                                                     (if evicted-id
-                                                       (do
-                                                         (swap! !deferred-component-cache dissoc evicted-id)
-                                                         (dissoc m' evicted-id))
-                                                       m'))
-                                                   m'))))
-                      (assoc item :worker-data versioned-pojo))))))
+                  (let [previous-id @!current-event-id]
+                    (reset! !current-event-id id)
+                    (try
+                      (swap! !deferred-component-cache dissoc id)
+                      (let [outer-res  (render-fn item nil false nil nil)
+                            hiccup-ast (if (fn? outer-res)
+                                         (outer-res item nil false nil nil)
+                                         outer-res)
+                            expanded   (expand-hiccup hiccup-ast)
+                            pojo       (hiccup->pojo expanded)
+                            versioned-pojo (doto pojo (goog.object/set "ast-version" cache-key))]
+                        (swap! !ast-node-cache (fn [m]
+                                                 (let [m' (assoc m id {:cache-key cache-key :pojo versioned-pojo})]
+                                                   (if (> (count m') 2000)
+                                                     (let [evictable  (remove @!visible-active-ids (keys m'))
+                                                           evicted-id (first evictable)]
+                                                       (if evicted-id
+                                                         (do
+                                                           (swap! !deferred-component-cache dissoc evicted-id)
+                                                           (dissoc m' evicted-id))
+                                                         m'))
+                                                     m'))))
+                        (assoc item :worker-data versioned-pojo))
+                      (finally
+                        (reset! !current-event-id previous-id)))))))
             laid-out)
       (do
         (log/error "FATAL: event-tile-render NOT FOUND registry!")
