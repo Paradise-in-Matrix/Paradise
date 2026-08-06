@@ -326,14 +326,6 @@
        :else
        [:span.text {:key "empty"} "\u00A0"])]))
 
-
-(re-frame/reg-event-fx :sdk/update-layout-context
-                       (fn [{:keys [db]} [_ room-id width theme measured]]
-                         (main/do-with-pool! @state/!virtualizer-pool
-                                             {:handler :update-layout-context
-                                              :arguments {:room-id room-id :width width :theme theme :measured measured}})
-                         {}))
-
 (def default-metrics {:font "16px sans-serif" :line-height 22.8})
 
 (defn pretext-timeline [room-id]
@@ -358,6 +350,7 @@
             back-dead?       @(re-frame/subscribe [:timeline/back-dead? room-id])
             jump-target      @(re-frame/subscribe [:timeline/jump-target-id room-id])
             focus-mode?      @(re-frame/subscribe [:room/is-focused? room-id])]
+        ^{:key room-id}
         [virtualized-list
          {:items                    events
           :items-map                events-map
@@ -371,7 +364,13 @@
           :on-jump-live             on-jump-live
           :on-viewport-change       on-viewport-change
           :on-scroll-state-change   on-scroll-state
-          :on-layout-context-change (fn [w t m] (re-frame/dispatch [:sdk/update-layout-context room-id w t m]))
+          :on-layout-context-change (fn [w t m]
+                                      (mesh/do-with-thread! :virtualizer-pool
+                                                            {:handler :update-layout-context
+                                                             :arguments {:room-id room-id
+                                                                         :width w
+                                                                         :theme t
+                                                                         :measured m}}))
           :extract-metrics-fn       extract-timeline-metrics
           :default-theme-metrics    default-metrics
           :wrapper-class            "timeline-wrapper"
@@ -381,7 +380,6 @@
           :render-jump-button       render-jump
           :render-loading-overlay   render-loading
           :render-measuring-sticks  render-sticks}]))))
-
 
 (defn timeline [& {:keys [compact? hide-header?]}]
   (let [active-id    @(re-frame/subscribe [:rooms/active-id])
