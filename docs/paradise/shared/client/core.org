@@ -284,7 +284,7 @@ then a quick reframe event for the login to also register them on protocol selec
      (let [pool @state/!engine-pool
            res  (<! (main/do-with-pool! pool {:handler :start-sync}))]
        (if (= (:status res) "success")
-         (log/info "Matrix sync loop started successfully.")
+         (log/info "Main sync loop started successfully.")
          (log/error "Failed to start sync:" (:msg res)))))
    {}))
 #+end_src
