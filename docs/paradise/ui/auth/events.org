@@ -229,7 +229,7 @@ Probably needs a better name (and logical grouping)
 ***** Login Field
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/auth/events.cljs
-(defui login-field [{:keys [id label type value on-change disabled]}]
+(defn ^:ui login-field [{:keys [id label type value on-change disabled]}]
   [:div.field-group.mb-4
    [:label.field-label {:for id} label]
    [:input.field-input
