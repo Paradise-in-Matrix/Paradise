@@ -637,7 +637,6 @@
      (cond
        is-editing-this?
        [inline-editor item active-room]
-;;       ["comp:paradise.ui.input.base/inline-editor" item active-room]
        (= tag "Sticker") [render-message-content tr "Sticker" inner in-reply-to item]
        (= tag "Redacted") [:span.redacted (tr [:container.timeline.status/redacted])]
        (= tag "UnableToDecrypt") [:span.decryption-error (tr [:container.timeline.status/decryption-error])]
