@@ -130,8 +130,6 @@
           (delete-db! (str base-name "::media"))])))
 
 
-
-
 (defn- load-sessions-impl []
   (p/let [sessions (load-raw-sessions-opfs)
           Session (get-session-class)]
@@ -155,7 +153,6 @@
                                   :passphrase final-pass
                                   :storeId final-id})
       (save-raw-sessions-opfs! sessions))))
-
 
 (defn- clear-session-impl! [user-id]
   (p/let [sessions (load-raw-sessions-opfs)
