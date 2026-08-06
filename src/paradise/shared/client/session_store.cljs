@@ -130,33 +130,6 @@
           (delete-db! (str base-name "::media"))])))
 
 
-#_(defn- sync-to-sw-vault! [sessions-obj]
-  (let [user-keys (js/Object.keys sessions-obj)]
-    (when (pos? (.-length user-keys))
-      (let [request (.open js/indexedDB "sw-vault" 1)]
-        (set! (.-onupgradeneeded request)
-              (fn [e]
-                (let [db (.. e -target -result)]
-                  (.createObjectStore db "tokens" #js {:keyPath "userId"}))))
-        (set! (.-onsuccess request)
-              (fn [e]
-                (let [db (.. e -target -result)
-                      tx (.transaction db #js ["tokens"] "readwrite")
-                      store (.objectStore tx "tokens")]
-                  (.clear store)
-                  (doseq [user-id user-keys]
-                    (let [data (aget sessions-obj user-id)
-                          session (aget data "session")
-                          token (aget session "accessToken")
-                          device-id (aget session "deviceId")
-                          hs-url (aget session "homeserverUrl")]
-                      (.put store #js {:userId    user-id
-                                       :token      token
-                                       :deviceId  device-id
-                                       :hsUrl     hs-url
-                                       :updatedAt (js/Date.now)}))))))))))
-
-
 
 
 (defn- load-sessions-impl []
@@ -183,14 +156,6 @@
                                   :storeId final-id})
       (save-raw-sessions-opfs! sessions))))
 
-#_(defn- clear-sw-vault-user! [user-id]
-  (let [request (.open js/indexedDB "sw-vault" 1)]
-    (set! (.-onsuccess request)
-          (fn [e]
-            (let [db (.. e -target -result)
-                  tx (.transaction db #js ["tokens"] "readwrite")
-                  store (.objectStore tx "tokens")]
-              (.delete store user-id))))))
 
 (defn- clear-session-impl! [user-id]
   (p/let [sessions (load-raw-sessions-opfs)
