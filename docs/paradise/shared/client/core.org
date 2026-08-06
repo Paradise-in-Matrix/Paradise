@@ -308,7 +308,7 @@ the standard boot strap.
        (when engine-id
          (<! (register-engine engine-id))
          (binding/set-active-engine! engine-id)
-         (engines/init-engine-streams! engine-id))
+         (streams/init-engine-streams! engine-id))
 
        (log/info "Cold boot sequence initiated. Targeting engine:" engine-id)
 
