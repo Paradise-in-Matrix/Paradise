@@ -3,6 +3,7 @@
    [re-frame.core :as rf]
    [re-frame.db :as rf-db]
    [paradise.ui.container.call.call-container :refer [primary-iframe-ref backup-iframe-ref]]
+   [paradise.ui.container.call.native :as native]
    [paradise.ui.container.call.call-view :as call-view]
    [taoensso.timbre :as log]
    [clojure.string :as str]
@@ -30,7 +31,7 @@
        {:db (assoc db :call base-call)
         :dispatch [:call/attach-window-listener]}))))
 
-(rf/reg-event-fx
+#_(rf/reg-event-fx
  :call/init-widget
  (fn [{:keys [db]} [_ room-id opts]]
    (let [active-iframe   (get-in db [:call :active-iframe])
@@ -41,6 +42,86 @@
                            (= (:primary iframes) room-id) :primary
                            (= (:backup iframes) room-id) :backup
                            :else nil)]
+
+     (if existing-iframe
+       {:db (-> db
+                (assoc-in [:call :visible-iframe] existing-iframe)
+                (assoc-in [:call :loading?] false)
+                (cond-> join-directly? (assoc-in [:call :active-room-id] room-id)))}
+       (let [target-iframe-key (if active-iframe
+                                 (if (= active-iframe :primary) :backup :primary)
+                                 (if (= visible-iframe :primary) :backup :primary))
+             target-iframe     (if (= target-iframe-key :primary) @primary-iframe-ref @backup-iframe-ref)
+             local-url         (str (.. js/window -location -origin) "/element-call/index.html")
+             pool              @state/!engine-pool]
+
+         (if-not pool
+           (do (log/error "Cannot init widget: No worker pool") {})
+           (go
+             (let [res (<! (main/do-with-pool! pool {:handler :init-call-widget
+                                                     :arguments {:room-id        room-id
+                                                                 :join-directly? join-directly?
+                                                                 :local-url      local-url}}))]
+               (if (= (:status res) "success")
+                 (let [raw-url        (:raw-url res)
+                       is-encrypted?  (:is-encrypted? res)
+                       actual-id      (str "element-call-" room-id)
+                       base           (str/replace raw-url #"\?.*$|\#.*$" "")
+                       intent-str     (if join-directly? "start_call" "join_existing")
+                       skip-lobby-str (if join-directly? "true" "false")
+                       widget-query   (str "?widgetId=" (js/encodeURIComponent actual-id)
+                                           "&parentUrl=" (js/encodeURIComponent (.. js/window -location -origin))
+                                           "&userId=" (js/encodeURIComponent (:user-id res))
+                                           "&deviceId=" (js/encodeURIComponent (:device-id res))
+                                           "&baseUrl=" (js/encodeURIComponent (get db :homeserver-url))
+                                           "&_t=" (.now js/Date))
+                       app-fragment   (str "#/?intent=" intent-str
+                                           "&skipLobby=" skip-lobby-str
+                                           "&roomId=" (js/encodeURIComponent room-id)
+                                           "&perParticipantE2EE=" (if is-encrypted? "true" "false")
+                                           "&theme=dark&lang=en")
+                       final-url      (str base widget-query app-fragment)]
+                   (set! (.-src target-iframe) "about:blank")
+                   (js/setTimeout #(set! (.-src target-iframe) final-url) 10)
+                   (rf/dispatch [:call/finalize-init room-id target-iframe-key is-encrypted? final-url join-directly?]))
+                 (log/error "Worker failed to init widget:" (:msg res))))))
+         {:db (assoc-in db [:call :loading?] true)})))))
+
+
+(rf/reg-event-fx
+ :call/init-widget
+ (fn [{:keys [db]} [_ room-id opts]]
+   (if native/call-plugin
+     (do
+(js/console.error "NOTIFY FOR PERMISSIONS")
+       (log/error "Should request permissions")
+       (-> (.requestMediaPermissions native/call-plugin)
+           (.then (fn []
+                    (rf/dispatch [:call/do-init-widget room-id opts])))
+           (.catch (fn [err]
+                     (log/error "Media permissions denied:" err)
+                     (rf/dispatch [:call/hangup {:room-id room-id :wipe-state? true}]))))
+       {:db (assoc-in db [:call :loading?] true)})
+     {:dispatch [:call/do-init-widget room-id opts]})))
+
+
+(rf/reg-event-fx
+ :call/do-init-widget
+ (fn [{:keys [db]} [_ room-id opts]]
+   (let [active-iframe   (get-in db [:call :active-iframe])
+         visible-iframe  (get-in db [:call :visible-iframe] :primary)
+         iframes         (get-in db [:call :iframes] {:primary nil :backup nil})
+         join-directly?  (:join-directly? opts true)
+         is-native-answered? (:is-native-answered? opts false)
+         existing-iframe (cond
+                           (= (:primary iframes) room-id) :primary
+                           (= (:backup iframes) room-id) :backup
+                           :else nil)]
+
+     (when (and join-directly? (not is-native-answered?))
+       (let [room-meta    (get-in db [:rooms :metadata room-id])
+             display-name (or (:name room-meta) "Paradise Call")]
+         (native/start-call! room-id display-name)))
 
      (if existing-iframe
        {:db (-> db
@@ -121,40 +202,47 @@
    (when-not @window-listener-attached?
      (reset! window-listener-attached? true)
      (.addEventListener js/window "message"
-       (fn [event]
-         (when (= (.-origin event) (.. js/window -location -origin))
-           (let [raw-data   (.-data event)
-                 action     (str (.-action raw-data))
-                 req-id     (.-requestId raw-data)
-                 widget-id  (.-widgetId raw-data)
-                 msg-string (js/JSON.stringify raw-data)]
+                        (fn [event]
+                          (when (= (.-origin event) (.. js/window -location -origin))
+                            (let [raw-data   (.-data event)
+                                  action     (str (.-action raw-data))
+                                  req-id     (.-requestId raw-data)
+                                  widget-id  (.-widgetId raw-data)
+                                  msg-string (js/JSON.stringify raw-data)]
 
-             (when (= action "io.element.device_mute")
-               (let [d (.-data raw-data)]
-                 (rf/dispatch [:call/update-media-state {:audio (.-audio_enabled d) :video (.-video_enabled d)}])))
+                              (when (= action "io.element.device_mute")
+                                (let [d (.-data raw-data)]
+                                  (rf/dispatch [:call/update-media-state {:audio (.-audio_enabled d) :video (.-video_enabled d)}])))
 
-             (when (or (= action "io.element.join")
-                       (and (= action "io.element.call.state")
-                            (let [st (.-state (.-data raw-data))] (or (= st "joined") (= st "connected")))))
-               (rf/dispatch [:call/widget-joined widget-id]))
+                              #_(when (or (= action "io.element.join")
+                                          (and (= action "io.element.call.state")
+                                               (let [st (.-state (.-data raw-data))] (or (= st "joined") (= st "connected")))))
+                                  (rf/dispatch [:call/widget-joined widget-id]))
 
-             (when (or (= action "io.element.close")
-                       (= action "im.vector.hangup")
-                       (and (= action "io.element.call.state")
-                            (let [st (.-state (.-data raw-data))]
-                              (or (= st "ended") (= st "left") (= st "disconnected")))))
-               (rf/dispatch [:call/handle-widget-hangup widget-id]))
-             (when (or (str/starts-with? action "io.element.")
-                       (str/starts-with? action "im.vector."))
-               (let [ack #js {:api       "toWidget"
-                              :action    action
-                              :requestId req-id
-                              :widgetId  widget-id
-                              :response  #js {}
-                              :data      #js {}}]
-                 (.postMessage (.-source event) ack "*")))
+                              (when (or (= action "io.element.join")
+                                        (and (= action "io.element.call.state")
+                                             (let [st (.-state (.-data raw-data))] (or (= st "joined") (= st "connected")))))
+                                (let [room-id (clojure.string/replace widget-id #"^element-call-" "")]
+                                  (native/report-connected! room-id))
+                                (rf/dispatch [:call/widget-joined widget-id]))
 
-             (if-let [pool @state/!engine-pool]
-               (main/do-with-pool! pool {:handler :send-widget-message :arguments {:msg-string msg-string}})
-               (log/error "No worker pool to route iframe message!")))))))
+                              (when (or (= action "io.element.close")
+                                        (= action "im.vector.hangup")
+                                        (and (= action "io.element.call.state")
+                                             (let [st (.-state (.-data raw-data))]
+                                               (or (= st "ended") (= st "left") (= st "disconnected")))))
+                                (rf/dispatch [:call/handle-widget-hangup widget-id]))
+                              (when (or (str/starts-with? action "io.element.")
+                                        (str/starts-with? action "im.vector."))
+                                (let [ack #js {:api       "toWidget"
+                                               :action    action
+                                               :requestId req-id
+                                               :widgetId  widget-id
+                                               :response  #js {}
+                                               :data      #js {}}]
+                                  (.postMessage (.-source event) ack "*")))
+
+                              (if-let [pool @state/!engine-pool]
+                                (main/do-with-pool! pool {:handler :send-widget-message :arguments {:msg-string msg-string}})
+                                (log/error "No worker pool to route iframe message!")))))))
    {}))
