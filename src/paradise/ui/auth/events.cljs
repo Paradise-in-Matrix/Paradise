@@ -3,7 +3,10 @@
             [reagent.core :as r]
             [paradise.shared.client.state :as state]
             [cljs-workers.core :as main]
+            [cljs-workers.mesh :as mesh]
             [cljs.core.async :refer [go <!]]
+            [paradise.binding.streams :as engines]
+            [paradise.binding.core :as binding]
             [paradise.shared.utils.macros :refer [defui]]
             [paradise.shared.client.session-store :as store]
             [paradise.shared.utils.svg :as icons]
@@ -37,35 +40,44 @@
 
 (re-frame/reg-event-fx
  :auth/login
- (fn [{:keys [db]} [_ hs user pass]]
+ (fn [{:keys [db]} [_ engine-id hs user pass]]
+   (binding/set-active-engine! engine-id)
    (if-let [pool @state/!engine-pool]
      (go
        (try
          (let [res (<! (main/do-with-pool! pool {:handler :login
                                                  :arguments {:hs hs
                                                              :user user
-                                                             :pass pass}}))]
-           (if (= (:status res) "success")
+                                                             :pass pass}}))
+               status-kw (keyword (:status res))]
+           (if (= status-kw :success)
              (re-frame/dispatch [:auth/login-success
                                  (assoc res :credentials {:homeserver hs
                                                           :username user
-                                                          :password pass})])
+                                                          :password pass}
+                                        :engine-id engine-id)])
              (re-frame/dispatch [:auth/login-failure (:msg res)])))
          (catch :default e
            (re-frame/dispatch [:auth/login-failure (str e)]))))
      (log/error "Cannot login: Engine pool not initialized"))
 
    {:db (assoc db :auth-status :authenticating
-                  :login-error nil)}))
+               :login-error nil)}))
+
 
 (re-frame/reg-event-fx
  :auth/login-success
- (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials]}]]
+ (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials engine-id]}]]
    (when session-data
      (register-sw!)
      (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data))
-     (store/set-setting! "last_active_user" user-id))
-   (log/info "Login successful for:" user-id)
+     (store/set-setting! "last_active_user" user-id)
+     (store/set-setting! "last-active-engine" (name engine-id)))
+
+
+   (when engine-id
+     (engines/init-engine-streams! engine-id))
+
    (let [actual-hs-url (or (:homeserverUrl session-data) hs-url)]
      {:db (cond-> (assoc db
                          :auth-status :logged-in
@@ -81,7 +93,7 @@
             (and credentials session-data)
             (conj [:dispatch [:push/create-sleepy-shadow
                               (assoc credentials :homeserver actual-hs-url
-                                                 :userId user-id)]]))})))
+                                     :userId user-id)]]))})))
 
 (re-frame/reg-sub
  :auth/active-user-id
@@ -190,7 +202,7 @@
                   (log/info "All databases destroyed. Reloading...")
                   (.reload js/window.location)))))))
 
-(defui login-field [{:keys [id label type value on-change disabled]}]
+(defn ^:ui login-field [{:keys [id label type value on-change disabled]}]
   [:div.field-group.mb-4
    [:label.field-label {:for id} label]
    [:input.field-input
@@ -200,8 +212,9 @@
      :on-change on-change
      :disabled disabled}]])
 
-(defui login-screen []
-  (let [fields (r/atom {:hs (or js/process.env.MATRIX_HOMESERVER "https://matrix.org")
+(defn ^:ui login-screen []
+  (let [fields (r/atom {:engine nil
+                        :hs (or js/process.env.MATRIX_HOMESERVER "https://matrix.org")
                         :user ""
                         :pass ""})]
     (fn []
@@ -209,7 +222,9 @@
             error    @(re-frame/subscribe [:auth/error])
             status   @(re-frame/subscribe [:auth/status])
             accounts @(re-frame/subscribe [:settings/available-accounts])
-            auth?    (= status :authenticating)]
+            auth?    (= status :authenticating)
+            current-engine (:engine @fields)
+            submit-disabled? (or auth? (nil? current-engine))]
         [:div.auth-page-container
          [:div.auth-card
           [:div.auth-header
@@ -240,22 +255,46 @@
           [:form.auth-form
            {:on-submit (fn [e]
                          (.preventDefault e)
-                         (re-frame/dispatch [:auth/login (:hs @fields) (:user @fields) (:pass @fields)]))}
+                         (when current-engine
+                           (re-frame/dispatch [:auth/login current-engine (:hs @fields) (:user @fields) (:pass @fields)])))}
 
-           [login-field
-            {:id "hs" :label (tr [:auth.labels/homeserver]) :value (:hs @fields)
-             :disabled auth? :on-change #(swap! fields assoc :hs (.. % -target -value))}]
+           [:div.field-group.mb-4
+            [:label.field-label {:for "engine-select"} "Protocol Engine"]
+            [:select.field-input
+             {:id "engine-select"
+              :value (if current-engine (name current-engine) "")
+              :disabled auth?
+              :on-change (fn [e]
+                           (let [val (.. e -target -value)
+                                 kw-val (keyword val)]
+                             (swap! fields assoc :engine kw-val)
+                             (when (seq val)
+                               (re-frame/dispatch [:engine/load-protocol val]))))}
+             [:option {:value "" :disabled true} "Select a protocol..."]
+             [:option {:value "matrix"} "Matrix"]
+             [:option {:value "discord"} "Discord"]
+             [:option {:value "nostr"} "Nostr"]]]
 
-           [login-field
-            {:id "user" :label (tr [:auth.labels/username]) :value (:user @fields)
-             :disabled auth? :on-change #(swap! fields assoc :user (.. % -target -value))}]
+           (when (= current-engine :matrix)
+             [login-field
+              {:id "hs" :label (tr [:auth.labels/homeserver]) :value (:hs @fields)
+               :disabled auth? :on-change #(swap! fields assoc :hs (.. % -target -value))}])
 
-           [login-field
-            {:id "pass" :label (tr [:auth.labels/password]) :type "password" :value (:pass @fields)
-             :disabled auth? :on-change #(swap! fields assoc :pass (.. % -target -value))}]
+           (when current-engine
+             [:<>
+              [login-field
+               {:id "user"
+                :label (if (= current-engine :matrix) (tr [:auth.labels/username]) "Authentication Token / Key")
+                :value (:user @fields)
+                :disabled auth? :on-change #(swap! fields assoc :user (.. % -target -value))}]
+
+              (when (= current-engine :matrix)
+                [login-field
+                 {:id "pass" :label (tr [:auth.labels/password]) :type "password" :value (:pass @fields)
+                  :disabled auth? :on-change #(swap! fields assoc :pass (.. % -target -value))}])])
 
            [:button.btn-primary.w-full
-            {:type "submit" :disabled auth?}
+            {:type "submit" :disabled submit-disabled?}
             (if auth?
               (tr [:auth.actions/logging-in])
               (tr [:auth.actions/login]))]
