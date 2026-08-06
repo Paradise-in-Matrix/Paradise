@@ -78,14 +78,20 @@ Probably needs a better name (and logical grouping)
    {:db (assoc db :auth-status :authenticating
                :login-error nil)}))
 
+
 (re-frame/reg-event-fx
  :auth/login-success
- (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials]}]]
+ (fn [{:keys [db]} [_ {:keys [user-id hs-url session-data credentials engine-id]}]]
    (when session-data
      (register-sw!)
      (set-auth-context! (:accessToken session-data) (:homeserverUrl session-data))
-     (store/set-setting! "last_active_user" user-id))
-   (log/info "Login successful for:" user-id)
+     (store/set-setting! "last_active_user" user-id)
+     (store/set-setting! "last-active-engine" (name engine-id)))
+
+
+   (when engine-id
+     (engines/init-engine-streams! engine-id))
+
    (let [actual-hs-url (or (:homeserverUrl session-data) hs-url)]
      {:db (cond-> (assoc db
                          :auth-status :logged-in
@@ -101,7 +107,7 @@ Probably needs a better name (and logical grouping)
             (and credentials session-data)
             (conj [:dispatch [:push/create-sleepy-shadow
                               (assoc credentials :homeserver actual-hs-url
-                                                 :userId user-id)]]))})))
+                                     :userId user-id)]]))})))
 
 (re-frame/reg-sub
  :auth/active-user-id
