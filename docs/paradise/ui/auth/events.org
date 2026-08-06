@@ -246,8 +246,9 @@ Probably needs a better name (and logical grouping)
 This needs to be broken up a good bit, but it'll suffice for now
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/ui/auth/events.cljs
-(defui login-screen []
-  (let [fields (r/atom {:hs (or js/process.env.MATRIX_HOMESERVER "https://matrix.org")
+(defn ^:ui login-screen []
+  (let [fields (r/atom {:engine nil
+                        :hs (or js/process.env.MATRIX_HOMESERVER "https://matrix.org")
                         :user ""
                         :pass ""})]
     (fn []
