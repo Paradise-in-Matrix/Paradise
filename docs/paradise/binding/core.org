@@ -1,0 +1,100 @@
+
+** Binding Core
+
+**** Preface
+
+As we've continued to build this glorified tech demo out we've found that
+we can continue to be more and more modular.
+It becomes abundantly clear that the 'engine' doesn't have to be the only
+applicable engine for the client. Instead, engines can and should be
+loadable similar to plugins.
+
+Now, since our UI mostly (should be entirely, but I will need to check)
+avoids any direct Matrix specific call... we can instead make a binding layer
+and map the old engine to that. From that binding layer we can create
+new mappings for other protocols even.
+
+Two that I have in mind are Nostr and Discord.
+We'll try to start with Nostr as the 'second' supported engine.
+
+
+An important consideration is that there will be UI components that functionally
+do not exist for other engines.
+Initially, the easiest way to support them is likely noop and just letting them
+do 'nothing'.
+Eventually though, since all methods are registered we can most likely use the
+engine load as the point to DELOAD the unused components.
+
+
+***** First tests
+
+Initially, we'll just hard connect the Matrix 'Engine' to our binding layer.
+Eventually, being able to select the engine at the login screen and in an
+ideal situation then we download the actual engine at that point.
+Some SDKs are rather... bulky and we'd like to keep our initial size...
+well we don't want it larger than it is.
+
+
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../../src/paradise/binding/core.cljs
+(ns paradise.binding.core
+  (:require [goog.object]
+            [taoensso.timbre :as log]
+            [cljs-workers.helpers :as workers-helpers]
+            ))
+#+end_src
+
+
+**** Dump
+
+#+begin_src clojurescript :tangle ../../../src/paradise/binding/core.cljs
+(defonce !stream-handlers (atom {}))
+
+(defn register-handlers!
+  "Allows an engine plugin to register its UI stream listeners."
+  [engine-id handlers]
+  (swap! !stream-handlers update engine-id merge handlers))
+
+
+(defonce !active-engine (atom nil))
+
+
+(defn handle-worker-stream! [data]
+  (let [is-map?       (map? data)
+        msg-type      (if is-map? (:type data) (goog.object/get data "type"))
+        raw-engine-id (if is-map? (get data :engine-id) (goog.object/get data "engine-id"))
+        engine-id     (keyword (or raw-engine-id @!active-engine))
+        get-val       (fn [k-str k-kw]
+                        (if is-map? (get data k-kw) (goog.object/get data k-str)))]
+    (if-let [handler (get-in @!stream-handlers [engine-id msg-type])]
+      (handler data get-val)
+      (when msg-type
+        (log/warn "Unhandled stream event:" msg-type "for engine:" engine-id)))))
+
+(defn set-active-engine! [engine-id]
+  (reset! !active-engine engine-id))
+
+(def internal-handlers #{:register-port :bind-app-db :register-engine})
+
+
+
+(defn rpc-interceptor [payload]
+  (if-let [handler (:handler payload)]
+    (if (or (namespace handler)
+            (internal-handlers handler)
+            (nil? @!active-engine))
+      payload
+      (assoc payload :handler (keyword (name @!active-engine) (name handler))))
+    payload)
+  )
+
+(defn init-middleware! []
+  (workers-helpers/set-request-interceptor! rpc-interceptor))
+#+end_src
+
+
+
+
