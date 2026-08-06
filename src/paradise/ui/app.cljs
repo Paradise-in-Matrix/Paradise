@@ -27,6 +27,7 @@
    [paradise.shared.plugin-storage]
    [paradise.ui.auth.events :refer [login-screen]]
    [paradise.ui.container.call.call-container :refer [persistent-call-container]]
+   [paradise.ui.container.call.native :refer [init-native-listeners!]]
    [paradise.shared.client.config :refer [load-config check-remote-version load-i18n eve-enabled?]]
    [paradise.shared.client.state :refer [!config]]
    [paradise.shared.client.session-store :as store]
@@ -376,11 +377,11 @@
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
   (init-eve)
+  (init-native-listeners!)
   (re-frame/dispatch [:app/thread-boot])
   (re-frame/dispatch [:app/load-settings-by-stage :boot])
   (re-frame/dispatch [:app/start-boot-sequence])
   (mount-root))
-
 
 (re-frame/reg-event-fx
  :app/start-boot-sequence
@@ -400,12 +401,13 @@
                      (.replaceState js/window.history #js {} "" (.. js/window -location -pathname)))
 
                    (p/let [saved-user (store/get-setting "last_active_user")]
-                     (re-frame/dispatch [:app/bootstrap saved-user]))
+                     (re-frame/dispatch [:app/cold-boot saved-user]))
 
                    (notifications/init!)
                    (js/setInterval #(re-frame/dispatch [:app/poll-version false]) (* 1000 60 15)))))
        (p/catch #(log/error "App initialization failed:" %)))
    {}))
+
 
 (re-frame/reg-event-db
  :nav/lock-deep-link
