@@ -317,6 +317,11 @@ the standard boot strap.
          (re-frame/dispatch [:auth/set-status :logged-out]))))
    {}))
 #+end_src
+
+
+
+
+
 ***** Start session
 Could probably be cleaner, but works for now.
 Basically here is where we go ahead and start initializing emotes and such for
@@ -336,6 +341,7 @@ the user.
 Provides the entry-point for the application that Vite and the index.html enter from.
 #+begin_src clojurescript  :tangle ../../../../src/paradise/shared/client/core.cljs
 (defn ^:export init []
+  (binding/init-middleware!)
   (init-worker!)
   (app/init)
   (logger/init!)
