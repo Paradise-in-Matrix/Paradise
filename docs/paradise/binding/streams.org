@@ -1,0 +1,22 @@
+
+** Streams Bindings
+
+**** Preface
+
+Mildly temporary until we better place these with the engine
+
+
+**** Dump
+
+#+begin_src clojurescript :tangle ../../../src/paradise/binding/streams.cljs
+(ns paradise.binding.streams
+  (:require [paradise.binding.matrix :as matrix]
+            [paradise.binding.nostr :as nostr]
+            ))
+
+(defn init-engine-streams! [engine-id]
+  (case (keyword engine-id)
+    :matrix (matrix/init!)
+    :nostr  (nostr/init!)
+    nil))
+#+end_src
