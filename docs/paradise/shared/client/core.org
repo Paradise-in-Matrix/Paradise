@@ -84,7 +84,10 @@ linked.
         me-port2 (.-port2 me-chan)
         db-chan  (js/MessageChannel.)
         db-port1 (.-port1 db-chan)
-        db-port2 (.-port2 db-chan)]
+        db-port2 (.-port2 db-chan)
+        ee-chan  (js/MessageChannel.)
+        ee-port1 (.-port1 ee-chan)
+        ee-port2 (.-port2 ee-chan)]
 
     (if eve-enabled?
       (main/do-with-pool! virtualizer-pool
@@ -144,9 +147,16 @@ linked.
     (main/do-with-pool! virtualizer-pool
                         {:handler   :register-port
                          :arguments {:identity-id :virtualizer-loopback :port vv-port2}
+                         :transfer  [:port]})
+
+    (main/do-with-pool! engine-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :engine-pool :port ee-port1}
+                         :transfer  [:port]})
+    (main/do-with-pool! engine-pool
+                        {:handler   :register-port
+                         :arguments {:identity-id :engine-loopback :port ee-port2}
                          :transfer  [:port]})))
-
-
 #+end_src
 
 
