@@ -1,0 +1,120 @@
+
+** Worker Core
+
+**** Preface
+
+As we've built this out it becomes apparent there would be a tangible gain to separating
+the behavior that is ONLY rust-sdk operations from the UI code.
+This would allow our start-up to feel much more instantaneous and incredibly more responsive.
+
+As far as documentation goes, some of it will be ported from the prior implementations location
+if applicable.
+
+Going beyond that. It makes sense to actually break the SDK away from the repo
+and instead bind it and reference it. This gives us a smoother experience
+and enables us to support multiple protocols and not just Matrix.
+
+
+**** Imports
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(ns paradise.engine.core
+  (:require [cljs.core.async :refer [go <!]]
+            [cljs-workers.worker :as worker]
+            [cljs-workers.mesh :as mesh]
+            [cljs.core.async.interop :refer-macros [<p!]]))
+#+end_src
+
+
+**** Registry
+
+We need to keep a registry of the engines, so we do so here
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(defonce !registry (atom {}))
+#+end_src
+
+
+***** Register
+
+Now to register and engine to the registry
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(defn register-engine! [id handler-map]
+  (swap! !registry assoc (keyword id) (js->clj handler-map :keywordize-keys true)))
+#+end_src
+
+
+**** Dynamic Runtime Engine Loading
+
+This is enables us to take a compiled JS bundle and ingest it to use the engine
+it is associated with.
+
+
+***** Fetch
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(defn fetch-engine-chunk! [url]
+  (js* "import(~{})" url))
+#+end_src
+
+
+
+***** Load
+
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(defn load-protocol-engine! [protocol]
+  (go
+    (try
+      (let [url (case protocol
+                  "nostr" "http://localhost:8081/plugin.js"
+                  "matrix"
+                  "http://localhost:8082/plugin.js"
+                  (throw (js/Error. (str "Unknown protocol: " protocol))))
+
+            module (<p! (fetch-engine-chunk! url))
+            bootstrap-fn (.-bootstrap module)]
+
+        (if bootstrap-fn
+          (bootstrap-fn register-engine!)
+          (js/console.error "Engine module did not export a bootstrap function:" protocol)))
+      (catch js/Error e
+        (js/console.error "External import failed:" e)))))
+#+end_src
+
+
+
+***** Register RPC
+
+This lets the engine be informed of what engine is being registered
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(worker/register :register-engine
+                 (fn [payload]
+                   (go
+                     (try
+                       (let [protocol-str (if (map? payload) (:engine-id payload) payload)]
+                         (if protocol-str
+                           (let [protocol-name (name protocol-str)]
+                             (<! (load-protocol-engine! protocol-name))
+                             (let [engine-map (get @!registry (keyword protocol-name))
+                                   preload-fn (:preload engine-map)]
+                               (when preload-fn
+                                 (preload-fn))
+                               {:status "success" :msg (str "Registered engine " protocol-name)}))
+                           {:status "error" :msg "No engine provided."}))
+                       (catch :default e
+                         (js/console.error "Engine Registration Crash:" e)
+                         {:status "error" :msg (.-message e)})))))
+#+end_src
+
+
+
+**** Thread Initialization
+
+This just kicks off the thread with the registered methods being processed
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(worker/bootstrap)
+#+end_src
