@@ -34,24 +34,26 @@ pieces.
 
 Now we want to just create a pool of one for the rust-sdk to execute on.
 
+We also want to create a media pool for decryption events (especially on iOS)
+and a pool for our virtualizer.
 
-Now we want to just create a pool of one for the rust-sdk to execute on.
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
 (defn init-worker! []
   (when-not @state/!engine-pool
     (reset! state/!engine-pool
             (main/create-pool 1 "engine.js"
                               {:worker-opts #js {:type "module"}
-                               :on-stream handle-worker-stream!})))
+                               :on-stream binding/handle-worker-stream!})))
   (when-not @state/!media-pool
     (reset! state/!media-pool
             (main/create-pool 3 "media.js"
                               {:worker-opts #js {:type "module"}})))
+
   (when-not @state/!virtualizer-pool
     (reset! state/!virtualizer-pool
             (main/create-pool 1 "virtualizer.js"
                               {:worker-opts #js {:type "module"}
-                               :on-stream handle-worker-stream!}))))
+                               :on-stream binding/handle-worker-stream!}))))
 #+end_src
 
 
