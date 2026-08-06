@@ -59,18 +59,21 @@
           "lambda-paths" lambda-paths}
      true)))
 
-(defn trigger-defer-check! []
-  (re-frame/clear-subscription-cache!)
-  (js/setTimeout
-   (fn []
-     (let [changed-ids (parsing/check-deferred-components!)]
-       (when (seq changed-ids)
-         (swap! parsing/!ast-node-cache #(apply dissoc % changed-ids))
-         (swap! parsing/!deferred-component-cache #(apply dissoc % changed-ids))
-         (doseq [r-id (keys @!room-events) src (keys (get @!room-events r-id))]
-           (recalculate-and-stream! r-id src)))))
-   0))
 
+(defonce !sync-timer (atom nil))
+
+(defn queue-defer-check! []
+  (when-let [t @!sync-timer]
+    (js/cancelAnimationFrame t))
+  (reset! !sync-timer
+          (js/requestAnimationFrame
+           (fn []
+             (let [changed-ids (parsing/check-deferred-components!)]
+               (when (seq changed-ids)
+                 (swap! parsing/!ast-node-cache #(apply dissoc % changed-ids))
+                 (swap! parsing/!deferred-component-cache #(apply dissoc % changed-ids))
+                 (doseq [r-id (keys @!room-events) src (keys (get @!room-events r-id))]
+                   (recalculate-and-stream! r-id src))))))))
 
 (defn process-timeline-redraw! []
   (parsing/flush-ast-cache!)
@@ -93,75 +96,65 @@
 
 
 (worker/register :bind-app-db
-  (fn [{:keys [eve-payload ports]}]
-    (let [mode          (keyword (:mode eve-payload))
-          initial-state (:initial-state eve-payload)
-          db-port       (first ports)]
-      (cond
-        (= mode :async)
-        (let [reader    (t/reader :json)
-              writer    (t/writer :json)
-              start-db  (if initial-state (t/read reader initial-state) {})
-              !local-db (atom start-db)]
-          (set! (.-onmessage db-port)
-                (fn [msg]
-                  (let [edits (t/read reader (.-data msg))]
-                    (reset! !applying-remote-patch? true)
-                    (try
-                      (swap! !local-db e/patch (edit/edits->script edits))
-                      (finally
-                        (reset! !applying-remote-patch? false))))))
+                 (fn [{:keys [eve-payload ports]}]
+                   (let [mode          (keyword (:mode eve-payload))
+                         initial-state (:initial-state eve-payload)
+                         db-port       (first ports)]
+                     (cond
+                       (= mode :async)
+                       (let [reader    (t/reader :json)
+                             writer    (t/writer :json)
+                             start-db  (if initial-state (t/read reader initial-state) {})
+                             !local-db (atom start-db)]
+                         (set! (.-onmessage db-port)
+                               (fn [msg]
+                                 (let [edits (t/read reader (.-data msg))]
+                                   (reset! !applying-remote-patch? true)
+                                   (try
+                                     (swap! !local-db e/patch (edit/edits->script edits))
+                                     (finally
+                                       (reset! !applying-remote-patch? false))))))
 
-          (add-watch !local-db :unified-ast-sync
-                     (fn [_ _ old-state new-state]
-                       (when-not @!applying-remote-patch?
-                         (let [edits (e/get-edits (e/diff old-state new-state {:algo :quick}))]
-                           (when (seq edits)
-                             (.postMessage db-port (t/write writer edits)))))
-                       (re-frame/clear-subscription-cache!)
-                       (js/setTimeout
-                        (fn []
-                          (let [changed-ids (parsing/check-deferred-components!)]
-                            (when (seq changed-ids)
-                              (swap! parsing/!ast-node-cache #(apply dissoc % changed-ids))
-                              (swap! parsing/!deferred-component-cache #(apply dissoc % changed-ids))
-                              (doseq [r-id (keys @!room-events) src (keys (get @!room-events r-id))]
-                                (recalculate-and-stream! r-id src)))))
-                        0)))
 
-          (db/set-eve-atom! !local-db)
-          {:status :db-bound-async})
 
-        :else
-        (let [root-sab      (:root-sab eve-payload)
-              rmap-sab      (:rmap-sab eve-payload)
-              slab-sabs     (:slab-sabs eve-payload)
-              atom-slot-idx (:atom-slot-idx eve-payload)]
-          (alloc/init-worker-slabs! slab-sabs root-sab nil)
-          (let [root-r       (mem/js-sab-region root-sab)
-                rmap-r       (mem/js-sab-region rmap-sab)
-                slot-idx     (ea/register-worker! {:root-r root-r} 2)
-                domain-state {:root-r root-r :rmap-r rmap-r :base-path nil
-                              :slot-idx slot-idx :retire-q (atom [])
-                              :flush-ts (doto (make-array 1) (aset 0 0))}
-                eve-atom     (ea/->MmapAtom domain-state atom-slot-idx)]
+                         (add-watch !local-db :unified-ast-sync
+                                    (fn [_ _ old-state new-state]
+                                      (when-not @!applying-remote-patch?
+                                        (let [edits (e/get-edits (e/diff old-state new-state {:algo :quick}))]
+                                          (when (seq edits)
+                                            (.postMessage db-port (t/write writer edits)))))
+                                      (re-frame/clear-subscription-cache!)
+                                      (queue-defer-check!)))
 
-            (add-watch eve-atom :timeline-sync-watch
-                       (fn [_ _ old-state new-state]
-                         (re-frame/clear-subscription-cache!)
-                         (js/setTimeout
-                          (fn []
-                            (let [changed-ids (parsing/check-deferred-components!)]
-                              (when (seq changed-ids)
-                                (swap! parsing/!ast-node-cache #(apply dissoc % changed-ids))
-                                (swap! parsing/!deferred-component-cache #(apply dissoc % changed-ids))
-                                (doseq [r-id (keys @!room-events) src (keys (get @!room-events r-id))]
-                                  (recalculate-and-stream! r-id src)))))
-                          0)))
+                         (db/set-eve-atom! !local-db)
+                         {:status :db-bound-async})
 
-            (db/set-eve-atom! eve-atom)
-            (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
-            {:status :db-bound-sab}))))))
+                       :else
+                       (let [root-sab      (:root-sab eve-payload)
+                             rmap-sab      (:rmap-sab eve-payload)
+                             slab-sabs     (:slab-sabs eve-payload)
+                             atom-slot-idx (:atom-slot-idx eve-payload)]
+                         (alloc/init-worker-slabs! slab-sabs root-sab nil)
+                         (let [root-r       (mem/js-sab-region root-sab)
+                               rmap-r       (mem/js-sab-region rmap-sab)
+                               slot-idx     (ea/register-worker! {:root-r root-r} 2)
+                               domain-state {:root-r root-r :rmap-r rmap-r :base-path nil
+                                             :slot-idx slot-idx :retire-q (atom [])
+                                             :flush-ts (doto (make-array 1) (aset 0 0))}
+                               eve-atom     (ea/->MmapAtom domain-state atom-slot-idx)]
+
+                           (add-watch eve-atom :timeline-sync-watch
+                                      (fn [_ _ old-state new-state]
+                                        (re-frame/clear-subscription-cache!)
+                                        (queue-defer-check!)))
+
+
+                           (db/set-eve-atom! eve-atom)
+                           (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
+                           {:status :db-bound-sab}))))))
+
+
+
 
 (worker/register :recalculate-timeline
                  (fn [{:keys [room-id]}]
@@ -170,11 +163,9 @@
                        (recalculate-and-stream! room-id source))
                      {:status :success})))
 
-
 (worker/register :set-viewport
                  (fn [{:keys [visible-ids]}]
                    (reset! parsing/!visible-active-ids (set visible-ids))
-                   (trigger-defer-check!)
                    {:status :success}))
 
 (worker/register :set-scrolling-state
@@ -182,15 +173,14 @@
                    (reset! parsing/!is-scrolling? scrolling?)
                    (when (and (not scrolling?) @parsing/!pending-defer-check?)
                      (reset! parsing/!pending-defer-check? false)
-                     (trigger-defer-check!))
+                     (queue-defer-check!))
                    {:status :success}))
 
-;; still using old call form
-;; need to globally update all to use mesh form
 (worker/register :update-layout-context
-                 (fn [{:keys [arguments]}]
-                   (let [{:keys [room-id width theme measured]} arguments
-                         old-ctx (get @!layout-context room-id)]
+                 (fn [{:keys [room-id width theme measured]}]
+                   (let  [old-ctx (get @!layout-context room-id)]
+
+      (js/console.log "[WORKER] Received layout context update. Total measured items:" (count measured))
                      (when (or (not= width (:width old-ctx)) (not= theme (:theme old-ctx)))
                        (reset! measurements/!pretext-cache {}))
 
@@ -208,6 +198,7 @@
                      (swap! !room-events assoc-in [room-id source] enriched-events)
                      (recalculate-and-stream! room-id source)
                      {:status :success})))
+
 
 (worker/register :recalculate-items
                  (fn [{:keys [room-id item-ids]}]
