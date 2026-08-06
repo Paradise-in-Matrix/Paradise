@@ -256,7 +256,9 @@ This needs to be broken up a good bit, but it'll suffice for now
             error    @(re-frame/subscribe [:auth/error])
             status   @(re-frame/subscribe [:auth/status])
             accounts @(re-frame/subscribe [:settings/available-accounts])
-            auth?    (= status :authenticating)]
+            auth?    (= status :authenticating)
+            current-engine (:engine @fields)
+            submit-disabled? (or auth? (nil? current-engine))]
         [:div.auth-page-container
          [:div.auth-card
           [:div.auth-header
@@ -287,22 +289,46 @@ This needs to be broken up a good bit, but it'll suffice for now
           [:form.auth-form
            {:on-submit (fn [e]
                          (.preventDefault e)
-                         (re-frame/dispatch [:auth/login (:hs @fields) (:user @fields) (:pass @fields)]))}
+                         (when current-engine
+                           (re-frame/dispatch [:auth/login current-engine (:hs @fields) (:user @fields) (:pass @fields)])))}
 
-           [login-field
-            {:id "hs" :label (tr [:auth.labels/homeserver]) :value (:hs @fields)
-             :disabled auth? :on-change #(swap! fields assoc :hs (.. % -target -value))}]
+           [:div.field-group.mb-4
+            [:label.field-label {:for "engine-select"} "Protocol Engine"]
+            [:select.field-input
+             {:id "engine-select"
+              :value (if current-engine (name current-engine) "")
+              :disabled auth?
+              :on-change (fn [e]
+                           (let [val (.. e -target -value)
+                                 kw-val (keyword val)]
+                             (swap! fields assoc :engine kw-val)
+                             (when (seq val)
+                               (re-frame/dispatch [:engine/load-protocol val]))))}
+             [:option {:value "" :disabled true} "Select a protocol..."]
+             [:option {:value "matrix"} "Matrix"]
+             [:option {:value "discord"} "Discord"]
+             [:option {:value "nostr"} "Nostr"]]]
 
-           [login-field
-            {:id "user" :label (tr [:auth.labels/username]) :value (:user @fields)
-             :disabled auth? :on-change #(swap! fields assoc :user (.. % -target -value))}]
+           (when (= current-engine :matrix)
+             [login-field
+              {:id "hs" :label (tr [:auth.labels/homeserver]) :value (:hs @fields)
+               :disabled auth? :on-change #(swap! fields assoc :hs (.. % -target -value))}])
 
-           [login-field
-            {:id "pass" :label (tr [:auth.labels/password]) :type "password" :value (:pass @fields)
-             :disabled auth? :on-change #(swap! fields assoc :pass (.. % -target -value))}]
+           (when current-engine
+             [:<>
+              [login-field
+               {:id "user"
+                :label (if (= current-engine :matrix) (tr [:auth.labels/username]) "Authentication Token / Key")
+                :value (:user @fields)
+                :disabled auth? :on-change #(swap! fields assoc :user (.. % -target -value))}]
+
+              (when (= current-engine :matrix)
+                [login-field
+                 {:id "pass" :label (tr [:auth.labels/password]) :type "password" :value (:pass @fields)
+                  :disabled auth? :on-change #(swap! fields assoc :pass (.. % -target -value))}])])
 
            [:button.btn-primary.w-full
-            {:type "submit" :disabled auth?}
+            {:type "submit" :disabled submit-disabled?}
             (if auth?
               (tr [:auth.actions/logging-in])
               (tr [:auth.actions/login]))]
