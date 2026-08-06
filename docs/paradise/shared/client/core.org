@@ -248,6 +248,32 @@ mechanism for multi-threaded communication.
 #+end_src
 
 
+***** Register Engine
+
+The protocol engine needs to be registered and the best place to land
+this method is here.
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
+(defn register-engine [protocol-str]
+  (go
+    (let [res (<! (mesh/do-with-thread! :engine-pool
+                                        {:handler :register-engine
+                                         :arguments {:engine-id protocol-str}}))]
+      (if (= "success" (:status res))
+        (js/console.log "Engine loaded successfully:" protocol-str)
+        (js/console.error "Failed to load engine:" (:msg res))))))
+#+end_src
+
+then a quick reframe event for the login to also register them on protocol selection
+
+#+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
+(re-frame/reg-event-fx
+ :engine/load-protocol
+ (fn [_ [_ protocol-str]]
+   (register-engine protocol-str)
+   {}))
+#+end_src
+
 ***** SDK Sync Kick Off
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
