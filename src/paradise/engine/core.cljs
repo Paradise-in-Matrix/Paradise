@@ -18,7 +18,7 @@
       (let [url (case protocol
                   "nostr" "http://localhost:8081/plugin.js"
                   "matrix"
-                  "http://localhost:8082/plugin.js"
+                  "https://paradise-chat.github.io/Matrix-Engine/plugin.js"
                   (throw (js/Error. (str "Unknown protocol: " protocol))))
 
             module (<p! (fetch-engine-chunk! url))
