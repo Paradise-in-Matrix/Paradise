@@ -63,100 +63,63 @@ linked.
 
 
 #+begin_src clojurescript :tangle ../../../../src/paradise/shared/client/core.cljs
+(defn connect-main-to-pool! [pool pool-id]
+  (let [chan (js/MessageChannel.)]
+    (mesh/register-thread! pool-id (.-port1 chan))
+    (main/do-with-pool! pool
+                        {:handler :register-port
+                         :arguments {:identity-id :main-thread :port (.-port2 chan)}
+                         :transfer [:port]})))
+
+(defn connect-pools! [pool-a id-a pool-b id-b]
+  (let [chan (js/MessageChannel.)]
+    (main/do-with-pool! pool-a
+                        {:handler :register-port
+                         :arguments {:identity-id id-b :port (.-port1 chan)}
+                         :transfer [:port]})
+    (main/do-with-pool! pool-b
+                        {:handler :register-port
+                         :arguments {:identity-id id-a :port (.-port2 chan)}
+                         :transfer [:port]})))
+
+(defn connect-loopback! [pool id-base loopback-id]
+  (let [chan (js/MessageChannel.)]
+    (main/do-with-pool! pool
+                        {:handler :register-port
+                         :arguments {:identity-id id-base :port (.-port1 chan)}
+                         :transfer [:port]})
+    (main/do-with-pool! pool
+                        {:handler :register-port
+                         :arguments {:identity-id loopback-id :port (.-port2 chan)}
+                         :transfer [:port]})))
+
+
 (defn bind-workers! [engine-pool media-pool virtualizer-pool app-db-payload]
-  (let [ev-chan  (js/MessageChannel.)
-        ev-port1 (.-port1 ev-chan)
-        ev-port2 (.-port2 ev-chan)
-        vm-chan  (js/MessageChannel.)
-        vm-port1 (.-port1 vm-chan)
-        vm-port2 (.-port2 vm-chan)
-        mv-chan  (js/MessageChannel.)
-        mv-port1 (.-port1 mv-chan)
-        mv-port2 (.-port2 mv-chan)
-        vv-chan  (js/MessageChannel.)
-        vv-port1 (.-port1 vv-chan)
-        vv-port2 (.-port2 vv-chan)
-        mm-chan  (js/MessageChannel.)
-        mm-port1 (.-port1 mm-chan)
-        mm-port2 (.-port2 mm-chan)
-        me-chan  (js/MessageChannel.)
-        me-port1 (.-port1 me-chan)
-        me-port2 (.-port2 me-chan)
-        db-chan  (js/MessageChannel.)
-        db-port1 (.-port1 db-chan)
-        db-port2 (.-port2 db-chan)
-        ee-chan  (js/MessageChannel.)
-        ee-port1 (.-port1 ee-chan)
-        ee-port2 (.-port2 ee-chan)]
-
-    (if eve-enabled?
+  (if eve-enabled?
+    (main/do-with-pool! virtualizer-pool
+                        {:handler :bind-app-db
+                         :arguments {:eve-payload app-db-payload}})
+    (let [db-chan (js/MessageChannel.)]
+      (db/set-async-broadcaster! (fn [payload] (.postMessage (.-port1 db-chan) payload)))
+      (set! (.-onmessage (.-port1 db-chan)) (fn [e] (db/apply-remote-patch! (.-data e))))
       (main/do-with-pool! virtualizer-pool
-                          {:handler   :bind-app-db
-                           :arguments {:eve-payload app-db-payload}})
-      (do
-        (db/set-async-broadcaster! (fn [payload] (.postMessage db-port1 payload)))
-        (set! (.-onmessage db-port1) (fn [e] (db/apply-remote-patch! (.-data e))))
+                          {:handler :bind-app-db
+                           :arguments {:eve-payload {:mode :async
+                                                     :initial-state (db/get-encoded-state)}
+                                       :port (.-port2 db-chan)}
+                           :transfer [(.-port2 db-chan)]})))
 
-        (main/do-with-pool! virtualizer-pool
-                            {:handler   :bind-app-db
-                             :arguments {:eve-payload {:mode :async
-                                                       :initial-state (db/get-encoded-state)}
-                                         :port        db-port2}
-                             :transfer  [:port]})))
+  (connect-main-to-pool! engine-pool :engine-pool)
+  (connect-main-to-pool! media-pool :media-pool)
+  (connect-main-to-pool! virtualizer-pool :virtualizer-pool)
 
-    (main/do-with-pool! engine-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :virtualizer-pool :port ev-port1}
-                         :transfer  [:port]})
-    (main/do-with-pool! virtualizer-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :engine-pool :port ev-port2}
-                         :transfer  [:port]})
+  (connect-pools! engine-pool :engine-pool virtualizer-pool :virtualizer-pool)
+  (connect-pools! media-pool :media-pool virtualizer-pool :virtualizer-pool)
 
-    (main/do-with-pool! media-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :virtualizer-pool :port vm-port1}
-                         :transfer  [:port]})
-    (main/do-with-pool! virtualizer-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :media-pool :port vm-port2}
-                         :transfer  [:port]})
+  (connect-loopback! virtualizer-pool :virtualizer-pool :virtualizer-loopback)
+  (connect-loopback! engine-pool :engine-pool :engine-loopback))
 
-    (mesh/register-thread! :media-pool mm-port1)
-    (main/do-with-pool! media-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :main-thread :port mm-port2}
-                         :transfer  [:port]})
 
-    (mesh/register-thread! :engine-pool me-port1)
-    (main/do-with-pool! engine-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :main-thread :port me-port2}
-                         :transfer  [:port]})
-
-    (mesh/register-thread! :virtualizer-pool mv-port1)
-    (main/do-with-pool! virtualizer-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :main-thread :port mv-port2}
-                         :transfer  [:port]})
-
-    (main/do-with-pool! virtualizer-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :virtualizer-pool :port vv-port1}
-                         :transfer  [:port]})
-    (main/do-with-pool! virtualizer-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :virtualizer-loopback :port vv-port2}
-                         :transfer  [:port]})
-
-    (main/do-with-pool! engine-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :engine-pool :port ee-port1}
-                         :transfer  [:port]})
-    (main/do-with-pool! engine-pool
-                        {:handler   :register-port
-                         :arguments {:identity-id :engine-loopback :port ee-port2}
-                         :transfer  [:port]})))
 #+end_src
 
 
