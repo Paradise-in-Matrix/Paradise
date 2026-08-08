@@ -10,8 +10,10 @@
         reagent/reagent {:mvn/version "2.0.1"}
         com.taoensso/tempura {:mvn/version "1.5.4"}
         re-frame/re-frame {:mvn/version "1.4.4"}
-        eve/eve {:git/url "https://github.com/Paradise-Chat/eve"
-                 :git/sha "1809878e5265e34fc65bba2a00feabd3065340d4"}
+
+        ;; Wonderful idea limited by Android Webviews.
+        ;;        eve/eve {:git/url "https://github.com/Paradise-Chat/eve"
+        ;;                 :git/sha "1809878e5265e34fc65bba2a00feabd3065340d4"}
         paradise/virtualizer {:git/url "https://github.com/Paradise-Chat/Virtualizer.git"
                               :git/sha "2d560a54e88d1aa9f7434543a3e05c4f72e7859e"}
 ;;        paradise/matrix-engine {:local/root "../Matrix-Engine"}
