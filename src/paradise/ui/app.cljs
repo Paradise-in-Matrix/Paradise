@@ -7,10 +7,6 @@
    [re-frame.db :as db]
    [paradise.shared.client.state :as state]
    [reagent.core :as r]
-   [eve.alpha :as eve]
-   [eve.atom :as ea]
-   [eve.mem :as mem]
-   [eve.deftype-proto.alloc :as alloc]
    [reagent.dom.client :as rdom]
    [paradise.ui.navigation.spaces.bar :refer [spaces-sidebar]]
    [paradise.shared.client.key-handler :refer [global-key-listener]]
@@ -163,7 +159,7 @@
 (defonce !tr-cache (atom {:locale nil :is-empty? true :fn nil}))
 
 
-#_(re-frame/reg-sub
+(re-frame/reg-sub
  :i18n/tr
  :<- [:i18n/locale]
  :<- [:i18n/dictionary]
@@ -171,26 +167,6 @@
    (if (empty? dictionary)
      (fn [k & _] (str "[" (name (last k)) "]"))
      (partial tempura/tr {:dict dictionary} [locale :en]))))
-
-;; May need to check the above and ensure it is stable in the app-db impl
-
-(re-frame/reg-sub
- :i18n/tr
- :<- [:i18n/locale]
- :<- [:i18n/dictionary]
- (fn [[locale dictionary] _]
-   (let [{old-locale :locale old-empty? :is-empty? cached-fn :fn} @!tr-cache
-         dict-empty? (empty? dictionary)]
-     (if (and (= locale old-locale) (= dict-empty? old-empty?) cached-fn)
-       cached-fn
-       (let [native-dict (if (satisfies? eve.map/EveHashMap dictionary)
-                           (eve.atom/eve->cljs dictionary)
-                           dictionary)
-             new-fn (if dict-empty?
-                      (fn [k & _] (str "[" (name (last k)) "]"))
-                      (partial tempura/tr {:dict native-dict} [locale :en]))]
-         (reset! !tr-cache {:locale locale :is-empty? dict-empty? :fn new-fn})
-         new-fn)))))
 
 (re-frame/reg-event-db
  :i18n/set-dictionary
@@ -351,32 +327,9 @@
     (init-capacitor-listeners!)
     (.render @root (r/as-element [main-layout]))))
 
-(defn get-eve-worker-payload [eve-atom]
-      (let [ds       (.-domain-state ^js eve-atom)
-            transfer (eve/sab-transfer-data eve-atom)]
-        {:root-sab      (:root-sab ds)
-         :rmap-sab      (:rmap-sab ds)
-         :slab-sabs     (:slab-sabs transfer)
-         :atom-slot-idx (.-atom-slot-idx ^js eve-atom)}))
-
-(defn init-eve []
-      (when eve-enabled?
-      (alloc/init! :capacities {0 50000
-                                1 50000
-                                2 25000
-                                3 25000
-                                4 10000
-                                5 10000})
-      (let [eve-db (ea/atom {})
-            full-payload (get-eve-worker-payload eve-db)]
-        (reset! state/!shared-app-db eve-db)
-        (reset! state/!eve-app-db-payload full-payload)
-        (re-frame.db/set-eve-atom! eve-db))))
-
 
 (defn ^:export init []
   (re-frame/dispatch-sync [:initialize-db])
-  (init-eve)
   (init-native-listeners!)
   (re-frame/dispatch [:app/thread-boot])
   (re-frame/dispatch [:app/load-settings-by-stage :boot])
