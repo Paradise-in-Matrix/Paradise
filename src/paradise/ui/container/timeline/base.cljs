@@ -7,7 +7,6 @@
             [cljs-workers.mesh :as mesh]
             [cljs.core.async :refer [go <!]]
             [reagent.core :as r]
-            [eve.atom :as ea]
             [goog.object]
             [paradise.shared.client.state :as state]
             [reagent.dom.client :as rdom]
