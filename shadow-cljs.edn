@@ -12,10 +12,8 @@
         :output-dir "build"
         :asset-path "/"
         :modules {:base {:entries []}
-                  :eve-shared {:entries [eve.alpha]
-                               :depends-on #{:base}}
                   :main {:entries [paradise.shared.client.core]
-                         :depends-on #{:eve-shared}
+                         :depends-on #{:base}
                          :exports {init paradise.shared.client.core/init}}
                   :sw {:entries [service-worker]
                        :web-worker true
@@ -34,7 +32,7 @@
 
                   :virtualizer {:entries [paradise.virtualizer.base]
                                 :web-worker true
-                                :depends-on #{:eve-shared}}}
+                                :depends-on #{:base}}}
         :js-options
         {:js-provider :import
          :esm-js-shim false
