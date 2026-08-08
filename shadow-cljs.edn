@@ -11,29 +11,30 @@
                       [build-hooks/copy-element-call]]
         :output-dir "build"
         :asset-path "/"
-        :modules {:base   {:entries []}
+        :modules {:base {:entries []}
                   :eve-shared {:entries [eve.alpha]
                                :depends-on #{:base}}
-                  :main   {:entries [paradise.shared.client.core]
-                           :depends-on #{:eve-shared}
-                           :exports {init paradise.shared.client.core/init}}
-                  :sw     {:entries [service-worker]
-                           :web-worker true
-                           :depends-on #{:base}}
-                  ;; exists solely for decryption
+                  :main {:entries [paradise.shared.client.core]
+                         :depends-on #{:eve-shared}
+                         :exports {init paradise.shared.client.core/init}}
+                  :sw {:entries [service-worker]
+                       :web-worker true
+                       :depends-on #{:base}}
                   :media {:entries [paradise.media.core]
                           :web-worker true
                           :depends-on #{:base}}
                   :engine {:entries [paradise.engine.core]
                            :web-worker true
-                           :depends-on #{:base}
-                           #_#{:eve-shared}
+                           :depends-on #{:base}}
+;;                  :engine-matrix {:entries [paradise.engine.matrix.core]
+;;                                  :web-worker true
+;;                                  :depends-on #{:engine}
+;;                                  :exports {init paradise.engine.matrix.core/bootstrap}
+;;                                  }
 
-                           }
                   :virtualizer {:entries [paradise.virtualizer.base]
                                 :web-worker true
                                 :depends-on #{:eve-shared}}}
-
         :js-options
         {:js-provider :import
          :esm-js-shim false
