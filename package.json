@@ -32,7 +32,6 @@
         "electron:make": "npm run electron:make --prefix electron",
         "guix:electron:make": "guix shell -FCN -m ./electron-manifest.scm -- npm run electron:make --prefix electron"
     },
-
     "dependencies": {
         "@capacitor-community/electron": "^5.0.1",
         "@capacitor/android": "^8.4.1",
@@ -48,14 +47,13 @@
         "@tiptap/core": "^3.20.0",
         "@tiptap/extension-mention": "^3.20.0",
         "@tiptap/extension-placeholder": "^3.20.0",
-        "@tiptap/suggestion": "^3.20.0",
         "@tiptap/react": "^3.20.0",
         "@tiptap/starter-kit": "^3.20.0",
+        "@tiptap/suggestion": "^3.20.0",
         "@xmldom/xmldom": "^0.9.10",
         "emojibase-data": "^17.0.0",
-        "ffi-bindings": "^1.0.6",
-        "matrix-widget-api": "^1.17.0",
         "eve-native": "github:SeniorCareMarket/eve",
+        "matrix-widget-api": "^1.17.0",
         "nbb": "^1.4.206",
         "react": "^19",
         "react-dom": "^19",
