@@ -14,8 +14,11 @@
                  :git/sha "1809878e5265e34fc65bba2a00feabd3065340d4"}
         paradise/virtualizer {:git/url "https://github.com/Paradise-Chat/Virtualizer.git"
                               :git/sha "2d560a54e88d1aa9f7434543a3e05c4f72e7859e"}
+;;        paradise/matrix-engine {:local/root "../Matrix-Engine"}
+
         jtk-dvlp/cljs-workers {:git/url "https://github.com/Paradise-Chat/cljs-workers.git"
                                :git/sha "9d52ca9097702ae640836b9b299a5720f312868a"}
+;;        jtk-dvlp/cljs-workers {:local/root "../cljs-workers"}
         org.babashka/sci {:mvn/version "0.12.51"}
         org.babashka/sci.configs {:git/url "https://github.com/babashka/sci.configs"
                                   :git/sha "a785be2090991bf99ddc1c8cb4923a7217f6e098"}
