@@ -1,9 +1,11 @@
 (ns paradise.shared.utils.macros
-  (:require [clojure.java.io :as io]
-            [clojure.edn :as edn]
-            [cljs.analyzer.api :as ana]
-            [cljs.env :as env]
-            ))
+  (:require
+   [clojure.string :as str]
+   [clojure.java.io :as io]
+   [clojure.edn :as edn]
+   [cljs.analyzer.api :as ana]
+   [cljs.env :as env]
+   ))
 
 (defmacro ocall
   [obj method & args]
@@ -35,6 +37,11 @@
          (clojure.core/aset f# "$env" ~env-map)
          f#))))
 
+
+(defmacro export-engine [protocol-name bootstrap-fn]
+  (let [prop-name  (str (str/capitalize (name protocol-name)) "EngineBootstrap")
+        global-sym (symbol "js" (str "globalThis." prop-name))]
+    `(set! ~global-sym ~bootstrap-fn)))
 
 (defmacro defoverride [comp-name args & body]
   (let [comp-str  (name comp-name)
