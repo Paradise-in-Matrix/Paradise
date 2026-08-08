@@ -17,7 +17,6 @@ const copyFiles = {
             ),
             dest: "element-call",
         },
-
         {
             src: path.resolve(
                 __dirname,
@@ -59,8 +58,6 @@ export default defineConfig(({ mode }) => {
                     return false;
                 },
             }),
-            //  topLevelAwait(),
-
             viteStaticCopy(copyFiles),
             VitePWA({
                 strategies: "injectManifest",
@@ -73,7 +70,7 @@ export default defineConfig(({ mode }) => {
                     swSrc: "./sw.js",
                     swDest: "./dist/sw.js",
                     globIgnores: ["**/*.wasm", "**/element-call/assets/*"],
-                    maximumFileSizeToCacheInBytes: 10485760,
+                    maximumFileSizeToCacheInBytes: 25 * 1024 * 1024,
                 },
                 devOptions: {
                     enabled: false,
@@ -176,7 +173,6 @@ export default defineConfig(({ mode }) => {
                     __dirname,
                     "./node_modules/react/jsx-dev-runtime"
                 ),
-                //      '/element-call': path.resolve(__dirname, './node_modules/@element-hq/element-call-embedded')
             },
         },
 
@@ -187,8 +183,6 @@ export default defineConfig(({ mode }) => {
             headers: {
                 "Cross-Origin-Opener-Policy": "unsafe-none",
                 "Cross-Origin-Embedder-Policy": "unsafe-none",
-                //"Cross-Origin-Opener-Policy": "same-origin",
-                //"Cross-Origin-Embedder-Policy": "credentialless",
             },
             fs: {
                 allow: [
