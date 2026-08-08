@@ -1,32 +1,43 @@
 (ns paradise.engine.core
-  (:require [cljs.core.async :refer [go <!]]
-            [cljs-workers.worker :as worker]
-            [cljs-workers.mesh :as mesh]
-            [cljs.core.async.interop :refer-macros [<p!]]))
+  (:require
+   [clojure.string :as str]
+   [cljs.core.async :refer [go <!]]
+   [cljs-workers.worker :as worker]
+   [goog.object :as gobj]
+   [paradise.shared.utils.macros :refer [config]]
+   [cljs.core.async.interop :refer-macros [<p!]]
+   [shadow.esm :refer [dynamic-import]]))
 
 (defonce !registry (atom {}))
 
 (defn register-engine! [id handler-map]
   (swap! !registry assoc (keyword id) (js->clj handler-map :keywordize-keys true)))
 
-(defn fetch-engine-chunk! [url]
-  (js* "import(~{})" url))
+(defn get-engine-url [protocol]
+  (when-let [paths (get config protocol)]
+    (if ^boolean goog.DEBUG
+      (:dev paths)
+      (:prod paths))))
+
+(defn get-fallback-bootstrap [protocol]
+  (let [prop-name (str (str/capitalize protocol) "EngineBootstrap")]
+    (gobj/get js/globalThis prop-name)))
 
 (defn load-protocol-engine! [protocol]
   (go
     (try
-      (let [url (case protocol
-                  "nostr" "http://localhost:8081/plugin.js"
-                  "matrix"
-                  "https://paradise-chat.github.io/Matrix-Engine/plugin.js"
-                  (throw (js/Error. (str "Unknown protocol: " protocol))))
-
-            module (<p! (fetch-engine-chunk! url))
-            bootstrap-fn (.-bootstrap module)]
-
-        (if bootstrap-fn
-          (bootstrap-fn register-engine!)
-          (js/console.error "Engine module did not export a bootstrap function:" protocol)))
+      (let [url (get-engine-url protocol)]
+        (if-not url
+          (throw (js/Error. (str "Unknown protocol: " protocol)))
+          (let [module (<p! (dynamic-import url))
+                bootstrap-fn (or (.-bootstrap module)
+                                 (.-init module)
+                                 (some-> module .-default .-bootstrap)
+                                 (some-> module .-default .-init)
+                                 (get-fallback-bootstrap protocol))]
+            (if bootstrap-fn
+              (bootstrap-fn register-engine!)
+              (js/console.error "Engine module did not export a bootstrap function:" protocol)))))
       (catch js/Error e
         (js/console.error "External import failed:" e)))))
 
