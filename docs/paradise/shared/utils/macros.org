@@ -71,6 +71,11 @@ registry of components instead of manually aggregating them.
          f#))))
 
 
+(defmacro export-engine [protocol-name bootstrap-fn]
+  (let [prop-name  (str (str/capitalize (name protocol-name)) "EngineBootstrap")
+        global-sym (symbol "js" (str "globalThis." prop-name))]
+    `(set! ~global-sym ~bootstrap-fn)))
+
 (defmacro defoverride [comp-name args & body]
   (let [comp-str  (name comp-name)
         local-sym (symbol comp-str)]
