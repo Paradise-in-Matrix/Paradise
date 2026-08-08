@@ -67,11 +67,7 @@
                          :transfer [:port]})))
 
 
-(defn bind-workers! [engine-pool media-pool virtualizer-pool app-db-payload]
-  (if eve-enabled?
-    (main/do-with-pool! virtualizer-pool
-                        {:handler :bind-app-db
-                         :arguments {:eve-payload app-db-payload}})
+(defn bind-workers! [engine-pool media-pool virtualizer-pool]
     (let [db-chan (js/MessageChannel.)]
       (db/set-async-broadcaster! (fn [payload] (.postMessage (.-port1 db-chan) payload)))
       (set! (.-onmessage (.-port1 db-chan)) (fn [e] (db/apply-remote-patch! (.-data e))))
@@ -80,7 +76,7 @@
                            :arguments {:eve-payload {:mode :async
                                                      :initial-state (db/get-encoded-state)}
                                        :port (.-port2 db-chan)}
-                           :transfer [(.-port2 db-chan)]})))
+                           :transfer [(.-port2 db-chan)]}))
 
   (connect-main-to-pool! engine-pool :engine-pool)
   (connect-main-to-pool! media-pool :media-pool)
@@ -94,40 +90,14 @@
 
 
 
-(extend-type eve.vec/EveVector
-  IReversible
-  (-rseq [coll]
-    (let [c (count coll)]
-      (when (pos? c)
-        (map #(nth coll %) (range (dec c) -1 -1))))))
-
-(extend-type eve.map/EveHashMap
-  IEquiv
-  (-equiv [this other]
-    (and (instance? eve.map/EveHashMap other)
-         (= (.-offset__ this) (.-offset__ other))))
-  IHash
-  (-hash [this]
-    (hash (.-offset__ this))))
-
-(extend-type eve.vec/EveVector
-  IEquiv
-  (-equiv [this other]
-    (and (instance? eve.vec/EveVector other)
-         (= (.-offset__ this) (.-offset__ other))))
-  IHash
-  (-hash [this]
-    (hash (.-offset__ this))))
-
 (re-frame/reg-event-fx
  :app/thread-boot
  (fn [_]
    (init-worker!)
-     (let [app-db-payload   @state/!eve-app-db-payload
-           engine-pool      @state/!engine-pool
+     (let [engine-pool      @state/!engine-pool
            media-pool       @state/!media-pool
            virtualizer-pool @state/!virtualizer-pool]
-       (bind-workers! engine-pool media-pool virtualizer-pool app-db-payload)
+       (bind-workers! engine-pool media-pool virtualizer-pool)
        )
    {}
    ))
