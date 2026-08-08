@@ -36,7 +36,7 @@
                                  (some-> module .-default .-init)
                                  (get-fallback-bootstrap protocol))]
             (if bootstrap-fn
-              (bootstrap-fn register-engine!)
+              (<! (bootstrap-fn register-engine!))
               (js/console.error "Engine module did not export a bootstrap function:" protocol)))))
       (catch js/Error e
         (js/console.error "External import failed:" e)))))
