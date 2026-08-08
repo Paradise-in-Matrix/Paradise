@@ -57,9 +57,29 @@ it is associated with.
 
 ***** Fetch
 
+This ensures that we provide the proper behavior depending on environment.
+The shadow-cljs docs clarify that goog.DEBUG is eliminate the goog.DEBUG
+entirely in release mode.
+
 #+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
-(defn fetch-engine-chunk! [url]
-  (js* "import(~{})" url))
+(defn get-engine-url [protocol]
+  (when-let [paths (get config protocol)]
+    (if ^boolean goog.DEBUG
+      (:dev paths)
+      (:prod paths))))
+#+end_src
+
+
+For dev we need to use the fallback trigger for the bootstrap since seem to be
+ignored for dev web worker modules. Not entirely sure why.
+
+We do ensure to keep it in a form so that it can remain ignorant of the
+actual protocol.
+
+#+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
+(defn get-fallback-bootstrap [protocol]
+  (let [prop-name (str (str/capitalize protocol) "EngineBootstrap")]
+    (gobj/get js/globalThis prop-name)))
 #+end_src
 
 
