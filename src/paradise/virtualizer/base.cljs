@@ -3,16 +3,11 @@
             [paradise.shared.sci-runner.virtualizer :as sci-runner]
             [taoensso.timbre :as log]
             [paradise.virtualizer.state :as state]
-            [eve.alpha :as eve]
-            [eve.atom :as ea]
-            [eve.mem :as mem]
             [re-frame.db :as db]
             [re-frame.core :as re-frame]
-            [eve.wasm-mem :as wasm-mem]
             [cognitect.transit :as t]
             [editscript.core :as e]
             [editscript.edit :as edit]
-            [eve.deftype-proto.alloc :as alloc]
             [goog.object]
             [paradise.ui.container.timeline.base]
             [paradise.ui.navigation.rooms.room-list]
@@ -130,28 +125,8 @@
                          {:status :db-bound-async})
 
                        :else
-                       (let [root-sab      (:root-sab eve-payload)
-                             rmap-sab      (:rmap-sab eve-payload)
-                             slab-sabs     (:slab-sabs eve-payload)
-                             atom-slot-idx (:atom-slot-idx eve-payload)]
-                         (alloc/init-worker-slabs! slab-sabs root-sab nil)
-                         (let [root-r       (mem/js-sab-region root-sab)
-                               rmap-r       (mem/js-sab-region rmap-sab)
-                               slot-idx     (ea/register-worker! {:root-r root-r} 2)
-                               domain-state {:root-r root-r :rmap-r rmap-r :base-path nil
-                                             :slot-idx slot-idx :retire-q (atom [])
-                                             :flush-ts (doto (make-array 1) (aset 0 0))}
-                               eve-atom     (ea/->MmapAtom domain-state atom-slot-idx)]
-
-                           (add-watch eve-atom :timeline-sync-watch
-                                      (fn [_ _ old-state new-state]
-                                        (re-frame/clear-subscription-cache!)
-                                        (queue-defer-check!)))
-
-
-                           (db/set-eve-atom! eve-atom)
-                           (js/setInterval #(ea/update-heartbeat! domain-state slot-idx) 5000)
-                           {:status :db-bound-sab}))))))
+                       nil
+                       ))))
 
 
 
