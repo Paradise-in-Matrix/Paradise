@@ -19,10 +19,14 @@ and enables us to support multiple protocols and not just Matrix.
 
 #+begin_src clojurescript :tangle ../../../src/paradise/engine/core.cljs
 (ns paradise.engine.core
-  (:require [cljs.core.async :refer [go <!]]
-            [cljs-workers.worker :as worker]
-            [cljs-workers.mesh :as mesh]
-            [cljs.core.async.interop :refer-macros [<p!]]))
+  (:require
+   [clojure.string :as str]
+   [cljs.core.async :refer [go <!]]
+   [cljs-workers.worker :as worker]
+   [goog.object :as gobj]
+   [paradise.shared.utils.macros :refer [config]]
+   [cljs.core.async.interop :refer-macros [<p!]]
+   [shadow.esm :refer [dynamic-import]]))
 #+end_src
 
 
