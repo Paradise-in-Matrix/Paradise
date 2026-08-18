@@ -40,6 +40,7 @@
         :compiler-options
         {:optimizations
          :simple
+         :pretty-print true
          :output-feature-set :es-next
          :warnings {:undeclared-ns false
                     :undeclared-var false
