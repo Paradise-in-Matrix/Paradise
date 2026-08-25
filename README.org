@@ -1,4 +1,4 @@
-#+TITLE: Paradise: A Literate CLJS-WASM Matrix Client
+#+TITLE: Paradise: A Literate CLJS Multi-Protocol Chat Client
 #+TEXINFO_FILENAME: matrix-cljs.info
 #+TEXINFO_DIR_CATEGORY: Network Applications
 #+TEXINFO_DIR_TITLE: Matrix-CLJS
@@ -9,29 +9,64 @@
 
 
 **** What is Paradise?
-Intended to be both a lightweight CLJS-based Matrix client that uses the matrix-rust-sdk with WASM bindings.
+Initially designed as a modular Matrix client that used the matrix-rust-sdk with
+WASM bindings. It has evolved to leverage the very same modularity to go further
+and support other protocols through dynamically loaded pre-compiled engines.
 
-This is necessary to avoid rewriting logic that has complex implementations. Instead we should use the views described
-and expand on them via the lovely polymorphic options provided via ClojureScript.
+****** Highlights
 
-As a final design choice, we opt for using .org files to generate the actual ClojureScript files. Org-mode provides
-a clean way to document the methods without making the 'source' code a mess as we will auto-tangle the files.
+Since plugins can modify the UI or engine (or any thread namespace) at runtime,
+pre-compiled engines can even remove or add UI features relevant to the
+specific protocol by targeting the FQN of the method.
 
-This allows the process to be:
-Org file -> CLJS -> ShadowCLJS compiles -> Vite detects change -> Browser refresh
-So we still maintain a crisp developer experience while adding great depth to the documentation end.
+Every named method (and technically anonymous) is target-able by plugins. So
+effectively everything is modifiable.
+
+To prevent performance bottlenecks, we provide a custom virtual list
+implementation that enables offloading the rendering specific workload
+(not painting obviously) to a separate thread with a virtual dom.
+We then measure using Pretext to provide the main thread the measurements.
+This keeps the timeline smooth.
+
+iOS, Android, Web, and Desktop apps exist. Aiming to provide full functionality
+regardless of platform. Plugins work on all platforms as the app is effectively
+still a web app with a few native modifications. Plugins themselves are
+runtime scripts, so they don't violate any TOS with Google Play Store or
+Apple App Store.
 
 
 
-Goals for the client include creating a reusable base that can be built on top of and extended easily.
-Expanding on that we can then try to build out a full feature client. For the most part these will be React-based
-Reagent components in hiccup.
+Designed with org in mind, but the scope is messy. Currently engines need a proper binding
+layer and elegant documentation per protocol... This existed for Matrix, but will need to be
+cleaned up as the move to support multiple engines continues.
 
+Still, a tangler is supplied so that the source code can be clean. TODO for making the VS Code
+plugin, and docs on creating that exist in the Tangler org file itself.
+Emacs and Org-mode are very nice, and I recommend at least checking out Spacemacs.
 
-Now there is one feature we use to develop with that is only usable in one editor on the planet. Org-mode.
 It isn't practical to remake all of org-mode, but it might be worthwhile to build out tangling of .org files
 for VS Code or as a Clojure program embedded in the project. We don't want to limit the options of those who
 would help improve on Paradise.
+
+
+So with all that in mind our build process looks a bit like this:
+Org file -> CLJS file -> ShadowCLJS compiles - (Compiler modifications like lifting anonymous functions
+and registering existing functions) - normal CLJS compilation via Google Closure -> Vite detects change
+-> Browser refresh -> Plugins registered and evaluated using Small Clojure Interpreter
+
+
+So we still maintain a crisp developer experience while adding great depth to the documentation end.
+Documentation on the more complex bits exists in multiple places, so we'll avoid repeating here in
+the README.
+
+
+Main goals for the client include creating a reusable base that can be built on top of and extended easily.
+Expanding on that we can then try to build out a full feature client. For the most part these will be React-based
+Reagent components in Hiccup.
+I feel we've accomplished proof that an easy to modify ClojureScript client with all the runtime
+behaviors we want across all the platforms we sought.
+It is likely soon time to create a proper roadmap for the future for the project for visibility.
+That'll be linked here when that does exist.
 
 
 
@@ -54,8 +89,11 @@ protocol.
 
 
 ***** Set-up
-The Matrix Rust SDK WASM package is extracted from the repo for cleanliness. So the set-up is rather simple on
-most platforms.
+
+Engines are pre-compiled and provide their dependencies for us... so for Matrix the rust-sdk is left up
+to the relevant engine. This means our actual build process and run process is rather straight-forward.
+
+
 
 #+NAME: build-scripts
 #+begin_src sh :tangle build-all.sh :tangle-mode (identity #o755)
